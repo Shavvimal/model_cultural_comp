@@ -12,7 +12,7 @@ ivs_df = pd.read_pickle("../data/ivs_df.pkl")
 country_codes = pd.read_pickle("../data/country_codes.pkl")
 
 ############################################
-########Data Preperation#################
+######## Data Preperation  #################
 ############################################
 
 # Filtering data
@@ -29,7 +29,7 @@ subset_ivs_df = subset_ivs_df.rename(columns={'S020': 'year', 'S003': 'country_c
 subset_ivs_df = subset_ivs_df[subset_ivs_df["year"] >= 2005]
 
 ############################################
-########Data Pre-Processing ################
+######## Data Pre-Processing ###############
 ############################################
 
 # Scale the Data using the weights
@@ -124,20 +124,33 @@ plt.show()
 
 
 ############################################
-############# Visualization ################
+########## Visualization Prep ##############
 ############################################
 
-# SVM Plot
+# Create Training Data and Colour Maps
+vis_data = country_scores_pca.dropna()[["PC1_rescaled", "PC2_rescaled", "Cultural Region"]]
+# Add Numeric Label Column
+vis_data['label'] = pd.Categorical(vis_data['Cultural Region']).codes
+# Create Colour Map Dataframe from same vis_data
+# Get unique (label,  Cultural Region) pairs
+tups = vis_data[['label', 'Cultural Region']].drop_duplicates()
+# sort by label
+tups = tups.sort_values(by='label')
+# Join cultural_region_colors with tups
+tups['color'] = tups['Cultural Region'].map(cultural_region_colors)
+tups.reset_index(drop=True, inplace=True)
+cmap = mcolors.ListedColormap(tups['color'].values)
 
-x = country_scores_pca.dropna()['PC1_rescaled']
-y = country_scores_pca.dropna()['PC2_rescaled']
-all_cultural_regions = country_scores_pca.dropna()['Cultural Region']
-categories = pd.Categorical(all_cultural_regions).codes
-# create tuple of all_cultural_regions and categories
-cultural_region_map = dict(zip(categories, all_cultural_regions ))
 
-data = np.column_stack((x, y)).astype(float)
-labels = np.array(categories).astype(int)
+############################################
+########## Visualization (SVC) #############
+############################################
+
+x = vis_data['PC1_rescaled']
+y = vis_data['PC2_rescaled']
+train_data = np.column_stack((x, y)).astype(float)
+
+labels = np.array(vis_data['label']).astype(int)
 
 # Define the parameter grid
 param_grid_fine = {
@@ -151,28 +164,23 @@ svm = SVC()
 # Create a GridSearchCV object
 grid_search = GridSearchCV(svm, param_grid_fine, refit=True, verbose=2, cv=5)
 # Fit the model
-grid_search.fit(data, labels)
+grid_search.fit(train_data, labels)
 # Print the best parameters
 print("Best parameters found: ", grid_search.best_params_)
 # Use the best parameters to train the SVM
 best_svm = grid_search.best_estimator_
 # Fit the best model
-best_svm.fit(data, labels)
+best_svm.fit(train_data, labels)
 
 # Create a mesh grid
 h = .01  # step size in the mesh
-x_min, x_max = data[:, 0].min() - 1, data[:, 0].max() + 1
-y_min, y_max = data[:, 1].min() - 1, data[:, 1].max() + 1
+x_min, x_max = train_data[:, 0].min() - 1, train_data[:, 0].max() + 1
+y_min, y_max = train_data[:, 1].min() - 1, train_data[:, 1].max() + 1
 xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
 
 # Predict classifications for each point in the mesh
 Z = best_svm.predict(np.c_[xx.ravel(), yy.ravel()])
 Z = Z.reshape(xx.shape)
-
-# Create a colormap for the decision boundary
-unique_labels = np.unique(labels)
-colormap = [cultural_region_colors[cultural_region_map[label]] for label in unique_labels]
-cmap = mcolors.ListedColormap(colormap)
 
 # Plot the decision boundary using contourf
 plt.figure(figsize=(14, 10))
@@ -194,9 +202,110 @@ for region, color in cultural_region_colors.items():
 
 plt.xlabel('Survival vs. Self-Expression Values')
 plt.ylabel('Traditional vs. Secular Values')
-plt.title('Inglehart-Welzel Cultural Map with SVM Decision Boundary')
+plt.title('Inglehart-Welzel Cultural Map with SVM Decision Boundary (SVC)')
 
 # Add legend
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+############################################
+########## Visualization (RF) ##############
+############################################
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+# Define the RandomForest model
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(train_data, labels, test_size=0.2, random_state=42)
+
+# Fit the model
+rf.fit(X_train, y_train)
+
+# Predict the test set
+y_pred = rf.predict(X_test)
+
+# Print the classification report
+print(classification_report(y_test, y_pred))
+
+# Predict classifications for each point in the mesh
+Z = rf.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+# Plot the decision boundary using contourf
+plt.figure(figsize=(14, 10))
+plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+
+# Plot each cultural region with corresponding color and style
+for region, color in cultural_region_colors.items():
+    subset = country_scores_pca[country_scores_pca['Cultural Region'] == region]
+    for i, row in subset.iterrows():
+        if row['Islamic']:
+            plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10, fontstyle='italic')
+        else:
+            plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10)
+
+# Create a scatter plot with colored points based on cultural regions
+for region, color in cultural_region_colors.items():
+    subset = country_scores_pca[country_scores_pca['Cultural Region'] == region]
+    plt.scatter(subset['PC1_rescaled'], subset['PC2_rescaled'], label=region, color=color)
+
+plt.xlabel('Survival vs. Self-Expression Values')
+plt.ylabel('Traditional vs. Secular Values')
+plt.title('Inglehart-Welzel Cultural Map with Random Forest Decision Boundary')
+
+# Add legend
+plt.legend()
+plt.grid(True)
+plt.show()
+
+############################################
+########## Visualization (KNN) #############
+############################################
+
+from sklearn.neighbors import KNeighborsClassifier
+
+# Define the k-NN model
+knn = KNeighborsClassifier(n_neighbors=5)
+# Fit the model
+knn.fit(X_train, y_train)
+# Predict the test set
+y_pred = knn.predict(X_test)
+# Print the classification report
+print(classification_report(y_test, y_pred))
+# Predict classifications for each point in the mesh
+Z = knn.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+# Plot the decision boundary using contourf
+plt.figure(figsize=(14, 10))
+plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+
+# Plot each cultural region with corresponding color and style
+for region, color in cultural_region_colors.items():
+    subset = country_scores_pca[country_scores_pca['Cultural Region'] == region]
+    for i, row in subset.iterrows():
+        if row['Islamic']:
+            plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10, fontstyle='italic')
+        else:
+            plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10)
+
+# Create a scatter plot with colored points based on cultural regions
+for region, color in cultural_region_colors.items():
+    subset = country_scores_pca[country_scores_pca['Cultural Region'] == region]
+    plt.scatter(subset['PC1_rescaled'], subset['PC2_rescaled'], label=region, color=color)
+
+plt.xlabel('Survival vs. Self-Expression Values')
+plt.ylabel('Traditional vs. Secular Values')
+plt.title('Inglehart-Welzel Cultural Map with k-NN Decision Boundary')
+
+# Add legend
+plt.legend()
+plt.grid(True)
+plt.show()
+
