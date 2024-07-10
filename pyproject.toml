@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "app"
+version = "0.1.0"
+description = "Model Comparison"
+authors = ["shavvimal <shavhugan@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+tqdm = "^4.66.2"
+pandas = "^2.2.2"
+matplotlib = "^3.8.4"
+jupyter = "^1.0.0"
+pyreadstat = "^1.2.7"
+scikit-learn = "^1.5.1"
+factor-analyzer = "^0.5.1"
+umap-learn = "^0.5.6"
+seaborn = "^0.13.2"
+cupy-cuda12x = "^13.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
