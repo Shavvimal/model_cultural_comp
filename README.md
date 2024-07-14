@@ -17,8 +17,16 @@ Use these to create `Trends_VS_1981_2022_sav_v4_0.sav`
 GGUF is a file format used for storing large language models. I use this file to run LLMs in Ollama. For the comparison, we are looking at these models in particular:
 
 
+## Poetry 
+
+````bash
+poetry add pandas numpy matplotlib jupyter pyreadstat scikit-learn factor-analyzer umap-learn 
+````
+
 ## References
 
 [^26]: EVS (2022): EVS Trend File 1981-2017. GESIS Data Archive, Cologne. ZA7503 Data file Version 3.0.0, doi:10.4232/1.14021
 [^27]: Haerpfer, C., Inglehart, R., Moreno, A., Welzel, C., Kizilova, K., Diez-Medrano J., M. Lagos, P. Norris, E. Ponarin & B. Puranen et al. (eds.). 2022. World Values Survey Trend File (1981-2022) Cross-National Data-Set. Madrid, Spain & Vienna, Austria: JD Systems Institute & WVSA Secretariat. Data File Version 4.0.0, doi:10.14281/18241.27.
+
+
 

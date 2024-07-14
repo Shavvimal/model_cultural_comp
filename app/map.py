@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 import matplotlib.colors as mcolors
+from scipy.ndimage import center_of_mass
 
 # load ivs_df and country metadata from pkl
 ivs_df = pd.read_pickle("../data/ivs_df.pkl")
@@ -124,7 +125,7 @@ plt.show()
 
 
 ############################################
-########## Visualization Prep ##############
+######## DB Visualization Prep #############
 ############################################
 
 # Create Training Data and Colour Maps
@@ -132,9 +133,9 @@ vis_data = country_scores_pca.dropna()[["PC1_rescaled", "PC2_rescaled", "Cultura
 # Add Numeric Label Column
 vis_data['label'] = pd.Categorical(vis_data['Cultural Region']).codes
 # Create Colour Map Dataframe from same vis_data
-# Get unique (label,  Cultural Region) pairs
+# Get unique (label, Cultural Region) pairs
 tups = vis_data[['label', 'Cultural Region']].drop_duplicates()
-# sort by label
+# Sort by label
 tups = tups.sort_values(by='label')
 # Join cultural_region_colors with tups
 tups['color'] = tups['Cultural Region'].map(cultural_region_colors)
@@ -184,7 +185,7 @@ Z = Z.reshape(xx.shape)
 
 # Plot the decision boundary using contourf
 plt.figure(figsize=(14, 10))
-plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+plt.contourf(xx, yy, Z, alpha=0.3, levels=tups['label'].to_list(), colors=tups['color'].to_list())
 
 # Plot each cultural region with corresponding color and style
 for region, color in cultural_region_colors.items():
@@ -239,7 +240,7 @@ Z = Z.reshape(xx.shape)
 
 # Plot the decision boundary using contourf
 plt.figure(figsize=(14, 10))
-plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+plt.contourf(xx, yy, Z, alpha=0.3, levels=tups['label'].to_list(), colors=tups['color'].to_list())
 
 # Plot each cultural region with corresponding color and style
 for region, color in cultural_region_colors.items():
@@ -271,7 +272,7 @@ plt.show()
 from sklearn.neighbors import KNeighborsClassifier
 
 # Define the k-NN model
-knn = KNeighborsClassifier(n_neighbors=5)
+knn = KNeighborsClassifier(n_neighbors=1)
 # Fit the model
 knn.fit(X_train, y_train)
 # Predict the test set
@@ -284,7 +285,8 @@ Z = Z.reshape(xx.shape)
 
 # Plot the decision boundary using contourf
 plt.figure(figsize=(14, 10))
-plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+plt.contourf(xx, yy, Z, alpha=0.3, levels=tups['label'].to_list(), colors=tups['color'].to_list())
+
 
 # Plot each cultural region with corresponding color and style
 for region, color in cultural_region_colors.items():
