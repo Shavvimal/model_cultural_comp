@@ -17,6 +17,7 @@ pandas = "^2.2.2"
 numpy = "^2.0.0"
 pydantic = "^2.8.2"
 ollama = "^0.2.1"
+huggingface-hub = "^0.23.5"
 
 [build-system]
 requires = ["poetry-core"]

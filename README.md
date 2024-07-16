@@ -17,11 +17,66 @@ Use these to create `Trends_VS_1981_2022_sav_v4_0.sav`
 GGUF is a file format used for storing large language models. I use this file to run LLMs in Ollama. For the comparison, we are looking at these models in particular:
 
 
-## Poetry 
+1. **Chinese LLMs:**
+
+   - **[AquilaChat2-34B-16K](https://huggingface.co/BAAI/AquilaChat2-34B-16K):** Using the Q4 quantization `aquilachat2-34b-16k.Q4_K_M.gguf` from [`TheBloke/AquilaChat2-34B-16K-GGUF`](https://huggingface.co/TheBloke/AquilaChat2-34B-16K-GGUF). This model has an architecture similar to LLama2, making it ideal for comparison.
+   - **[Yi-34B-Chat](https://huggingface.co/01-ai/Yi-34B-Chat):** Using the Q4 quantization `yi-34b-chat.Q4_K_M.gguf` from [`TheBloke/Yi-34B-Chat-GGUF`](https://huggingface.co/TheBloke/Yi-34B-Chat-GGUF).
+   - **[Qwen2:7B](https://huggingface.co/Qwen/Qwen2-7B):** Using the [Q4 model](https://ollama.com/library/qwen2).
+   - **[GLM-4v-9B](https://huggingface.co/THUDM/glm-4-9b-chat):** Using the Q4 quantization `glm-4-9b-chat.Q4_K.gguf` from [legraphista/glm-4-9b-chat-GGUF](https://huggingface.co/legraphista/glm-4-9b-chat-GGUF).
+   - **[Llama2-Chinese](https://ollama.com/library/llama2-chinese):** A Llama 2 based model fine-tuned to improve Chinese dialogue ability.
+
+2. **Western LLMs:**
+
+   - **[LLaMA2:7B](https://ollama.com/library/llama2):** Using the Q4 quantization.
+   - **[LLaMA3:8B](https://ollama.com/library/llama3:8b):** Using the Q4 quantization.
+   - **[Mistral](https://ollama.com/library/mistral):** The 7B model released by Mistral AI.
+
+3. **Dolphin Models:** These models are uncensored and have been trained on data filtered to remove alignment and bias, making them more compliant.
+   - **[Dolphin-Mixtral:8x7B](https://ollama.com/library/dolphin-mixtral):** An uncensored, fine-tuned model based on the Mixtral mixture of experts models, available in 8x7B and 8x22B configurations.
+   - **[dolphin-llama3:8b](https://ollama.com/library/dolphin-llama3)**: Dolphin 2.9 is a new model with 8B and 70B sizes by Eric Hartford based on Llama 3.
+
+
+Ollama models are stored at `C:\Users\%username%\.ollama\models` so I will save the models there aswell. I `mkdir` a folder for `huggingface-hub` then save the models there. Then I use the `huggingface-cli` command to download the models
 
 ````bash
-poetry add pandas numpy matplotlib jupyter pyreadstat scikit-learn factor-analyzer umap-learn 
+poetry run huggingface-cli download {repo_name} {file_name} --local-dir  "C:\Users\shavh\.ollama\models\huggingface-hub\" 
 ````
+
+For example:
+
+````bash
+poetry run huggingface-cli download TheBloke/AquilaChat2-34B-16K-GGUF aquilachat2-34b-16k.Q4_K_M.gguf --local-dir  "C:\Users\shavh\.ollama\models\huggingface-hub\" 
+````
+
+| Repo                              | File                            |
+| --------------------------------- | ------------------------------- |
+| TheBloke/AquilaChat2-34B-16K-GGUF | aquilachat2-34b-16k.Q4_K_M.gguf |
+| TheBloke/Yi-34B-Chat-GGUF         | yi-34b-chat.Q4_K_M.gguf         |
+| legraphista/glm-4-9b-chat-GGUF    | glm-4-9b-chat.Q4_K.gguf         |
+
+We then have to create [ModelFiles](https://github.com/ollama/ollama/blob/main/docs/modelfile.md) for each of these models. The model file is the blueprint to create and share models with Ollama. For this one, simply it is:
+
+```ModelFile
+FROM C:\Users\shavh\.ollama\models\huggingface-hub\aquilachat2-34b-16k.Q4_K_M.gguf
+```
+
+Then we use an ollama command to create the model from the ModelFiles:
+
+```bash
+ollama create aquilachat2:34b -f aquilachat2
+ollama create yi:34b -f yi
+ollama create glm4:9b -f glm
+```
+
+
+Also pull from ollama, for example:
+
+```
+ollama pull llama2:13b
+ollama pull mistral:7b
+ollama pull dolphin-llama3:8b
+ollama pull dolphin-mistral:7b
+```
 
 ## References
 

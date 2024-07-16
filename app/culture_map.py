@@ -156,7 +156,6 @@ class CulturalMap:
         return new_ppca_df
 
 
-# Example usage
 if __name__ == "__main__":
     cultural_map = CulturalMap("../data/ivs_df.pkl", "../data/country_codes.pkl")
     cultural_map.prepare_data()
@@ -190,11 +189,6 @@ if __name__ == "__main__":
     new_data["model"] = "LLama"
     new_data = new_data.append(pd.DataFrame(qwen, columns=cultural_map.iv_qns))
     new_data["model"] = "Qwen"
-
-
-
-
-
 
     # Project new data
     new_projection = cultural_map.project_new_data(new_data)
