@@ -18,6 +18,7 @@ class CulturalMap:
         self.valid_data = None
         self.country_scores_pca = None
         self.llm_scores_pca = None
+        self.llm_meta = None
 
         self.cultural_region_colors = {
             'African-Islamic': '#000000',
@@ -28,6 +29,7 @@ class CulturalMap:
             'English-Speaking': '#009e73',
             'Orthodox Europe': '#0072b2',
             'West & South Asia': '#f0e442',
+            'AI Model': "#bada55"
         }
         # Metadata we need
         self.meta_col = ["S020", "S003"]
@@ -46,7 +48,8 @@ class CulturalMap:
         # Filtering data
         self.subset_ivs_df = self.ivs_df[self.meta_col + self.weights + self.iv_qns]
         self.subset_ivs_df = self.subset_ivs_df.rename(
-            columns={'S020': 'year', 'S003': 'country_code', 'S017': 'weight'})
+            columns={'S020': 'year', 'S003': 'country_code', 'S017': 'weight'}
+        )
         # Remove data from before 2005
         # We need to filter down to the three most recent survey waves (from 2005 onwards).
         # The most recent survey waves provide up-to-date information on cultural values,
@@ -92,17 +95,21 @@ class CulturalMap:
         """
         # Step 7: Country-Level Mean Scores Calculation
         country_mean_scores = self.valid_data.groupby('country_code')[
-            ['PC1_rescaled', 'PC2_rescaled']].mean().reset_index()
+            ['PC1_rescaled', 'PC2_rescaled']
+        ].mean().reset_index()
         # Merge the country codes DataFrame with the country scores DataFrame
         # Add country names and cultural regions to the DataFrame
-        self.country_scores_pca = country_mean_scores.merge(self.country_codes, left_on='country_code',
-                                                            right_on='Numeric', how='left')
+        self.country_scores_pca = country_mean_scores.merge(
+            self.country_codes, left_on='country_code',
+            right_on='Numeric', how='left'
+        )
+        print(self.country_scores_pca)
         # Drop if Numeric is NaN
         self.country_scores_pca = self.country_scores_pca.dropna(subset=['Numeric'])
         # Save the DataFrame
         self.country_scores_pca.to_pickle("../data/country_scores_pca.pkl")
 
-    def visualize_cultural_map(self, title='Inglehart-Welzel Cultural Map', with_llms = False):
+    def visualize_cultural_map(self, title='Inglehart-Welzel Cultural Map'):
         """
         Visualization
         """
@@ -110,7 +117,14 @@ class CulturalMap:
         # Plot each cultural region with corresponding color and style
         for region, color in self.cultural_region_colors.items():
             subset = self.country_scores_pca[self.country_scores_pca['Cultural Region'] == region]
+            print(region, subset['Country'].unique())
             for i, row in subset.iterrows():
+                if row['llm']:
+                    if row['Chinese LLM']:
+                        plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10,
+                                 fontstyle='italic' )
+                    else:
+                        plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10)
                 if row['Islamic']:
                     plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['Country'], color=color, fontsize=10,
                              fontstyle='italic')
@@ -119,17 +133,6 @@ class CulturalMap:
             # Create a scatter plot with colored points based on cultural regions
             plt.scatter(subset['PC1_rescaled'], subset['PC2_rescaled'], label=region, color=color)
 
-        if with_llms:
-            # Plot each LLM from self.llm_scores_pca
-            for i, row in self.llm_scores_pca.iterrows():
-                if row['Chinese']:
-                    plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['llm'], color="#bada55", fontsize=10,
-                             fontstyle='italic')
-                else:
-                    plt.text(row['PC1_rescaled'], row['PC2_rescaled'], row['llm'], color="#bada55", fontsize=10)
-
-                # Create a scatter plot with colored points based on cultural regions
-                plt.scatter(row['PC1_rescaled'], row['PC2_rescaled'], label="AI Model", color="#bada55")
 
 
         plt.xlabel('Survival vs. Self-Expression Values')
@@ -234,73 +237,67 @@ class CulturalMap:
         pivot_df = pivot_df.dropna()
         pivot_df['Y002'] = pivot_df.apply(lambda row: self.Y002_transform(row["Y002"]), axis=1).astype("float64")
         pivot_df['Y003'] = pivot_df.apply(lambda row: self.Y003_transform(row["Y003"]), axis=1).astype("float64")
+        # Add year as 2024
+        pivot_df["year"] = 2024
+        # Add weighht 1
+        pivot_df["weight"] = 1
+
         return pivot_df
 
-
-    def project_new_data(self, llm_data):
+    def concat_llm_data(self):
         """
-        Project new data onto the existing cultural map using the saved PPCA model.
+        Collect LLM data
+        Concatenate into self.subset_ivs_df
+        :return:
         """
-        # Apply the PPCA transformation using the loaded model
-        principal_components = self.ppca.transform(llm_data[self.iv_qns].to_numpy())
-        # Apply the varimax rotation
-        rotated_components = self.rotator.fit_transform(principal_components)
-        # Create a DataFrame for the new principal components
-        new_ppca_df = pd.DataFrame(rotated_components, columns=["PC1", "PC2"])
-
-        # Rescale the principal component scores using the same parameters
-        new_ppca_df['PC1_rescaled'] = self.pc_rescale_params['PC1'][0] * new_ppca_df['PC1'] + \
-                                      self.pc_rescale_params['PC1'][1]
-        new_ppca_df['PC2_rescaled'] = self.pc_rescale_params['PC2'][0] * new_ppca_df['PC2'] + \
-                                      self.pc_rescale_params['PC2'][1]
-
-        # add in the llm column
-        new_ppca_df["llm"] = llm_data["llm"].values
-        return new_ppca_df
-
-    def calculate_average_llm(self, new_ppca_df):
-        """
-        Mean Points
-        """
-        # Step 7: Country-Level Mean Scores Calculation
-        country_mean_scores = new_ppca_df.groupby('llm')[['PC1_rescaled', 'PC2_rescaled']].mean().reset_index()
-        # Add a 'Cultural Region' column to the DataFrame that says "AI Model"
-        country_mean_scores['Cultural Region'] = 'AI Model'
-        # Create column called "Chinese" and make it a Boolean
-        country_mean_scores['Chinese'] = False
-        # If the llm is in this list, set the Chinese column to True
+        llm_data = self.collect_llm_data()
+        # Create MetaData Dataframe
+        # Get unique llm's and create country_codes
+        llm_meta = pd.DataFrame(llm_data["llm"].unique(), columns=["llm"])
+        # New numbers
+        llm_meta["Numeric"] = list(range(self.country_codes["Numeric"].max()+10, self.country_codes["Numeric"].max()+10 + len(llm_meta)))
+        # Join with llm_data
+        llm_data = llm_data.merge(llm_meta, left_on="llm", right_on="llm", how="left")
+        # Rename "Numeric" to "country_code"
+        llm_data = llm_data.rename(columns={"Numeric": "country_code"})
+        # Can drop the "llm" column
+        llm_data = llm_data.drop(columns=["llm"])
+        # Add a "Cultural Region" as "AI Model"
+        llm_meta["Cultural Region"] = "AI Model"
+        # Rename "llm" to Country
+        llm_meta = llm_meta.rename(columns={"llm": "Country"})
+        # Add Islamic "False"
+        llm_meta["Islamic"] = False
+        llm_meta["llm"] = True
+        # Chinese LLM column
         chinese_llms = [
-            # "wangshenzhi/gemma2-27b-chinese-chat", # Worked decently well
-            # "qwen2:7b",
-            # "llama2-chinese:13b",
-            "wangrongsheng/llama3-70b-chinese-chat", # Refusal rate is high
-            "yi:34b", # just goves "."
-            "aquilachat2:34b", # Gives '。' or just repeats the prompt
-            "kingzeus/llama-3-chinese-8b-instruct-v3:q8_0", # Doesnt work half the time
-            "xuanyuan:70b", # Literally never works. Unintelligable output
-            "glm4:9b", # Just gives "."
+            "wangshenzhi/gemma2-27b-chinese-chat",  # Worked decently well
+            "qwen2:7b",
+            "llama2-chinese:13b",
+            "wangrongsheng/llama3-70b-chinese-chat",  # Refusal rate is high
+            "yi:34b",  # just goves "."
+            "aquilachat2:34b",  # Gives '。' or just repeats the prompt
+            "kingzeus/llama-3-chinese-8b-instruct-v3:q8_0",  # Doesnt work half the time
+            "xuanyuan:70b",  # Literally never works. Unintelligable output
+            "glm4:9b",  # Just gives "."
             "llama2-chinese:13b",
             "qwen2:7b",
             "wangrongsheng/llama3-70b-chinese-chat",
         ]
-        country_mean_scores["Chinese"] = country_mean_scores.loc[country_mean_scores['llm'].isin(chinese_llms), 'Chinese'] = True
-        self.llm_scores_pca = country_mean_scores
-
-
-
+        llm_meta["Chinese LLM"] = llm_meta["Country"].isin(chinese_llms)
+        # Add llm info to country Codes
+        self.country_codes["llm"] = False
+        self.country_codes["Chinese LLM"] = False
+        # Concatenate the LLM data with the valid data in self.subset
+        self.subset_ivs_df = pd.concat([self.subset_ivs_df, llm_data], ignore_index=True)
+        # concat the llm_meta with the country_codes
+        self.country_codes = pd.concat([self.country_codes, llm_meta], ignore_index=True)
 
 
 if __name__ == "__main__":
     cultural_map = CulturalMap("../data/ivs_df.pkl", "../data/country_codes.pkl")
     cultural_map.prepare_data()
+    cultural_map.concat_llm_data()
     cultural_map.perform_ppca()
     cultural_map.calculate_mean_scores()
     cultural_map.visualize_cultural_map()
-    # Collect LLM data
-    llm_data = cultural_map.collect_llm_data()
-    # Project new data
-    new_projection = cultural_map.project_new_data(llm_data)
-    # Calculate average LLM
-    cultural_map.calculate_average_llm(new_projection)
-    # Visualize the cultural map with LLMs
-    cultural_map.visualize_cultural_map(with_llms=True)

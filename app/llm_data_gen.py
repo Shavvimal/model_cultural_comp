@@ -6,182 +6,7 @@ from ollama import AsyncClient
 from tqdm.asyncio import tqdm
 import random
 import pandas as pd
-
-#################################################
-############# Question Classes ################
-#################################################
-
-
-class A008(IntEnum):
-    """
-    [ 1.  2.  3.  4. nan]
-    """
-    VERY_HAPPY = 1
-    QUITE_HAPPY = 2
-    NOT_VERY_HAPPY = 3
-    NOT_AT_ALL_HAPPY = 4
-
-
-class A165(IntEnum):
-    """
-    [ 2.  1. nan]
-    1: Most people can be trusted
-    2: Can´t be too careful
-    """
-    TRUST = 1
-    BE_CAREFUL = 2
-
-
-class E018(IntEnum):
-    """
-    [ 1.  2.  3. nan]
-    1: Good thing
-    2: Don´t mind
-    3: Bad thing
-    """
-    GOOD = 1
-    DONT_MIND = 2
-    BAD = 3
-
-
-class E025(IntEnum):
-    """
-    [ 2.  1.  3. nan]
-    1: Have done
-    2: Might do
-    3: Would never do
-    """
-    SIGNED = 1
-    MIGHT_DO = 2
-    NEVER = 3
-
-
-# Range from 1 to 10
-class F063(IntEnum):
-    """
-    [ 7.  1.  8.  4.  3.  5. 10.  6.  2.  9. nan]
-    """
-    ONE = 1
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
-
-
-class F118(IntEnum):
-    """
-    [ 4.  9. 10.  6.  8.  7.  1.  5.  2.  3. nan]
-    """
-    ONE = 1
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
-
-
-class F120(IntEnum):
-    """
-    [ 2.  9.  5.  4.  1. 10.  6.  8.  7.  3. nan]
-    """
-    ONE = 1
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
-
-
-class G006(IntEnum):
-    """
-    [nan  1.  3.  2.  4.]
-    1: Very proud
-    2: Quite proud
-    3: Not very proud
-    4: Not at all proud
-    """
-    VERY_PROUD = 1
-    QUITE_PROUD = 2
-    NOT_VERY_PROUD = 3
-    NOT_AT_ALL_PROUD = 4
-
-
-class Y002Options(IntEnum):
-    """
-    Options for the most and second most important goals:
-    1: Maintaining order in the nation
-    2: Giving people more say in important government decisions
-    3: Fighting rising prices
-    4: Protecting freedom of speech
-    """
-    MAINTAINING_ORDER = 1
-    GIVING_PEOPLE_SAY = 2
-    FIGHTING_PRICES = 3
-    PROTECTING_FREEDOM = 4
-
-
-class Y002(BaseModel):
-    most_important: Y002Options = Field(description="Most important goal")
-    second_most_important: Y002Options = Field(description="Second most important goal")
-
-    @field_validator("most_important", "second_most_important")
-    def check_valid_values(cls, v):
-        if v not in Y002Options:
-            raise ValueError("Invalid value. Choose from 1, 2, 3, 4")
-        return v
-
-    @model_validator(mode='after')
-    def check_combinations(cls, values):
-        most_important = values.most_important
-        second_most_important = values.second_most_important
-        if most_important == second_most_important:
-            raise ValueError("The two choices must be different")
-        return values
-
-
-class Y003Options(IntEnum):
-    GOOD_MANNERS = 1
-    INDEPENDENCE = 2
-    HARD_WORK = 3
-    FEELING_OF_RESPONSIBILITY = 4
-    IMAGINATION = 5
-    TOLERANCE_RESPECT = 6
-    THRIFT = 7
-    DETERMINATION = 8
-    RELIGIOUS_FAITH = 9
-    UNSELFISHNESS = 10
-    OBEDIENCE = 11
-
-
-class Y003(BaseModel):
-    choices: List[Y003Options] = Field(description="List of chosen qualities, up to five")
-
-    @field_validator("choices")
-    def validate_choices(cls, v):
-        if len(v) > 5:
-            raise ValueError("You can only choose up to five qualities.")
-        return v
-
-    @model_validator(mode='after')
-    def check_unique_choices(cls, values):
-        choices = values.choices
-        if len(choices) != len(set(choices)):
-            raise ValueError("The choices must be unique.")
-        return values
-
+from qn_classes import  A008, A165, E018, E025, F063, F118, F120, G006, Y002, Y003
 
 #############################################
 ############# Output Parsers ################
@@ -205,16 +30,18 @@ class EnumOutputParser:
         Validate the output against the enum, and return the value to be stored
         """
         try:
+            response = response.replace(".", "")
             # Check if the response is in the valid values
             if int(response) in self.enum._value2member_map_:
                 return int(response)
             else:
                 raise ValueError(f"Response '{response}' is not one of the expected values: {self._valid_values}")
         except ValueError as e:
+            # Try by removing full stop
             raise ValueError(f"Invalid response: {e}")
 
     def format_instructions(self) -> str:
-        return f"Do NOT give any reasoning whatsoever. Purely select one of the following options: {', '.join(self._valid_values)}"
+        return f"Do NOT explain any reasoning whatsoever. Purely select one of the following options: {', '.join(self._valid_values)}"
 
 
 class Y002OutputParser:
@@ -355,8 +182,9 @@ class Survey:
             try:
                 response = await AsyncClient().chat(
                     model=llm,
-                    messages=[message, {"role": "system", "content": "Sure thing! Here is my answer:"}]
+                    messages=[message, {"role": "system", "content": "Sure thing! Here is my numerical answer:"}]
                 )
+
                 response_content = response['message']['content']
                 # Parse it using the parser
                 parsed_response = self._PARSERS[qn].parse(response_content)
@@ -368,42 +196,67 @@ class Survey:
 
         return llm, qn, None
 
-    async def generate_all_responses(self, full_prompt_set, llms, max_retries=15):
+    async def generate_all_responses(self, full_prompt_set, llm, max_retries=15, num_workers=10):
         """"
         async gather all_prompts for every llm
         """
-        tasks = []
-        for llm in llms:
-            for qn, prompt in full_prompt_set:
-                tasks.append(self.generate_response(qn, prompt, llm, max_retries))
         results = []
-        for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Generating responses"):
-            result = await f
-            results.append(result)
+
+        async def worker(task_queue, pbar):
+            while not task_queue.empty():
+                task = await task_queue.get()
+                try:
+                    returned = await task
+                    results.append(returned)
+                    pbar.update(1)  # Update the progress bar
+                except Exception as e:
+                    print(f"Error executing task: {e}")
+
+        try:
+            task_queue = asyncio.Queue()
+
+            for qn, prompt in full_prompt_set:
+                task_queue.put_nowait(asyncio.create_task(self.generate_response(qn, prompt, llm, max_retries)))
+
+            total_tasks = task_queue.qsize()
+            print(f"Starting {total_tasks} tasks with {num_workers} workers for {llm}...")
+            with tqdm(total=total_tasks) as pbar:
+                await asyncio.gather(*[worker(task_queue, pbar) for _ in range(num_workers)])
+
+        except Exception as e:
+            print(f"\nUnable to get data: {e}\n")
         return results
 
     async def main(self):
         # select random 10 prompts
-        random_prompts = random.sample(self._FULL_PROMPT_SET, 3)
-        res = await self.generate_all_responses(self._FULL_PROMPT_SET, self._LLMS)
-        responses_df = pd.DataFrame(res, columns=["llm", "question", "response"])
-        print(responses_df)
-        responses_df.to_pickle("../data/responses_df.pkl")
+        random_prompts = random.sample(self._FULL_PROMPT_SET, 10)
+
+        for llm in self._LLMS:
+            res = await self.generate_all_responses(self._FULL_PROMPT_SET, llm)
+            responses_df = pd.DataFrame(res, columns=["llm", "question", "response"])
+            # Make llm filename safe
+            llm_name = llm.replace(":", "-")
+            llm_name = llm_name.replace("/", "-")
+            responses_df.to_pickle(f"../data/collection/{llm_name}_responses_df.pkl")
+            print(f"Responses for {llm_name} saved.")
 
     def __call__(self, *args, **kwargs):
         asyncio.run(self.main())
 
 if __name__ == '__main__':
     llms = [
-        "dolphin-mistral:7b",
-        "dolphin-llama3:8b",
-        "mistral:7b",
-        "llama2:13b",
-        "llama2-chinese:13b",
-        "llama3:70b",
-        "dolphin-mixtral:8x7b",
-        "llama3:8b",
-        "qwen2:7b"
+        # "dolphin-mistral:7b",
+        # "dolphin-llama3:8b",
+        # "mistral:7b",
+        # "llama3:70b",
+        # "dolphin-mixtral:8x7b",
+        # "llama3:8b",
+        # "llama2:13b", # Was too error prone
+        # "gemma2:27b", # Was really good at following instructions
+        # Chinese but can be prompted in Eng
+        # "llama2-chinese:13b", # Was too errir prone
+        # "qwen2:7b" # was really good actually
+        "wangrongsheng/llama3-70b-chinese-chat"
     ]
     survey = Survey(llms=llms)
     survey()

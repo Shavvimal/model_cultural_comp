@@ -53,6 +53,8 @@ poetry run huggingface-cli download TheBloke/AquilaChat2-34B-16K-GGUF aquilachat
 | TheBloke/AquilaChat2-34B-16K-GGUF | aquilachat2-34b-16k.Q4_K_M.gguf |
 | TheBloke/Yi-34B-Chat-GGUF         | yi-34b-chat.Q4_K_M.gguf         |
 | legraphista/glm-4-9b-chat-GGUF    | glm-4-9b-chat.Q4_K.gguf         |
+| RichardErkhov/Duxiaoman-DI_-_XuanYuan-70B-gguf | XuanYuan-70B.Q4_0.gguf |
+| TheBloke/deepseek-llm-67b-chat-GGUF | deepseek-llm-67b-chat.Q4_K_M.gguf |
 
 We then have to create [ModelFiles](https://github.com/ollama/ollama/blob/main/docs/modelfile.md) for each of these models. The model file is the blueprint to create and share models with Ollama. For this one, simply it is:
 
