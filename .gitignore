@@ -17,6 +17,7 @@ docsite/.yarn/*
 !docsite/.yarn/versions
 docsite/.pnp.*
 bin/cache
+.env
 
 .yarn/*
 !.yarn/patches

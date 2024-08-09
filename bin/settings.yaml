@@ -59,12 +59,13 @@ input:
   type: file # or blob
   file_type: csv # or csv
   base_dir: "data"
-  # file_encoding: utf-8
-  # file_pattern: ".*\\.txt$"
-  source_column: "uuid"
+  file_encoding: utf-8
+  file_pattern: ".*\\.csv$"
+  source_column: "id"
   text_column: "text"
   timestamp_column: "date"
   timestamp_format: "%Y-%m-%d %H:%M:%S"
+  title_column: "title"
 
 cache:
   type: file # or blob
