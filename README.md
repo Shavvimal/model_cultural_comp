@@ -1,66 +1,94 @@
-# GraphRAG
+# Cultural Bias in LLMs
 
-- [ ] Manage updating the Graph with new data without re-indexing 
-- [ ] Check Backlinks from Updates
-- [ ] Write a visualisation script
-  - See the streamlit app in the demo. You can see the communities, view the summaries on another tab. You can also click in to see the sources of the relationships, nodes and also the data used to make the response.
-  - Critical for using this data
-  - Think about using a second agent to provide a verification evaluation based on the provided context to see if there are any hallucinations in the returned response. Helps with after the fact analysis on if the response was correctly grounded or not
-- [ ] Hook into exisitng workflow to continuously update the Graph 
-  - CRON 
-  - Index all my AI news data and set up a CRON job to update it
-- [ ] Link it to my own twitter 
-- [ ] Do this for Podcasts and create a marketing thing
-  - throw it at the transcripts for a deep podcast list - you could really pick out connections between concepts that you didn't see initially
+This repo contains the code to explore the cultural bias in LLMs using the Inglehart-Welzel Cultural Map.
 
-# Getting Started 
+## Overview
 
-```bash
-python -m graphrag.index --root ./bin
+The goal of this project is to identify and map out the cultural biases present in the outputs of LLMs. We compare the model outputs to the Inglehart-Welzel Cultural Map, which is based on nationally representative survey data from the World Values Survey (WVS) and the European Values Study (EVS). This project involves:
+
+1. Collecting responses from a variety of LLMs.
+2. Mapping these responses onto the Inglehart-Welzel Cultural Map.
+3. Analyzing the cultural alignment of the models.
+
+## IVS Data
+
+I have followed the same procedure detailed on the website of the WVS Association for [creating the World Cultural Map](https://www.worldvaluessurvey.org/wvs.jsp). EVS and WVS time-series data-sets are released independently by EVS/GESIS and the WVSA/JDS. The Integrated Values Surveys (IVS) dataset 1981-2022 is constructed by merging the [EVS Trend File 1981-2017](https://search.gesis.org/research_data/ZA7503) [^26] and the [WVS trend 1981-2022 data-set](https://www.worldvaluessurvey.org/WVSEVStrend.jsp) [^27].
+
+I have decided to go ahead with the SPSS format, although it makes no difference. The files you will need are the following:
+
+- WVS Trend File 1981-2022 (4.0.0): `Trends_VS_1981_2022_sav_v4_0.sav`
+- EVS Trend File 1981-2017 (3.0.0): `ZA7503_v3-0-0.sav`
+- IVS_Merge_Syntax (SPSS): `EVS_WVS_Merge Syntax_Spss_June2024.sps`
+
+Use these to create `Trends_VS_1981_2022_sav_v4_0.sav`
+
+## Running Models
+
+We use the GGUF file format to run LLMs in Ollama. For the comparison, we are looking at these models in particular:
+
+
+1. **Chinese LLMs:**
+
+   - **[AquilaChat2-34B-16K](https://huggingface.co/BAAI/AquilaChat2-34B-16K):** Using the Q4 quantization `aquilachat2-34b-16k.Q4_K_M.gguf` from [`TheBloke/AquilaChat2-34B-16K-GGUF`](https://huggingface.co/TheBloke/AquilaChat2-34B-16K-GGUF). This model has an architecture similar to LLama2, making it ideal for comparison.
+   - **[Yi-34B-Chat](https://huggingface.co/01-ai/Yi-34B-Chat):** Using the Q4 quantization `yi-34b-chat.Q4_K_M.gguf` from [`TheBloke/Yi-34B-Chat-GGUF`](https://huggingface.co/TheBloke/Yi-34B-Chat-GGUF).
+   - **[Qwen2:7B](https://huggingface.co/Qwen/Qwen2-7B):** Using the [Q4 model](https://ollama.com/library/qwen2).
+   - **[GLM-4v-9B](https://huggingface.co/THUDM/glm-4-9b-chat):** Using the Q4 quantization `glm-4-9b-chat.Q4_K.gguf` from [legraphista/glm-4-9b-chat-GGUF](https://huggingface.co/legraphista/glm-4-9b-chat-GGUF).
+   - **[Llama2-Chinese](https://ollama.com/library/llama2-chinese):** A Llama 2 based model fine-tuned to improve Chinese dialogue ability.
+   - **[llama-3-chinese-8b-instruct-v3](https://ollama.com/kingzeus/llama-3-chinese-8b-instruct-v3:q4_0):** These models use large-scale Chinese data for continual pre-training on the original Llama-3, and are fine-tuned with selected instruction data to further enhance Chinese basic semantic and instruction understanding capabilities
+   - **[Deepseek:67b](https://huggingface.co/deepseek-ai/deepseek-llm-67b-base):** Trained from scratch on a vast dataset of 2 trillion tokens in both English and Chinese
+   - [**llama2-chinese:13b**](https://ollama.com/library/llama2-chinese:13b): They adopted a Chinese instruction set for fine-tuning to improve the Chinese dialogue ability.
+   - [**wangrongsheng/llama3-70b-chinese-chat**](https://ollama.com/wangrongsheng/llama3-70b-chinese-chat): Instruction-tuned language model for Chinese & English, built upon the Meta-Llama-3-70B-Instruct model.
+   - [**xuanyuan:70b**](https://huggingface.co/Duxiaoman-DI/XuanYuan-70B): Large financial model based on the Llama2-70b model with Chinese enhancement after incremental pre-training of a large number of Chinese and English data.
+   - [**wangshenzhi/gemma2-27b-chinese-chat:latest**](https://ollama.com/wangshenzhi/gemma2-27b-chinese-chat): Instruction-tuned language model built upon `google/gemma-2-27b-it` for Chinese & English
+
+2. **Western LLMs:**
+
+   - **[LLaMA2:7B](https://ollama.com/library/llama2):** Using the Q4 quantization.
+   - **[LLaMA3:70B](https://ollama.com/library/llama3:70b):** Using the Q4 quantization.
+   - **[Mistral](https://ollama.com/library/mistral):** The 7B model released by Mistral AI.
+   - [**gemma2:27b**](https://ollama.com/library/gemma2:27b): Google Research's Gemma 2 model.
+
+3. **Dolphin Models:** These models are uncensored and have been trained on data filtered to remove alignment and bias, making them more compliant.
+   - **[Dolphin-Mixtral:8x7B](https://ollama.com/library/dolphin-mixtral):** An uncensored, fine-tuned model based on the Mixtral mixture of experts models, available in 8x7B and 8x22B configurations.
+   - **[dolphin-llama3:8b](https://ollama.com/library/dolphin-llama3)**: Dolphin 2.9 is a new model with 8B and 70B sizes by Eric Hartford based on Llama 3.
+   - [**dolphin-mistral:7b**](https://ollama.com/library/dolphin-mistral): The uncensored Dolphin model based on Mistral
+
+Ollama models are stored at `C:\Users\%username%\.ollama\models` so I will save the models there aswell. I `mkdir` a folder for `huggingface-hub` then I use the `huggingface-cli` command to download the models
+
+````bash
+poetry run huggingface-cli download {repo_name} {file_name} --local-dir  "C:\Users\shavh\.ollama\models\huggingface-hub\" 
+````
+
+| Repo                              | File                            |
+| --------------------------------- | ------------------------------- |
+| TheBloke/AquilaChat2-34B-16K-GGUF | aquilachat2-34b-16k.Q4_K_M.gguf |
+| TheBloke/Yi-34B-Chat-GGUF         | yi-34b-chat.Q4_K_M.gguf         |
+| legraphista/glm-4-9b-chat-GGUF    | glm-4-9b-chat.Q4_K.gguf         |
+| RichardErkhov/Duxiaoman-DI_-_XuanYuan-70B-gguf | XuanYuan-70B.Q4_0.gguf |
+| TheBloke/deepseek-llm-67b-chat-GGUF | deepseek-llm-67b-chat.Q4_K_M.gguf |
+
+We then have to create [ModelFiles](https://github.com/ollama/ollama/blob/main/docs/modelfile.md) for each of these models. For example:
+
+```ModelFile
+FROM C:\Users\shavh\.ollama\models\huggingface-hub\aquilachat2-34b-16k.Q4_K_M.gguf
 ```
 
-```bash
-python -m graphrag.query --root ./bin --method global "What are the top 5 companies in the AI space?"
-```
+Then we use an ollama command to create the model from the ModelFiles:
 
 ```bash
-python -m graphrag.query --root ./bin --method local "What is OpenAI, and what are the main relationships?"
+ollama create aquilachat2:34b -f aquilachat2
 ```
 
-# Visualise
+We also pull from ollama, for example:
 
-Can use the Notebook I've added. I need to see if I can get the visualise python script they have left in the package to work. 
+```
+ollama pull dolphin-mistral:7b
+```
 
-## Resources
+## References
 
-- [GraphRAG Github](https://github.com/microsoft/graphrag)
-- [GraphRAG Blog Post](https://www.microsoft.com/en-us/research/blog/graphrag-unlocking-llm-discovery-on-narrative-private-data/)
-- [GraphRAG Docs](https://microsoft.github.io/graphrag/)
-- [GraphRAG Paper](https://arxiv.org/abs/2404.16130)
-- [Project GraphRAG](https://www.microsoft.com/en-us/research/project/graphrag/overview/)
-- [GPT Researcher](https://github.com/assafelovic/gpt-researcher)
-- [Plan-and-Solve](https://arxiv.org/abs/2305.04091)
-- [RAG](https://arxiv.org/abs/2005.11401)
-- [Knowledge Graphs are key to unlocking the power of AI](https://www.youtube.com/watch?v=lhRYnZS7yu4&list=WL&index=29&t=373s)
-- [How to Build Knowledge Graphs With LLMs (python tutorial)](https://www.youtube.com/watch?v=tcHIDCGu6Yw)
-- [Exploring Large Language Models for Knowledge Graph Completion](https://arxiv.org/abs/2308.13916)
-- [4 Ways Unstructured Data Management Will Change in 2024](https://builtin.com/articles/unstructured-data-management-change)
-- [Expert Reveals Key Data Management Trends for 2024 to Know](https://solutionsreview.com/data-management/data-management-trends-for-2024/)
-- [Harnessing LLMs With Neo4j](https://medium.com/neo4j/harnessing-large-language-models-with-neo4j-306ccbdd2867)
-- [Fine-Tuning vs Retrieval-Augmented Generation](https://medium.com/neo4j/knowledge-graphs-llms-fine-tuning-vs-retrieval-augmented-generation-30e875d63a35)
-- [Knowledge Graphs & LLMs: Multi-Hop Question Answering](https://medium.com/neo4j/knowledge-graphs-llms-multi-hop-question-answering-322113f53f51)
-- [Knowledge Graphs & LLMs: Real-Time Graph Analytics](https://medium.com/neo4j/knowledge-graphs-llms-real-time-graph-analytics-89b392eaaa95)
-- [Construct Knowledge Graphs From Unstructured Text](https://medium.com/neo4j/construct-knowledge-graphs-from-unstructured-text-877be33300a2)
-- [Project NaLLM](https://github.com/neo4j/NaLLM?tab=readme-ov-file)
-- [Constructing knowledge graphs from text using OpenAI functions](https://bratanic-tomaz.medium.com/constructing-knowledge-graphs-from-text-using-openai-functions-096a6d010c17)
-- [LangChain Cypher Search: Tips & Tricks](https://medium.com/neo4j/langchain-cypher-search-tips-tricks-f7c9e9abca4d)
-- [Extract knowledge from text: End-to-end information extraction pipeline with spaCy and Neo4j](https://towardsdatascience.com/extract-knowledge-from-text-end-to-end-information-extraction-pipeline-with-spacy-and-neo4j-502b2b1e0754)
-- [Text to Knowledge Graph Made Easy with Graph Maker](https://towardsdatascience.com/text-to-knowledge-graph-made-easy-with-graph-maker-f3f890c0dbe8)
-- [How to Convert Any Text Into a Graph of Concepts](https://towardsdatascience.com/how-to-convert-any-text-into-a-graph-of-concepts-110844f22a1a)
-- [Accelerating Scientific Discovery with Generative Knowledge Extraction, Graph-Based Representation, and Multimodal Intelligent Graph Reasoning](https://arxiv.org/abs/2403.11996)
-- [GraphRAG: LLM-Derived Knowledge Graphs for RAG](https://www.youtube.com/watch?v=r09tJfON6kE)
-- [GraphRAG Ollama: 100% Local Setup, Keeping your Data Private](https://www.youtube.com/watch?v=BLyGDTNdad0)
-- [Easy GraphRAG with Neo4j Visualisation Locally](https://www.youtube.com/watch?v=Dw2g2NEdsw0)
-- [Sciphi Triplex](https://www.youtube.com/watch?v=GR0jyxTKyYY)
-- [R2R Knowledge Graphs](https://r2r-docs.sciphi.ai/cookbooks/knowledge-graph)
-- [GraphRAG: LLM-Derived Knowledge Graphs for RAG](https://www.youtube.com/watch?v=r09tJfON6kE&t=833s)
+[^26]: EVS (2022): EVS Trend File 1981-2017. GESIS Data Archive, Cologne. ZA7503 Data file Version 3.0.0, doi:10.4232/1.14021
+[^27]: Haerpfer, C., Inglehart, R., Moreno, A., Welzel, C., Kizilova, K., Diez-Medrano J., M. Lagos, P. Norris, E. Ponarin & B. Puranen et al. (eds.). 2022. World Values Survey Trend File (1981-2022) Cross-National Data-Set. Madrid, Spain & Vienna, Austria: JD Systems Institute & WVSA Secretariat. Data File Version 4.0.0, doi:10.14281/18241.27.
+
+
+
