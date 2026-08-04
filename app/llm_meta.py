@@ -44,3 +44,44 @@ FAILED_LLMS_2024 = frozenset(
 
 def is_chinese(llm: str) -> bool:
     return llm in CHINESE_LLMS
+
+
+# --- 2026 Ollama Cloud generation ---------------------------------------
+
+# Chinese-origin frontier models served on Ollama Cloud (August 2026).
+CHINESE_LLMS_2026 = frozenset(
+    {
+        "deepseek-v4-flash",
+        "deepseek-v4-flash:0731",
+        "deepseek-v4-pro",
+        "glm-5.1",
+        "glm-5.2",
+        "kimi-k2.6",
+        "kimi-k2.7-code",
+        "kimi-k3",
+        "minimax-m2.7",
+        "minimax-m3",
+        "qwen3.5:397b",
+    }
+)
+
+# Western-origin cloud models in the same run.
+WESTERN_LLMS_2026 = frozenset(
+    {
+        "gemma4:31b",
+        "gpt-oss:120b",
+        "gpt-oss:20b",
+        "mistral-large-3:675b",
+        "nemotron-3-nano:30b",
+        "nemotron-3-super",
+        "nemotron-3-ultra",
+    }
+)
+
+
+def cohort_2026(llm: str) -> str:
+    if llm in CHINESE_LLMS_2026:
+        return "Chinese"
+    if llm in WESTERN_LLMS_2026:
+        return "Western"
+    raise ValueError(f"unknown 2026 model: {llm}")
