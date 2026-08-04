@@ -31,6 +31,28 @@ from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, _draw_countries
 
 # Okabe-Ito, CVD-validated
 COHORT_COLORS = {"Chinese": "#d55e00", "Western": "#0072b2"}
+
+# Hand-placed label offsets (dx, dy, ha) for the crowded centre cluster;
+# labels anchor on the en-arm marker.
+LABEL_OFFSETS_2026 = {
+    "deepseek-v4-flash": (-10, -6, "right"),
+    "deepseek-v4-flash:0731": (-2, -16, "right"),
+    "deepseek-v4-pro": (-8, -5, "right"),
+    "gemma4:31b": (2, 10, "left"),
+    "glm-5.1": (-18, -13, "right"),
+    "glm-5.2": (5, -3, "left"),
+    "gpt-oss:120b": (8, 4, "left"),
+    "gpt-oss:20b": (4, -15, "left"),
+    "kimi-k2.6": (-18, -4, "right"),
+    "kimi-k2.7-code": (-6, -16.5, "right"),
+    "minimax-m2.7": (-2, -17, "right"),
+    "minimax-m3": (-8, -10, "right"),
+    "mistral-large-3:675b": (-8, 9, "right"),
+    "nemotron-3-nano:30b": (-15, -13, "left"),
+    "nemotron-3-super": (-28, 22, "left"),
+    "nemotron-3-ultra": (8, 0, "left"),
+    "qwen3.5:397b": (-18, 3, "right"),
+}
 AI_2024 = "#5e35b1"
 
 
@@ -86,7 +108,7 @@ def _draw_cell(ax, row, marker: str, color: str) -> None:
 
 def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(9.5, 7.5))
-    _draw_countries(ax, countries, label_alpha=0.45)
+    _draw_countries(ax, countries, label_alpha=0.3)
 
     ell = ellipses.copy()
     ell["language"] = ["zh" if s.endswith(" [zh]") else "en" for s in ell["llm"]]
@@ -115,12 +137,14 @@ def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
         for _, row in pair.iterrows():
             _draw_cell(ax, row, "D" if row["language"] == "en" else "^", color)
         if len(en):
+            dx, dy, ha = LABEL_OFFSETS_2026.get(base, (5, 4, "left"))
             ax.annotate(
                 _short(base),
                 (en["PC1_rescaled"].iloc[0], en["PC2_rescaled"].iloc[0]),
-                xytext=(5, 4),
+                xytext=(dx, dy),
                 textcoords="offset points",
-                fontsize=6.5,
+                ha=ha,
+                fontsize=6,
                 fontweight="bold",
                 color=color,
                 zorder=7,
