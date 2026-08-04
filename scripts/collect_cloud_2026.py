@@ -42,8 +42,10 @@ async def list_cloud_models(survey) -> list[str]:
             response = await survey._client.list()
             return sorted(m.model for m in response.models)
         except Exception as exc:
-            print(f"startup list failed (attempt {attempt + 1}): "
-                  f"{str(exc)[:80]} — retrying in 60s", flush=True)
+            print(
+                f"startup list failed (attempt {attempt + 1}): {str(exc)[:80]} — retrying in 60s",
+                flush=True,
+            )
             await asyncio.sleep(60)
     raise RuntimeError("could not list cloud models after 60 attempts")
 
@@ -85,10 +87,14 @@ async def main() -> int:
         if deferred_total == 0:
             print(f"converged after sweep {sweep}", flush=True)
             return 0
-        print(f"sweep {sweep}: {deferred_total} deferred rows remain; re-sweeping in 120s", flush=True)
+        print(
+            f"sweep {sweep}: {deferred_total} deferred rows remain; re-sweeping in 120s", flush=True
+        )
         await asyncio.sleep(120)
 
-    print("WARNING: deferred rows remain after 5 sweeps — provider persistently failing", flush=True)
+    print(
+        "WARNING: deferred rows remain after 5 sweeps — provider persistently failing", flush=True
+    )
     return 1
 
 
