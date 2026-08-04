@@ -253,8 +253,14 @@ class CloudSurvey:
             return set()
         done = set()
         with path.open() as f:
-            for line in f:
-                rec = json.loads(line)
+            for i, line in enumerate(f, 1):
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    # A kill mid-write can truncate the final line; skipping it
+                    # re-runs that one call, and the analysis loader dedups.
+                    print(f"[{llm}] skipping corrupt line {i} in {path.name}", flush=True)
+                    continue
                 done.add((rec["question"], rec["system_prompt_id"], rec["repeat"]))
         return done
 
@@ -268,7 +274,11 @@ class CloudSurvey:
         # shared connection pool (observed as per-model tail hangs that a
         # process restart instantly cured). One TLS handshake per call is
         # cheap; a wedged run is not.
-        client = AsyncClient(host=self.host, headers={"Authorization": f"Bearer {self.api_key}"})
+        client = AsyncClient(
+            host=self.host,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            timeout=self.timeout_s,  # socket-level: dead connections error, never hang
+        )
         response = await client.chat(model=llm, messages=messages)
         content = response["message"]["content"] or ""
         thinking = response["message"].get("thinking") or ""

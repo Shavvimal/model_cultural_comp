@@ -72,14 +72,24 @@ async def main() -> int:
         flush=True,
     )
 
-    # Models run in small parallel batches; the shared semaphore caps total
-    # in-flight requests, so per-model progress interleaves without ever
-    # exceeding the account's concurrency budget.
-    for i in range(0, len(models), model_parallelism):
-        batch = models[i : i + model_parallelism]
-        await asyncio.gather(*(survey.run_model(llm) for llm in batch))
+    # Models run in parallel batches; the shared semaphore caps total
+    # in-flight requests. The outer loop re-sweeps deferred transport
+    # failures until every cell converges (refusals are persisted and count
+    # as complete), so a single invocation reaches 100% or reports why not.
+    for sweep in range(1, 6):
+        deferred_total = 0
+        for i in range(0, len(models), model_parallelism):
+            batch = models[i : i + model_parallelism]
+            counts = await asyncio.gather(*(survey.run_model(llm) for llm in batch))
+            deferred_total += sum(c["deferred"] for c in counts)
+        if deferred_total == 0:
+            print(f"converged after sweep {sweep}", flush=True)
+            return 0
+        print(f"sweep {sweep}: {deferred_total} deferred rows remain; re-sweeping in 120s", flush=True)
+        await asyncio.sleep(120)
 
-    return 0
+    print("WARNING: deferred rows remain after 5 sweeps — provider persistently failing", flush=True)
+    return 1
 
 
 if __name__ == "__main__":
