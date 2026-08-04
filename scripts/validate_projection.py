@@ -55,7 +55,7 @@ def check_a_path_identity(cm: CulturalMap) -> bool:
 
 
 def check_b_external_agreement(cm: CulturalMap, published: pd.DataFrame):
-    pub = published[published["llm"] == False]  # noqa: E712
+    pub = published[published["llm"] == False]
     merged = cm.country_scores_pca.merge(
         pub[["country_code", "PC1_rescaled", "PC2_rescaled"]],
         on="country_code",
