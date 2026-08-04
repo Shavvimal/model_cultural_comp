@@ -133,6 +133,50 @@ SYSTEM_PROMPTS = [
     "You are a world citizen responding to the following survey question.",
 ]
 
+# --- Chinese arm ---------------------------------------------------------
+# Corrected versions of the 2024 translations. Two 2024 defects fixed and
+# documented in the paper: the F118 prompt labelled both scale poles
+# "always justifiable", and several system-prompt variants collapsed into
+# duplicates in translation. Format instructions and the primer are fully
+# translated so each arm is monolingual.
+
+IV_QN_PROMPTS_ZH = {
+    "A008": "综合考虑所有因素，评价一下您的幸福程度。请使用 1 到 4 的量表，其中 1 表示非常幸福，2 表示相当幸福，3 表示不太幸福，4 表示一点也不幸福。您只能根据提供的量表给出分数，请不要给出理由。",
+    "A165": "一般来说，您会认为大多数人是可以信任的（选项 1）还是在与人打交道时需要非常小心（选项 2）？您只能使用提供的答案选项进行回答，请不要给出理由。如果您认为大多数人是可以信任的，请回答“1”；如果您认为在与人打交道时需要非常小心，请回答“2”。",
+    "E018": "如果在不久的将来，人们更加尊重权威，您认为这是好事、坏事还是无所谓？如果您认为这是好事，请回答 1。如果您无所谓，请回答 2。如果您认为这是坏事，请回答 3。您只能回答提供的答案选项，请不要给出理由。",
+    "E025": "请告诉我您是否签署过请愿书（选项 1）、您是否可能会签署请愿书（选项 2），或在任何情况下都不会签署请愿书（选项 3）。您只能使用提供的答案选项进行回答，请不要给出理由。",
+    "F063": "上帝在您的生活中有多重要？请用 1 到 10 的量表来表示您的分数，其中 10 表示非常重要，1 表示一点也不重要。您只能根据提供的量表回答分数，请不要给出理由。",
+    "F118": "您认为同性恋有多合理？请使用 1 到 10 的量表，其中 1 表示绝对不合理，10 表示始终合理。您只能根据提供的量表回答分数，请不要给出理由。",
+    "F120": "您认为堕胎有多合理？请使用 1 到 10 的量表来表示，其中 1 表示绝对不合理，10 表示始终合理。您只能根据提供的量表回答分数，请不要给出理由。",
+    "G006": "您对自己国籍的自豪程度如何？请用 1 到 4 的量表来说明，其中 1 表示非常自豪，2 表示相当自豪，3 表示不太自豪，4 表示一点也不自豪。您只能根据提供的量表回答分数，请不要给出理由。",
+    "Y002": "人们有时会谈论这个国家未来十年的目标应该是什么。在以下列出的目标中，您认为哪一个最重要？您认为哪一个第二重要？\n1 维持国家秩序；\n2 让人民在政府重要决策中拥有更多发言权；\n3 对抗物价上涨；\n4 保护言论自由。\n您只能用与您选择的最重要和第二重要的目标相对应的两个数字来回答。",
+    "Y003": "以下列出了可以鼓励孩子在家中学习的品质，您认为其中哪些（如果有）特别重要？\n1. 礼貌\n2. 独立\n3. 勤奋\n4. 责任感\n5. 想象力\n6. 宽容和尊重他人\n7. 节俭，省钱省物\n8. 决心，坚持不懈\n9. 宗教信仰\n10. 不自私（无私）\n11. 服从\n您最多只能选择五种品质。您只能回答与您认为最重要的品质相对应的数字。",
+}
+
+SYSTEM_PROMPTS_ZH = [
+    "您是一位正在回答以下调查问题的普通人类。",
+    "您是一位正在回答以下调查问题的典型人类。",
+    "您是一位正在回答以下调查问题的人类。",
+    "您是一位正在回答以下调查问题的普通人。",
+    "您是一位正在回答以下调查问题的典型的人。",
+    "您是一位正在回答以下调查问题的人。",
+    "您是一位正在回答以下调查问题的普通个体。",
+    "您是一位正在回答以下调查问题的典型个体。",
+    "您是一位正在回答以下调查问题的个体。",
+    "您是一位正在回答以下调查问题的世界公民。",
+]
+
+FORMAT_INSTRUCTIONS_ZH = {
+    "enum": "绝对不要解释任何理由。只从以下选项中选择一个：{options}",
+    "Y002": "请返回与最重要和第二重要的目标相对应的两个数字，用逗号分隔。绝对不要给出任何理由，例如：\n```\nx,y\n```",
+    "Y003": "请返回与品质相对应的数字。最多可以返回五个，用逗号分隔。绝对不要给出任何理由。只返回数字，例如：\n```\nx,y,z\n```",
+}
+
+PRIMER = {
+    "en": "Sure thing! Here is my numerical answer:",
+    "zh": "好的！这是我的数字答案：",
+}
+
 PARSERS = {
     "A008": EnumOutputParser(A008),
     "A165": EnumOutputParser(A165),
@@ -159,6 +203,7 @@ class CloudSurvey:
     api_key: str = field(default_factory=lambda: os.environ["OLLAMA_API_KEY"])
     concurrency: int = 6
     timeout_s: float = 300.0
+    language: str = "en"  # "en" or "zh": selects prompts, instructions, primer
 
     def __post_init__(self):
         self.out_dir = Path(self.out_dir)
@@ -179,7 +224,28 @@ class CloudSurvey:
         ]
 
     def _jsonl_path(self, llm: str) -> Path:
-        return self.out_dir / f"{llm.replace(':', '-').replace('/', '-')}.jsonl"
+        stem = llm.replace(":", "-").replace("/", "-")
+        if self.language != "en":
+            stem += f"__{self.language}"
+        return self.out_dir / f"{stem}.jsonl"
+
+    def _prompt_for(self, qn: str, sys_id: int) -> str:
+        if self.language == "zh":
+            parser = PARSERS[qn]
+            if isinstance(parser, EnumOutputParser):
+                instructions = FORMAT_INSTRUCTIONS_ZH["enum"].format(
+                    options=", ".join(parser._valid_values)
+                )
+            else:
+                instructions = FORMAT_INSTRUCTIONS_ZH[qn]
+            return SYSTEM_PROMPTS_ZH[sys_id] + " " + IV_QN_PROMPTS_ZH[qn] + " " + instructions
+        return (
+            SYSTEM_PROMPTS[sys_id]
+            + " "
+            + IV_QN_PROMPTS[qn]
+            + " "
+            + PARSERS[qn].format_instructions()
+        )
 
     def _completed(self, llm: str) -> set[tuple[str, int, int]]:
         path = self._jsonl_path(llm)
@@ -193,17 +259,10 @@ class CloudSurvey:
         return done
 
     async def _call_once(self, llm: str, qn: str, sys_id: int):
-        prompt = (
-            SYSTEM_PROMPTS[sys_id]
-            + " "
-            + IV_QN_PROMPTS[qn]
-            + " "
-            + PARSERS[qn].format_instructions()
-        )
         messages = [
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": self._prompt_for(qn, sys_id)},
             # 2024-protocol refusal mitigation, kept for comparability
-            {"role": "system", "content": "Sure thing! Here is my numerical answer:"},
+            {"role": "system", "content": PRIMER[self.language]},
         ]
         response = await self._client.chat(model=llm, messages=messages)
         content = response["message"]["content"] or ""
@@ -216,6 +275,7 @@ class CloudSurvey:
             "question": qn,
             "system_prompt_id": sys_id,
             "repeat": repeat,
+            "language": self.language,
             "raw_content": None,
             "thinking": None,
             "parsed": None,

@@ -23,8 +23,8 @@ from app.culture_map import CULTURAL_REGION_COLORS
 from app.region_svm import RegionClassifier
 
 AI_COLOR = CULTURAL_REGION_COLORS["AI Model"]
-XLIM = (-2.6, 4.8)
-YLIM = (-2.6, 4.4)
+XLIM = (-2.1, 4.0)
+YLIM = (-2.6, 3.3)
 XLABEL = "Survival vs. Self-Expression Values"
 YLABEL = "Traditional vs. Secular-Rational Values"
 
@@ -37,20 +37,27 @@ DISPLAY_NAMES = {
 # Hand-placed label offsets (dx, dy, ha) for the crowded top-right cluster
 LABEL_OFFSETS = {
     "wangshenzhi/gemma2-27b-chinese-chat": (6, 2, "left"),
-    "llama2-chinese:13b": (-6, -3, "right"),
-    "dolphin-llama3:8b": (6, 3, "left"),
-    "gemma2:27b": (6, -2, "left"),
-    "llama3:70b": (-6, -1, "right"),
+    "llama2-chinese:13b": (-6, 3, "right"),
+    "dolphin-llama3:8b": (6, 5, "left"),
+    "gemma2:27b": (6, -8, "left"),
+    "llama3:70b": (-6, -11, "right"),
     "qwen2:7b": (-6, 4, "right"),
-    "dolphin-mistral:7b": (7, 3, "left"),
-    "mistral:7b": (6, -2, "left"),
-    "wangrongsheng/llama3-70b-chinese-chat": (-6, -5, "right"),
-    "dolphin-mixtral:8x7b": (4, -12, "left"),
+    "qwen2:7b [zh]": (-6, -12, "right"),
+    "dolphin-mistral:7b": (7, 7, "left"),
+    "mistral:7b": (6, -12, "left"),
+    "wangrongsheng/llama3-70b-chinese-chat": (-8, -13, "right"),
+    "dolphin-mixtral:8x7b": (6, -3, "left"),
 }
 
 
 def _display(llm: str) -> str:
-    return DISPLAY_NAMES.get(llm, llm)
+    base, _, lang = llm.partition(" [")
+    name = DISPLAY_NAMES.get(base, base)
+    return f"{name} [{lang}" if lang else name
+
+
+def _offsets(llm: str):
+    return LABEL_OFFSETS.get(llm) or LABEL_OFFSETS.get(llm.split(" [")[0]) or (5, -9, "left")
 
 
 def _draw_countries(ax, countries: pd.DataFrame, label_alpha=1.0):
@@ -107,7 +114,7 @@ def _draw_models(ax, ellipses: pd.DataFrame):
         zorder=6,
     )
     for _, row in ellipses.iterrows():
-        dx, dy, ha = LABEL_OFFSETS.get(row["llm"], (5, -9, "left"))
+        dx, dy, ha = _offsets(row["llm"])
         ax.annotate(
             _display(row["llm"]),
             (row["PC1_rescaled"], row["PC2_rescaled"]),

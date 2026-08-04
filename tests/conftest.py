@@ -18,14 +18,23 @@ def rng():
 
 @pytest.fixture(scope="session")
 def synthetic_ivs(rng):
-    """An IVS-shaped frame with planted 2-factor structure and some NaNs."""
+    """An IVS-shaped frame with planted 2-factor structure and some NaNs.
+
+    Values are squashed into each item's valid range so the sentinel recode
+    in prepare_data() leaves the planted structure intact.
+    """
+    from app.culture_map import ITEM_VALID_RANGES
+
     n = N_COUNTRIES * ROWS_PER_COUNTRY
     latent = rng.standard_normal((n, 2))
     weights = rng.uniform(-1, 1, size=(2, len(IV_QNS)))
     x = latent @ weights + 0.3 * rng.standard_normal((n, len(IV_QNS)))
-    x = 5 + 2 * x  # shift/scale so standardization actually matters
 
     df = pd.DataFrame(x, columns=IV_QNS)
+    for qn in IV_QNS:
+        lo, hi = ITEM_VALID_RANGES[qn]
+        col = df[qn]
+        df[qn] = lo + (hi - lo) * (col - col.min()) / (col.max() - col.min())
     df["S020"] = 2010
     df["S003"] = np.repeat(np.arange(1, N_COUNTRIES + 1), ROWS_PER_COUNTRY)
     df["S017"] = 1.0

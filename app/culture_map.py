@@ -11,19 +11,33 @@ Everything projected afterwards — country data and model data alike — reuses
 the stored rotation, so all points share one coordinate space.
 """
 
-import glob
-import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from factor_analyzer import Rotator
 
-from app.llm_meta import CHINESE_LLMS
 from app.ppca import PPCA
 
 # The ten IVS items behind the Inglehart-Welzel map
 IV_QNS = ["A008", "A165", "E018", "E025", "F063", "F118", "F120", "G006", "Y002", "Y003"]
+
+# Valid value ranges per item. IVS microdata uses negative SPSS user-missing
+# codes (-1 "don't know" ... -5 "missing"); anything outside these ranges is a
+# sentinel, not a datum. Y003 is the documented offender: 31.9% of rows carry
+# -3 ("not applicable"), which an earlier version of this pipeline read as
+# data and which zeroed the item's loading on both axes.
+ITEM_VALID_RANGES = {
+    "A008": (1, 4),
+    "A165": (1, 2),
+    "E018": (1, 3),
+    "E025": (1, 3),
+    "F063": (1, 10),
+    "F118": (1, 10),
+    "F120": (1, 10),
+    "G006": (1, 4),
+    "Y002": (1, 3),
+    "Y003": (-2, 2),
+}
 
 # Published WVS rescaling constants: PC' = a * PC + b
 PC_RESCALE_PARAMS = {"PC1": (1.81, 0.38), "PC2": (1.61, -0.01)}
@@ -47,7 +61,7 @@ CULTURAL_REGION_COLORS = {
 class CulturalMap:
     """Fit the IW cultural map on IVS data and project new data onto it."""
 
-    def __init__(self, ivs_df, country_codes, data_dir="../data"):
+    def __init__(self, ivs_df, country_codes):
         """``ivs_df`` and ``country_codes`` may be DataFrames or pickle paths."""
         self.ivs_df = ivs_df if isinstance(ivs_df, pd.DataFrame) else pd.read_pickle(ivs_df)
         self.country_codes = (
@@ -55,7 +69,6 @@ class CulturalMap:
             if isinstance(country_codes, pd.DataFrame)
             else pd.read_pickle(country_codes)
         )
-        self.data_dir = data_dir
 
         self.subset_ivs_df = None
         self.valid_data = None
@@ -68,18 +81,33 @@ class CulturalMap:
 
         self.ppca = PPCA()
         self.rotation = None  # (2, 2) varimax rotation, fitted once in fit()
+        self.score_stds = None  # (2,) rotated-score SDs, fixed at fit time
+        self.sentinel_counts = None  # per-item out-of-range recode counts
 
     ##############################################
     ################ Fitting #####################
     ##############################################
 
     def prepare_data(self):
-        """Filter the IVS to post-2005 waves and the ten map items."""
+        """Filter the IVS to post-2005 waves and the ten map items.
+
+        Out-of-range values (SPSS user-missing sentinels) are recoded to NaN
+        *before* the completeness filter, so a sentinel never counts as an
+        answered item. Per-item recode counts are kept in
+        ``self.sentinel_counts``.
+        """
         subset = self.ivs_df[["S020", "S003", "S017"] + self.iv_qns]
         subset = subset.rename(columns={"S020": "year", "S003": "country_code", "S017": "weight"})
         # The waves from 2005 onwards reflect current societal norms; earlier
         # waves would blend in values measured up to four decades ago.
-        subset = subset[subset["year"] >= 2005]
+        subset = subset[subset["year"] >= 2005].copy()
+
+        self.sentinel_counts = {}
+        for qn, (lo, hi) in ITEM_VALID_RANGES.items():
+            bad = subset[qn].notna() & ((subset[qn] < lo) | (subset[qn] > hi))
+            self.sentinel_counts[qn] = int(bad.sum())
+            subset.loc[bad, qn] = np.nan
+
         # Require at least 6 of the 10 items answered
         subset = subset.dropna(subset=self.iv_qns, thresh=6)
         self.subset_ivs_df = subset
@@ -111,11 +139,23 @@ class CulturalMap:
         self._orient_rotation()
 
         rotated = scores @ self.rotation
+        # The published WVS rescale constants presuppose unit-variance factor
+        # scores; standardize the rotated scores before applying them, and
+        # keep the SDs so projected data goes through the identical path.
+        self.score_stds = rotated.std(axis=0, ddof=0)
+
         self.valid_data = self._rescale(rotated)
         self.valid_data["country_code"] = self.subset_ivs_df["country_code"].values
+        n_before = len(self.valid_data)
         self.valid_data = self.valid_data.merge(
             self.country_codes, left_on="country_code", right_on="Numeric", how="left"
         )
+        if len(self.valid_data) != n_before:
+            raise RuntimeError(
+                "country_codes merge changed the row count "
+                f"({n_before} -> {len(self.valid_data)}): duplicated Numeric codes "
+                "would silently corrupt every downstream coordinate."
+            )
 
     def _orient_rotation(self):
         """Fix the rotation's sign/order ambiguity to the IW convention.
@@ -139,7 +179,9 @@ class CulturalMap:
         self.rotation = self.rotation * signs
 
     def _rescale(self, rotated_scores) -> pd.DataFrame:
-        df = pd.DataFrame(rotated_scores, columns=["PC1", "PC2"])
+        if self.score_stds is None:
+            raise RuntimeError("score_stds not set; fit() or load_model() first.")
+        df = pd.DataFrame(rotated_scores / self.score_stds, columns=["PC1", "PC2"])
         for pc, (a, b) in self.pc_rescale_params.items():
             df[f"{pc}_rescaled"] = a * df[pc] + b
         return df
@@ -205,53 +247,6 @@ class CulturalMap:
         obedience = mentioned[11]
         return (faith + obedience) - (independence + determination)
 
-    def collect_llm_data(self, collection_dir=None) -> pd.DataFrame:
-        """Assemble pseudo-respondents from the stored raw model responses.
-
-        Pairs stored responses into complete ten-item respondents in stored
-        order. Retained for comparison with the 2024 analysis; the bootstrap
-        in llm_bootstrap.py supersedes it for uncertainty estimates.
-        """
-        collection_dir = collection_dir or os.path.join(self.data_dir, "collection")
-        files = glob.glob(os.path.join(collection_dir, "*.pkl"))
-        df = pd.concat((pd.read_pickle(f) for f in files), ignore_index=True)
-
-        rows = []
-        for name, group in df.groupby("llm"):
-            used = set()
-            while True:
-                row = {"llm": name}
-                complete = True
-                for question in self.iv_qns:
-                    available = group[(group["question"] == question) & (~group.index.isin(used))]
-                    if available.empty:
-                        row[question] = None
-                        complete = False
-                    else:
-                        row[question] = available.iloc[0]["response"]
-                        used.add(available.index[0])
-                rows.append(row)
-                if not complete:
-                    break
-
-        pivot = pd.DataFrame(rows).dropna()
-        pivot["Y002"] = pivot["Y002"].map(self.y002_transform).astype("float64")
-        pivot["Y003"] = pivot["Y003"].map(self.y003_transform).astype("float64")
-        return pivot
-
-    def project_llm_data(self, llm_data: pd.DataFrame) -> pd.DataFrame:
-        """Project per-respondent LLM data and attach the model name."""
-        projected = self.project(llm_data)
-        projected["llm"] = llm_data["llm"].values
-        return projected
-
-    def calculate_average_llm(self, projected: pd.DataFrame):
-        """Mean map position per model, flagged by origin."""
-        means = projected.groupby("llm")[["PC1_rescaled", "PC2_rescaled"]].mean().reset_index()
-        means["Cultural Region"] = "AI Model"
-        means["Chinese"] = means["llm"].isin(CHINESE_LLMS)
-        self.llm_scores_pca = means
-
     ##############################################
     ############### Persistence ##################
     ##############################################
@@ -265,6 +260,7 @@ class CulturalMap:
             stds=self.ppca.stds,
             eig_vals=self.ppca.eig_vals,
             rotation=self.rotation,
+            score_stds=self.score_stds,
         )
 
     def load_model(self, fpath):
@@ -275,6 +271,7 @@ class CulturalMap:
             self.ppca.stds = npz["stds"]
             self.ppca.eig_vals = npz["eig_vals"]
             self.rotation = npz["rotation"]
+            self.score_stds = npz["score_stds"]
 
     ##############################################
     ############## Visualization #################
@@ -334,8 +331,5 @@ if __name__ == "__main__":
     cultural_map.prepare_data()
     cultural_map.fit(seed=42, verbose=True)
     cultural_map.calculate_mean_scores()
-    llm_data = cultural_map.collect_llm_data()
-    projected = cultural_map.project_llm_data(llm_data)
-    cultural_map.calculate_average_llm(projected)
-    cultural_map.visualize_cultural_map(with_llms=True)
+    cultural_map.visualize_cultural_map()
     plt.show()

@@ -1,54 +1,73 @@
-"""Phase-3 analysis: project the 2026 cloud models onto the corrected map.
+"""2026-cohort analysis: cluster bootstrap (primary), both region rules,
+headline statistics, language-effect contrasts.
 
-Run from the repo root after collect_cloud_2026.py has finished:
+Run from the repo root after collect_cloud_2026.py (either arm):
 
     uv run python scripts/analyze_2026.py
 
-Reuses the fitted model from data/cultural_map_model.npz (so 2024 and 2026
-positions share one coordinate space by construction) and writes:
+Reads data/collection_2026/*.jsonl directly (both language arms, resumed
+runs deduplicated). Reuses the frozen fitted model, so 2024 and 2026
+positions share one coordinate space by construction.
 
-    data/llm_ellipses_2026.csv           mean + 95% ellipse per model
-    data/llm_region_stability_2026.csv   SVM region assignment + stability
-    data/llm_parse_rates_2026.csv        per-model parse success rates
-    figures/fig3_cultural_map_2026.{pdf,png}
+Writes:
+    data/llm_parse_rates_2026.csv
+    data/llm_bootstrap_replicates_2026.csv   cluster bootstrap (primary)
+    data/llm_ellipses_2026.csv               cluster + item-bootstrap SDs
+    data/llm_regions_2026.csv                both region rules
+    data/llm_headline_stats_2026.csv
+    data/llm_diagnostics_2026.csv
+    data/llm_language_effects_2026.csv       per-model zh - en displacement
 """
 
 import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from app.culture_map import CulturalMap
 from app.llm_bootstrap import (
     bootstrap_llm_positions,
+    bootstrap_llm_positions_cluster,
+    central_tendency_diagnostics,
+    centroid_statistics,
     confidence_ellipses,
-    load_transformed_responses,
+    load_responses_2026,
 )
 from app.llm_meta import cohort_2026
 from app.region_svm import RegionClassifier
 
 RAW_DIR = Path("data/collection_2026")
-N_BOOT = 1000
+N_BOOT_CLUSTER = 10_000
+N_BOOT_ITEM = 1000
 SEED = 42
-MIN_PER_QUESTION = 10  # a model needs at least this many parsed responses per item
+MIN_PER_QUESTION = 10
+
+
+def base_model(label: str) -> str:
+    return label.split(" [")[0]
 
 
 def parse_rates() -> pd.DataFrame:
     rows = []
     for path in sorted(RAW_DIR.glob("*.jsonl")):
         recs = [json.loads(line) for line in path.open()]
-        frame = pd.DataFrame(recs).drop_duplicates(
-            subset=["question", "system_prompt_id", "repeat"], keep="last"
+        frame = pd.DataFrame(recs)
+        frame["language"] = frame.get("language", pd.Series(["en"] * len(frame))).fillna("en")
+        frame = frame.drop_duplicates(
+            subset=["question", "system_prompt_id", "repeat", "language"], keep="last"
         )
         ok = frame["error"].isna()
+        llm = frame["llm"].iloc[0]
         rows.append(
             {
-                "llm": frame["llm"].iloc[0],
-                "cohort": cohort_2026(frame["llm"].iloc[0]),
+                "llm": llm,
+                "language": frame["language"].iloc[0],
+                "cohort": cohort_2026(llm),
                 "calls": len(frame),
                 "parsed": int(ok.sum()),
-                "parse_rate": round(ok.mean(), 4),
+                "parse_rate": round(float(ok.mean()), 4),
                 "min_per_question": int(frame[ok].groupby("question").size().min())
                 if ok.any()
                 else 0,
@@ -57,8 +76,44 @@ def parse_rates() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def language_effects(ellipses: pd.DataFrame, boot: pd.DataFrame) -> pd.DataFrame:
+    """Per-model zh - en displacement with a bootstrap CI.
+
+    Replicates are independent across arms, so the displacement CI pairs
+    replicate i of the zh arm with replicate i of the en arm.
+    """
+    rows = []
+    for label in ellipses["llm"]:
+        if not label.endswith(" [zh]"):
+            continue
+        base = base_model(label)
+        en = boot[boot["llm"] == base][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
+        zh = boot[boot["llm"] == label][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
+        if len(en) == 0 or len(zh) == 0:
+            continue
+        n = min(len(en), len(zh))
+        delta = zh[:n] - en[:n]
+        dist = np.linalg.norm(delta, axis=1)
+        rows.append(
+            {
+                "llm": base,
+                "cohort": cohort_2026(base),
+                "delta_pc1": delta[:, 0].mean(),
+                "delta_pc1_lo": np.quantile(delta[:, 0], 0.025),
+                "delta_pc1_hi": np.quantile(delta[:, 0], 0.975),
+                "delta_pc2": delta[:, 1].mean(),
+                "delta_pc2_lo": np.quantile(delta[:, 1], 0.025),
+                "delta_pc2_hi": np.quantile(delta[:, 1], 0.975),
+                "displacement": dist.mean(),
+                "displacement_lo": np.quantile(dist, 0.025),
+                "displacement_hi": np.quantile(dist, 0.975),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def main() -> int:
-    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl", data_dir="data")
+    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
     cm.load_model("data/cultural_map_model.npz")
     country_scores = pd.read_csv("data/corrected_country_scores.csv")
 
@@ -67,35 +122,59 @@ def main() -> int:
     print(rates.to_string(index=False))
     rates.to_csv("data/llm_parse_rates_2026.csv", index=False)
 
-    usable = rates[rates["min_per_question"] >= MIN_PER_QUESTION]["llm"]
-    excluded = sorted(set(rates["llm"]) - set(usable))
+    responses = load_responses_2026(cm, str(RAW_DIR))
+    per_item = responses.groupby("llm")["question"].value_counts().unstack(fill_value=0)
+    usable = per_item[per_item.min(axis=1) >= MIN_PER_QUESTION].index
+    excluded = sorted(set(responses["llm"]) - set(usable))
     if excluded:
-        print(f"\nexcluded (fewer than {MIN_PER_QUESTION} parsed responses on "
-              f"some item): {', '.join(excluded)}")
-
-    responses = load_transformed_responses(cm, str(RAW_DIR / "pickles"))
+        print(
+            f"\nexcluded (<{MIN_PER_QUESTION} parsed on some item — an "
+            f"outcome-dependent exclusion, reported as such): {', '.join(excluded)}"
+        )
     responses = responses[responses["llm"].isin(set(usable))]
 
-    boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT, seed=SEED)
+    boot = bootstrap_llm_positions_cluster(cm, responses, n_boot=N_BOOT_CLUSTER, seed=SEED)
     ellipses = confidence_ellipses(boot)
-    ellipses["cohort"] = ellipses["llm"].map(cohort_2026)
+
+    # Item bootstrap alongside, as the explicit lower bound
+    item_boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT_ITEM, seed=SEED)
+    item_sd = (
+        confidence_ellipses(item_boot)[["llm", "sd_pc1", "sd_pc2"]]
+        .rename(columns={"sd_pc1": "item_sd_pc1", "sd_pc2": "item_sd_pc2"})
+    )
+    ellipses = ellipses.merge(item_sd, on="llm")
 
     clf = RegionClassifier().fit(country_scores)
-    stability = clf.region_stability(boot)
+    print(f"\nSVM 5-fold CV accuracy: {clf.cv_accuracy:.3f}")
+    regions = clf.region_assignments(boot)
+    headline = centroid_statistics(boot, country_scores)
+    diagnostics = central_tendency_diagnostics(cm, responses)
+    lang_fx = language_effects(ellipses, boot)
 
-    summary = ellipses.merge(stability, on="llm")
-    cols = ["llm", "cohort", "PC1_rescaled", "PC2_rescaled", "sd_pc1", "sd_pc2",
-            "region", "stability", "runner_up", "runner_up_share"]
-    with pd.option_context("display.width", 220):
-        print("\n=== 2026 positions ===")
+    summary = ellipses.merge(regions, on="llm").merge(headline, on="llm")
+    summary["cohort"] = summary["llm"].map(lambda x: cohort_2026(base_model(x)))
+    cols = [
+        "llm", "cohort", "PC1_rescaled", "PC2_rescaled", "sd_pc1", "sd_pc2",
+        "item_sd_pc1", "svm_region", "positional_stability", "centroid_region",
+        "rules_agree", "dist_human_mean", "pct_countries_closer", "min_dist_nonwestern",
+    ]
+    with pd.option_context("display.width", 260):
+        print("\n=== 2026 positions (cluster bootstrap) ===")
         print(summary[cols].round(3).to_string(index=False))
+        if len(lang_fx):
+            print("\n=== Language effects (zh - en, per model) ===")
+            print(lang_fx.round(3).to_string(index=False))
+            print("\nCohort mean displacement:")
+            print(lang_fx.groupby("cohort")[["delta_pc1", "delta_pc2", "displacement"]]
+                  .mean().round(3))
 
-    ellipses.to_csv("data/llm_ellipses_2026.csv", index=False)
-    stability.to_csv("data/llm_region_stability_2026.csv", index=False)
     boot.to_csv("data/llm_bootstrap_replicates_2026.csv", index=False)
-
-    print("\n=== Cohort means ===")
-    print(summary.groupby("cohort")[["PC1_rescaled", "PC2_rescaled"]].mean().round(3))
+    ellipses.to_csv("data/llm_ellipses_2026.csv", index=False)
+    regions.to_csv("data/llm_regions_2026.csv", index=False)
+    headline.to_csv("data/llm_headline_stats_2026.csv", index=False)
+    diagnostics.to_csv("data/llm_diagnostics_2026.csv", index=False)
+    lang_fx.to_csv("data/llm_language_effects_2026.csv", index=False)
+    print("\nWrote the six data/llm_*_2026.csv artefacts.")
     return 0
 
 

@@ -95,3 +95,28 @@ class TestGuards:
         cm = CulturalMap(synthetic_ivs, synthetic_country_codes)
         with pytest.raises(RuntimeError):
             cm.fit()
+
+
+class TestSentinelRecode:
+    def test_out_of_range_values_become_nan(self, synthetic_ivs, synthetic_country_codes):
+        """The Y003 bug: SPSS user-missing codes must never count as data."""
+        poisoned = synthetic_ivs.copy()
+        poisoned.iloc[:50, poisoned.columns.get_loc("Y003")] = -3.0
+        cm = CulturalMap(poisoned, synthetic_country_codes)
+        cm.prepare_data()
+        assert cm.sentinel_counts["Y003"] == 50
+        assert not (
+            (cm.subset_ivs_df["Y003"] < -2) | (cm.subset_ivs_df["Y003"] > 2)
+        ).any()
+
+    def test_sentinels_do_not_count_toward_completeness(
+        self, synthetic_ivs, synthetic_country_codes
+    ):
+        poisoned = synthetic_ivs.copy()
+        # five items set to sentinels: with the recode the row has at most
+        # five answered items and must be dropped by the >=6 filter
+        for qn in ["A008", "A165", "E018", "E025", "F063"]:
+            poisoned.iloc[0, poisoned.columns.get_loc(qn)] = -5.0
+        cm = CulturalMap(poisoned, synthetic_country_codes)
+        cm.prepare_data()
+        assert poisoned.index[0] not in cm.subset_ivs_df.index
