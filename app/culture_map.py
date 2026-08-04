@@ -48,9 +48,13 @@ CULTURAL_REGION_COLORS = {
 class CulturalMap:
     """Fit the IW cultural map on IVS data and project new data onto it."""
 
-    def __init__(self, ivs_df_path, country_codes_path, data_dir="../data"):
-        self.ivs_df = pd.read_pickle(ivs_df_path)
-        self.country_codes = pd.read_pickle(country_codes_path)
+    def __init__(self, ivs_df, country_codes, data_dir="../data"):
+        """``ivs_df`` and ``country_codes`` may be DataFrames or pickle paths."""
+        self.ivs_df = ivs_df if isinstance(ivs_df, pd.DataFrame) else pd.read_pickle(ivs_df)
+        self.country_codes = (
+            country_codes if isinstance(country_codes, pd.DataFrame)
+            else pd.read_pickle(country_codes)
+        )
         self.data_dir = data_dir
 
         self.subset_ivs_df = None

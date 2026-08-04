@@ -139,12 +139,10 @@ class Y002(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def check_combinations(cls, values):
-        most_important = values.most_important
-        second_most_important = values.second_most_important
-        if most_important == second_most_important:
+    def check_combinations(self):
+        if self.most_important == self.second_most_important:
             raise ValueError("The two choices must be different")
-        return values
+        return self
 
 
 class Y003Options(IntEnum):
@@ -171,8 +169,7 @@ class Y003(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def check_unique_choices(cls, values):
-        choices = values.choices
-        if len(choices) != len(set(choices)):
+    def check_unique_choices(self):
+        if len(self.choices) != len(set(self.choices)):
             raise ValueError("The choices must be unique.")
-        return values
+        return self
