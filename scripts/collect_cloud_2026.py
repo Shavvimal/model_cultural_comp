@@ -60,7 +60,10 @@ async def main() -> int:
 
     concurrency = int(os.environ.get("SURVEY_CONCURRENCY", "18"))
     model_parallelism = int(os.environ.get("SURVEY_MODEL_PARALLELISM", "3"))
-    survey = CloudSurvey(out_dir=RAW_DIR, concurrency=concurrency, language=language)
+    timeout_s = float(os.environ.get("SURVEY_TIMEOUT_S", "300"))
+    survey = CloudSurvey(
+        out_dir=RAW_DIR, concurrency=concurrency, language=language, timeout_s=timeout_s
+    )
     models = args or await list_cloud_models(survey)
     print(
         f"Surveying {len(models)} models [{language}] "
