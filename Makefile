@@ -26,3 +26,6 @@ check: lint test
 validate:
 	uv run python scripts/validate_projection.py
 	uv run python scripts/bootstrap_llms.py
+
+progress: ## Show 2026 collection progress
+	bash scripts/progress.sh
