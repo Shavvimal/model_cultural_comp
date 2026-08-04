@@ -32,7 +32,7 @@ class PPCA:
         self.var_exp = None  # (d,) cumulative explained variance ratio
         self.data = None  # (N, D) standardized training data, EM-imputed
 
-    def fit(self, data, d=None, tol=1e-4, min_obs=10, seed=None, verbose=False):
+    def fit(self, data, d=None, tol=1e-4, min_obs=10, seed=None, verbose=False, max_iter=1000):
         """Fit the model to ``data`` (shape N x D, NaNs allowed).
 
         :param d: number of latent dimensions (defaults to D)
@@ -41,6 +41,8 @@ class PPCA:
         :param seed: seed for the random initialization of the loading matrix;
             set for reproducible fits
         :param verbose: print the convergence criterion each iteration
+        :param max_iter: hard cap on EM iterations; raises RuntimeError rather
+            than silently returning an unconverged fit
         """
         raw = np.array(data, dtype=float, copy=True)
         raw[np.isinf(raw)] = np.max(raw[np.isfinite(raw)])
@@ -102,6 +104,11 @@ class PPCA:
                 print(diff)
             if (diff < tol) and (counter > 5):
                 break
+            if counter >= max_iter:
+                raise RuntimeError(
+                    f"EM did not converge within {max_iter} iterations "
+                    f"(last relative change {diff:.2e}, tol {tol})."
+                )
 
             counter += 1
             v0 = v1
