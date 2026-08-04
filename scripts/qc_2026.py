@@ -50,6 +50,13 @@ REFUSAL_MARKERS = [
     "unable to answer",
     "i'm sorry",
     "i am sorry",
+    "not going to answer",
+    "can't comply",
+    "cannot comply",
+    "won't be answering",
+    "decline to answer",
+    "cannot answer",
+    "can't answer",
     "作为人工智能",
     "作为一个ai",
     "我不能",
@@ -154,7 +161,7 @@ def parse_rate_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def classify_failure(raw: str, error: str) -> str:
-    low = raw.strip().lower()
+    low = raw.strip().lower().replace("\u2019", "'")
     if not low:
         return "empty"
     if any(m in low for m in REFUSAL_MARKERS):

@@ -30,7 +30,7 @@ from app.llm_meta import cohort_2026
 from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, _draw_countries
 
 # Okabe-Ito, CVD-validated
-COHORT_COLORS = {"chinese": "#d55e00", "western": "#0072b2"}
+COHORT_COLORS = {"Chinese": "#d55e00", "Western": "#0072b2"}
 AI_2024 = "#5e35b1"
 
 
@@ -129,8 +129,8 @@ def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
     handles = [
         Line2D([], [], marker="D", ls="", color="0.35", label="English administration"),
         Line2D([], [], marker="^", ls="", color="0.35", label="Chinese administration"),
-        Line2D([], [], marker="s", ls="", color=COHORT_COLORS["chinese"], label="Chinese-origin"),
-        Line2D([], [], marker="s", ls="", color=COHORT_COLORS["western"], label="Western-origin"),
+        Line2D([], [], marker="s", ls="", color=COHORT_COLORS["Chinese"], label="Chinese-origin"),
+        Line2D([], [], marker="s", ls="", color=COHORT_COLORS["Western"], label="Western-origin"),
     ]
     ax.legend(handles=handles, fontsize=7.5, loc="lower right", framealpha=0.9)
     _finish(
@@ -162,7 +162,7 @@ def fig4_language_forest(lang_fx: pd.DataFrame):
     axes[0].set_yticks(list(y))
     axes[0].set_yticklabels([_short(m) for m in fx["llm"]], fontsize=8)
     handles = [
-        Line2D([], [], marker="o", ls="", color=c, label=f"{k.capitalize()}-origin")
+        Line2D([], [], marker="o", ls="", color=c, label=f"{k}-origin")
         for k, c in COHORT_COLORS.items()
     ]
     axes[1].legend(handles=handles, fontsize=8, loc="lower right", framealpha=0.9)

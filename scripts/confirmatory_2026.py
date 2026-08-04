@@ -91,7 +91,7 @@ def origin_language_permutation(lang_fx: pd.DataFrame, seed: int = SEED) -> pd.D
     and for the displacement magnitude. Permutes cohort labels.
     """
     rng = np.random.default_rng(seed)
-    is_cn = (lang_fx["cohort"] == "chinese").to_numpy()
+    is_cn = (lang_fx["cohort"].str.lower() == "chinese").to_numpy()
     stats = {}
     for col in ["delta_pc1", "delta_pc2", "displacement"]:
         v = lang_fx[col].to_numpy()
@@ -237,7 +237,7 @@ def coherence_rate(rates_2026: pd.DataFrame, min_per_question: int = 10) -> pd.D
     provisioning failure, not a model behaviour; reported in Appendix A).
     """
     en = rates_2026[(rates_2026["language"] == "en")]
-    cn = en[en["cohort"] == "chinese"]
+    cn = en[en["cohort"].str.lower() == "chinese"]
     coherent = int((cn["min_per_question"] >= min_per_question).sum())
     attempted = len(cn)
     rows = []
@@ -304,7 +304,7 @@ def _synthetic_fixtures() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.
     lang_fx = pd.DataFrame(
         {
             "llm": models,
-            "cohort": ["chinese"] * 3 + ["western"] * 3,
+            "cohort": ["Chinese"] * 3 + ["Western"] * 3,
             "delta_pc1": rng.normal(0.3, 0.1, 6),
             "delta_pc2": rng.normal(-0.8, 0.2, 6),
             "displacement": rng.uniform(0.5, 1.5, 6),
@@ -337,7 +337,7 @@ def _synthetic_fixtures() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.
         {
             "llm": models,
             "language": "en",
-            "cohort": ["chinese"] * 3 + ["western"] * 3,
+            "cohort": ["Chinese"] * 3 + ["Western"] * 3,
             "min_per_question": [50, 50, 8, 50, 50, 50],
         }
     )
@@ -362,7 +362,7 @@ def main(selftest: bool = False) -> int:
         "conf_2026_mean_displacement": mean_displacement_ci(lang_fx),
         "conf_2026_origin_permutation": origin_language_permutation(lang_fx),
         "conf_2026_confucian_distances": confucian_distances(
-            boot, country_scores, cohort_fn=(lambda m: "chinese") if selftest else cohort_2026
+            boot, country_scores, cohort_fn=(lambda m: "Chinese") if selftest else cohort_2026
         ),
         "conf_2026_coherence_rate": coherence_rate(rates),
         "conf_2026_simultaneous_headline": simultaneous_headline(boot, country_scores),
