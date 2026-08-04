@@ -87,6 +87,17 @@ Pre-specified estimators; no alternatives tried first.
 
 ## 2. Secondary & diagnostic analyses
 
+- [ ] **Variance-components (G-theory) decomposition** — a methodological
+      first for values instruments: crossed components model × language ×
+      prompt-variant × repeat, reported in map units per axis. The harness
+      records every needed facet. (Added from the personas/ephemerality
+      literature review: no G-theory decomposition exists for any LLM
+      values instrument.)
+- [ ] **Item keying balance / response-directionality diagnostic:** report
+      the ten items' keying orientation and each cell's directional
+      response bias (acquiescence-style statistics), since directional
+      bias can masquerade as value placement.
+
 - [ ] **Prompt-variant ICC** per item × model × language (the cluster
       bootstrap's justification — report the max-ICC table; 2026-en early
       values reached 0.56).
@@ -177,3 +188,8 @@ Pre-specified estimators; no alternatives tried first.
 ## Deviations log
 
 *(append-only; date + what changed + why)*
+
+- 2026-08-04: Added G-theory variance decomposition and keying-balance
+  diagnostic (from docs review of stability/psychometrics literature);
+  noted interlocutor-crossed control as a future robustness arm. Added
+  before any 2026 projection was computed.
