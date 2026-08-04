@@ -1,0 +1,70 @@
+name: Bug report
+description: Report something in the pipeline that isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the sections
+        below. For security vulnerabilities, or anything involving exposed
+        survey data or API keys, do **not** use this form — see
+        [SECURITY.md](../blob/main/SECURITY.md) and report privately instead.
+
+        Never attach WVS/EVS survey data or `*.pkl` files to an issue.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands you ran (e.g. `make test`, `uv run python scripts/validate_projection.py`).
+      placeholder: |
+        1. uv sync
+        2. make test
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What you expected to happen, and what actually happened. For numerical issues, include the coordinates you got and the ones you expected.
+    validations:
+      required: true
+  - type: dropdown
+    id: data
+    attributes:
+      label: Do you have the IVS data locally?
+      description: Bugs in `make validate` need it; bugs in `make test` should not.
+      options:
+        - "No — this reproduces without any dataset"
+        - "Yes — the full IVS merge is present"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your OS, Python version, and `uv --version`. Include the Ollama version if the collection harness is involved.
+      placeholder: |
+        OS: macOS 15.5
+        Python: 3.11.9
+        uv: 0.x
+        Ollama: 0.x
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: >
+        A relevant excerpt of the traceback or output. Scrub any API keys and any
+        survey microdata first.
+      render: text
+    validations:
+      required: false

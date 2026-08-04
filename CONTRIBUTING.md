@@ -1,0 +1,88 @@
+# Contributing to model_cultural_comp
+
+Thanks for your interest in improving this project. It is the code artefact behind a
+paper, so the bar for anything that touches a published number is high — but
+contributions of all sizes are welcome, from typo fixes to new models on the map.
+
+## Ground rules
+
+- Be respectful. This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+- Keep changes focused. One logical change per pull request.
+- Discuss large changes first by opening an issue, so we agree on direction before you invest time.
+- **Never commit survey data.** The WVS/EVS inputs are licensed to you personally and
+  may not be redistributed. `data/` and `*.pkl` are gitignored; keep it that way.
+
+## Development setup
+
+```bash
+git clone https://github.com/Shavvimal/model_cultural_comp
+cd model_cultural_comp
+uv venv --python 3.11
+uv sync             # or: make install
+```
+
+`app/` is installed as a package, so `from app.culture_map import CulturalMap` works
+from any working directory — imports must never rely on the CWD being `app/`.
+
+The survey data is not in the repo and is not needed for development. See the README
+for how to obtain it if you want to run the reproduction.
+
+## Before you open a PR
+
+Run the full local gate — this mirrors CI exactly:
+
+```bash
+make check          # ruff check + pytest
+```
+
+Individual targets are available too: `make lint`, `make format`, `make test`.
+
+There are two test gates, and they are not interchangeable:
+
+- **`make test`** — the unit suite. Runs against synthetic, seeded fixtures generated
+  inside the test suite; needs no dataset, no network and no Ollama. This is what CI
+  runs, and a PR must be green here before it can merge.
+- **`make validate`** — the reproduction. Refits the pipeline on the real ~5.8GB IVS
+  data on your machine and reproduces the country-coordinate ground truth, then the
+  bootstrap. **CI can never run this**: the WVS and GESIS data-use agreements forbid
+  redistribution, so the data cannot be checked in or fetched by a workflow. If your
+  change could move a published number, run `make validate` locally and paste the
+  result in the PR.
+
+## Adding a new model
+
+The surveyed-model list lives in `app/llm_meta.py`, and that is the single source of
+truth. (There used to be four divergent copies of it across `culture_map.py`,
+`culture_map_post_hoc.py` and the notebooks, which disagreed about which entries were
+commented out — do not reintroduce a second copy.) Adding a model is:
+
+1. An entry in the appropriate set in `app/llm_meta.py` (`CHINESE_LLMS`,
+   `DOLPHIN_LLMS`, …), using the exact Ollama tag used to collect it.
+2. A collection run producing stored responses under `data/collection/`.
+3. A README row citing the model's source (HuggingFace repo or Ollama tag),
+   quantisation and licence.
+
+A new model must satisfy the parser contract in `app/qn_classes.py`. Each of the ten
+IVS items has a response class, and the model's raw output has to parse into it:
+
+- **Bare integer** for the single-choice items (`A008`, `A165`, `E018`, `E025`,
+  `F063`, `F118`, `F120`, `G006`) — one value from that item's `IntEnum`.
+- **Tuple** for `Y002` — the most important and second most important goal.
+- **List** for `Y003` — the chosen qualities, up to five.
+
+A model that cannot produce parseable answers does not silently vanish from the
+sample: record it in `FAILED_LLMS_2024` (or its successor) with the reason, since a
+refusal or malformed-output rate is itself a result.
+
+## Pull request process
+
+1. Fork and create a topic branch (`git checkout -b my-change`).
+2. Make your change with tests and a green `make check`.
+3. Open a PR against `main` and fill in the PR template.
+4. A maintainer reviews; address review threads (they must be resolved before merge).
+5. PRs are merged via **squash** to keep history linear.
+
+## Commit messages
+
+Keep them short and imperative ("store varimax rotation at fit time", not
+"added/adds"). Reference an issue number when relevant.
