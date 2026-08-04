@@ -14,8 +14,9 @@ app/ppca.py
   Copyright Allen Tran
   Licensed under the Apache License, Version 2.0.
 
-  You may obtain a copy of the Apache License, Version 2.0 at:
-  http://www.apache.org/licenses/LICENSE-2.0
+  A full copy of the Apache License, Version 2.0 is included in this
+  repository at LICENSES/Apache-2.0.txt (also available at
+  http://www.apache.org/licenses/LICENSE-2.0).
 
   Unless required by applicable law or agreed to in writing, software
   distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -39,3 +40,12 @@ app/ppca.py
   of Tipping, M. E. and Bishop, C. M. (1999), "Probabilistic Principal
   Component Analysis", Journal of the Royal Statistical Society, Series B,
   61(3), 611-622.
+
+Survey instrument texts
+-----------------------
+The ten survey item prompts administered to models are adapted from the
+Integrated Values Surveys (WVS/EVS) master questionnaires, © World Values
+Survey Association and European Values Study. They are reproduced here for
+research and replication purposes only; the underlying survey microdata is
+governed by the WVS/GESIS data-use agreements and is not distributed with
+this repository.

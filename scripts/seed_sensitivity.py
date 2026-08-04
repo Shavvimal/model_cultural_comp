@@ -36,7 +36,9 @@ def main() -> int:
         print(f"seed {seed}: angle {angles[-1]:+.2f} deg", flush=True)
 
     allc = pd.concat(coords)
-    stats = allc.groupby("country_code")[["PC1_rescaled", "PC2_rescaled"]].agg(["std", "min", "max"])
+    stats = allc.groupby("country_code")[["PC1_rescaled", "PC2_rescaled"]].agg(
+        ["std", "min", "max"]
+    )
     stats.columns = ["_".join(c) for c in stats.columns]
     stats["range_pc1"] = stats["PC1_rescaled_max"] - stats["PC1_rescaled_min"]
     stats["range_pc2"] = stats["PC2_rescaled_max"] - stats["PC2_rescaled_min"]

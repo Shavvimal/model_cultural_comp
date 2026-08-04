@@ -42,10 +42,7 @@ def main() -> int:
     country_scores = pd.read_csv("data/corrected_country_scores.csv")
 
     responses = load_transformed_responses(cm, "data/collection")
-    print(
-        f"{responses['llm'].nunique()} model-language cells, "
-        f"{len(responses)} stored responses"
-    )
+    print(f"{responses['llm'].nunique()} model-language cells, {len(responses)} stored responses")
 
     boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT, seed=SEED)
     ellipses = confidence_ellipses(boot)
@@ -58,9 +55,18 @@ def main() -> int:
 
     summary = ellipses.merge(regions, on="llm").merge(headline, on="llm")
     cols = [
-        "llm", "PC1_rescaled", "PC2_rescaled", "sd_pc1", "sd_pc2",
-        "svm_region", "positional_stability", "centroid_region", "rules_agree",
-        "dist_human_mean", "pct_countries_closer", "min_dist_nonwestern",
+        "llm",
+        "PC1_rescaled",
+        "PC2_rescaled",
+        "sd_pc1",
+        "sd_pc2",
+        "svm_region",
+        "positional_stability",
+        "centroid_region",
+        "rules_agree",
+        "dist_human_mean",
+        "pct_countries_closer",
+        "min_dist_nonwestern",
     ]
     with pd.option_context("display.width", 240):
         print(summary[cols].round(3).to_string(index=False))

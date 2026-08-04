@@ -146,6 +146,7 @@ class CulturalMap:
 
         self.valid_data = self._rescale(rotated)
         self.valid_data["country_code"] = self.subset_ivs_df["country_code"].values
+        self.valid_data["weight"] = self.subset_ivs_df["weight"].values
         n_before = len(self.valid_data)
         self.valid_data = self.valid_data.merge(
             self.country_codes, left_on="country_code", right_on="Numeric", how="left"
@@ -204,10 +205,25 @@ class CulturalMap:
         return self._rescale(scores @ self.rotation)
 
     def calculate_mean_scores(self):
-        """Country-level means of the rescaled individual scores."""
+        """Country-level means of the rescaled individual scores.
+
+        Weighted by the IVS equilibrated weight (S017), which corrects
+        within-country sampling design; unweighted means would treat every
+        respondent as equally representative of their country.
+        """
+
+        def weighted(group: pd.DataFrame) -> pd.Series:
+            w = group["weight"].fillna(1.0)
+            return pd.Series(
+                {
+                    "PC1_rescaled": np.average(group["PC1_rescaled"], weights=w),
+                    "PC2_rescaled": np.average(group["PC2_rescaled"], weights=w),
+                }
+            )
+
         means = (
-            self.valid_data.groupby("country_code")[["PC1_rescaled", "PC2_rescaled"]]
-            .mean()
+            self.valid_data.groupby("country_code")[["PC1_rescaled", "PC2_rescaled", "weight"]]
+            .apply(weighted)
             .reset_index()
         )
         merged = means.merge(
@@ -221,10 +237,15 @@ class CulturalMap:
 
     @staticmethod
     def y002_transform(ans) -> float:
-        """Post-materialist index (Y002) from the two E-goal choices."""
+        """Post-materialist index (Y002) from the two E-goal choices.
+
+        Raises on invalid choices rather than returning a sentinel: the
+        model-response path applies no range recode downstream, so a
+        sentinel here would flow straight into a published coordinate.
+        """
         first, second = ans[0], ans[1]
-        if first < 0 or second < 0:
-            return -5
+        if not (1 <= first <= 4 and 1 <= second <= 4):
+            raise ValueError(f"Y002 choices out of range: {ans!r}")
         if (first == 1 and second == 3) or (first == 3 and second == 1):
             return 1  # materialist
         if (first == 2 and second == 4) or (first == 4 and second == 2):

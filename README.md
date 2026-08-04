@@ -138,7 +138,7 @@ under **Apache-2.0**. Apache-2.0 code may be redistributed inside an MIT-license
 project provided the upstream notices are retained and the modifications are stated, so
 that is what [NOTICE](NOTICE) and the header of `app/ppca.py` do. Practically, for a
 downstream user: the repository is MIT, and if you redistribute `app/ppca.py` (or a
-derivative of it) you must carry the `NOTICE` file and the Apache-2.0 attribution with
+derivative of it) you must include a copy of the Apache-2.0 license (see `LICENSES/Apache-2.0.txt`), state any changes you make, and carry the `NOTICE` file and the Apache-2.0 attribution with
 it. The method itself is Tipping & Bishop (1999).
 
 The IVS/WVS/EVS data is under its own terms and is **not** covered by this licence and

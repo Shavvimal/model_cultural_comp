@@ -4,7 +4,7 @@ install:
 	uv sync
 
 lint:
-	uv run ruff check app scripts tests
+	uv run ruff check app scripts tests && uv run ruff format --check app scripts tests
 
 format:
 	uv run ruff check --fix app scripts tests

@@ -66,11 +66,17 @@ class TestWvsIndexTransforms:
             ((4, 2), 3),  # post-materialist
             ((1, 2), 2),
             ((3, 4), 2),  # mixed
-            ((-1, 3), -5),  # missing
         ],
     )
     def test_y002(self, ans, expected):
         assert CulturalMap.y002_transform(ans) == expected
+
+    @pytest.mark.parametrize("ans", [(-1, 3), (0, 2), (1, 5)])
+    def test_y002_rejects_out_of_range(self, ans):
+        """Out-of-range choices raise; a sentinel would flow into a
+        published coordinate because the model path applies no recode."""
+        with pytest.raises(ValueError, match="out of range"):
+            CulturalMap.y002_transform(ans)
 
     @pytest.mark.parametrize(
         "choices,expected",
@@ -105,9 +111,7 @@ class TestSentinelRecode:
         cm = CulturalMap(poisoned, synthetic_country_codes)
         cm.prepare_data()
         assert cm.sentinel_counts["Y003"] == 50
-        assert not (
-            (cm.subset_ivs_df["Y003"] < -2) | (cm.subset_ivs_df["Y003"] > 2)
-        ).any()
+        assert not ((cm.subset_ivs_df["Y003"] < -2) | (cm.subset_ivs_df["Y003"] > 2)).any()
 
     def test_sentinels_do_not_count_toward_completeness(
         self, synthetic_ivs, synthetic_country_codes

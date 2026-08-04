@@ -71,9 +71,7 @@ def check_b_external_agreement(cm: CulturalMap, published: pd.DataFrame):
 
 
 def check_c_rotation_diagnostics(cm: CulturalMap):
-    loadings = pd.DataFrame(
-        cm.ppca.C @ cm.rotation, index=cm.iv_qns, columns=["PC1", "PC2"]
-    )
+    loadings = pd.DataFrame(cm.ppca.C @ cm.rotation, index=cm.iv_qns, columns=["PC1", "PC2"])
     print("\n=== C. Rotated loadings (C @ R) ===")
     print(loadings.round(3).to_string())
 

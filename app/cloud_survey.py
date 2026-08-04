@@ -307,7 +307,7 @@ class CloudSurvey:
             # rate limit, 5xx) is expected at this volume, the record keeps
             # the error string so nothing fails silently, and the degradation
             # is a logged failed row that the analysis stage reports.
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 record["error"] = f"{type(exc).__name__}: {exc}"
                 record["duration_ms"] = int((time.time() - start) * 1000)
                 record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")

@@ -31,6 +31,7 @@ class PPCA:
         self.eig_vals = None  # (d,) score variances, descending
         self.var_exp = None  # (d,) cumulative explained variance ratio
         self.data = None  # (N, D) standardized training data, EM-imputed
+        self.valid_series = None  # (D_in,) column mask applied during fit
 
     def fit(self, data, d=None, tol=1e-4, min_obs=10, seed=None, verbose=False, max_iter=1000):
         """Fit the model to ``data`` (shape N x D, NaNs allowed).
@@ -47,8 +48,11 @@ class PPCA:
         raw = np.array(data, dtype=float, copy=True)
         raw[np.isinf(raw)] = np.max(raw[np.isfinite(raw)])
 
-        valid_series = np.sum(~np.isnan(raw), axis=0) >= min_obs
-        data = raw[:, valid_series].copy()
+        # Columns dropped here are remembered so transform() can apply the
+        # same selection — otherwise fitted means/stds/C would silently
+        # misalign with full-width input.
+        self.valid_series = np.sum(~np.isnan(raw), axis=0) >= min_obs
+        data = raw[:, self.valid_series].copy()
         N, D = data.shape
 
         self.means = np.nanmean(data, axis=0)
@@ -145,6 +149,13 @@ class PPCA:
         if data is None:
             return self.data @ self.C
         data = np.asarray(data, dtype=float)
+        if self.valid_series is not None and data.shape[1] == len(self.valid_series):
+            data = data[:, self.valid_series]
+        if data.shape[1] != len(self.means):
+            raise ValueError(
+                f"expected {len(self.valid_series) if self.valid_series is not None else len(self.means)} "
+                f"columns (as passed to fit), got {data.shape[1]}"
+            )
         if np.isnan(data).any():
             raise ValueError(
                 "transform() requires complete observations; "
@@ -158,7 +169,14 @@ class PPCA:
 
     def save(self, fpath):
         """Save all model parameters (npz)."""
-        np.savez(fpath, C=self.C, means=self.means, stds=self.stds, eig_vals=self.eig_vals)
+        np.savez(
+            fpath,
+            C=self.C,
+            means=self.means,
+            stds=self.stds,
+            eig_vals=self.eig_vals,
+            valid_series=self.valid_series,
+        )
 
     def load(self, fpath):
         """Load model parameters saved by :meth:`save`."""
@@ -167,3 +185,5 @@ class PPCA:
             self.means = npz["means"]
             self.stds = npz["stds"]
             self.eig_vals = npz["eig_vals"]
+            if "valid_series" in npz:
+                self.valid_series = npz["valid_series"]

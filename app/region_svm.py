@@ -33,9 +33,7 @@ class RegionClassifier:
         self.cv_accuracy = None  # 5-fold stratified CV accuracy of the SVM
 
     def fit(self, country_scores: pd.DataFrame) -> "RegionClassifier":
-        data = country_scores.dropna(
-            subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"]
-        )
+        data = country_scores.dropna(subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"])
         labels = pd.Categorical(data["Cultural Region"])
         self.regions = list(labels.categories)
         xy = data[["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
@@ -45,13 +43,9 @@ class RegionClassifier:
         search = GridSearchCV(SVC(), PARAM_GRID, refit=True, cv=cv)
         search.fit(xy, codes)
         self.svm = search.best_estimator_
-        self.cv_accuracy = float(
-            cross_val_score(search.best_estimator_, xy, codes, cv=cv).mean()
-        )
+        self.cv_accuracy = float(cross_val_score(search.best_estimator_, xy, codes, cv=cv).mean())
 
-        self.centroids = data.groupby("Cultural Region")[
-            ["PC1_rescaled", "PC2_rescaled"]
-        ].mean()
+        self.centroids = data.groupby("Cultural Region")[["PC1_rescaled", "PC2_rescaled"]].mean()
         return self
 
     def predict_svm(self, xy: np.ndarray) -> list[str]:
@@ -63,9 +57,7 @@ class RegionClassifier:
         if self.centroids is None:
             raise RuntimeError("Fit the classifier first.")
         xy = np.asarray(xy, dtype=float)
-        dists = np.linalg.norm(
-            xy[:, None, :] - self.centroids.to_numpy()[None, :, :], axis=2
-        )
+        dists = np.linalg.norm(xy[:, None, :] - self.centroids.to_numpy()[None, :, :], axis=2)
         return [self.centroids.index[i] for i in dists.argmin(axis=1)]
 
     def region_assignments(self, boot: pd.DataFrame) -> pd.DataFrame:

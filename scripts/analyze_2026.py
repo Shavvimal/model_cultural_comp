@@ -138,9 +138,8 @@ def main() -> int:
 
     # Item bootstrap alongside, as the explicit lower bound
     item_boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT_ITEM, seed=SEED)
-    item_sd = (
-        confidence_ellipses(item_boot)[["llm", "sd_pc1", "sd_pc2"]]
-        .rename(columns={"sd_pc1": "item_sd_pc1", "sd_pc2": "item_sd_pc2"})
+    item_sd = confidence_ellipses(item_boot)[["llm", "sd_pc1", "sd_pc2"]].rename(
+        columns={"sd_pc1": "item_sd_pc1", "sd_pc2": "item_sd_pc2"}
     )
     ellipses = ellipses.merge(item_sd, on="llm")
 
@@ -154,9 +153,20 @@ def main() -> int:
     summary = ellipses.merge(regions, on="llm").merge(headline, on="llm")
     summary["cohort"] = summary["llm"].map(lambda x: cohort_2026(base_model(x)))
     cols = [
-        "llm", "cohort", "PC1_rescaled", "PC2_rescaled", "sd_pc1", "sd_pc2",
-        "item_sd_pc1", "svm_region", "positional_stability", "centroid_region",
-        "rules_agree", "dist_human_mean", "pct_countries_closer", "min_dist_nonwestern",
+        "llm",
+        "cohort",
+        "PC1_rescaled",
+        "PC2_rescaled",
+        "sd_pc1",
+        "sd_pc2",
+        "item_sd_pc1",
+        "svm_region",
+        "positional_stability",
+        "centroid_region",
+        "rules_agree",
+        "dist_human_mean",
+        "pct_countries_closer",
+        "min_dist_nonwestern",
     ]
     with pd.option_context("display.width", 260):
         print("\n=== 2026 positions (cluster bootstrap) ===")
@@ -165,8 +175,11 @@ def main() -> int:
             print("\n=== Language effects (zh - en, per model) ===")
             print(lang_fx.round(3).to_string(index=False))
             print("\nCohort mean displacement:")
-            print(lang_fx.groupby("cohort")[["delta_pc1", "delta_pc2", "displacement"]]
-                  .mean().round(3))
+            print(
+                lang_fx.groupby("cohort")[["delta_pc1", "delta_pc2", "displacement"]]
+                .mean()
+                .round(3)
+            )
 
     boot.to_csv("data/llm_bootstrap_replicates_2026.csv", index=False)
     ellipses.to_csv("data/llm_ellipses_2026.csv", index=False)

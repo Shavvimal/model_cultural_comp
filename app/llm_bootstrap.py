@@ -257,9 +257,7 @@ def centroid_statistics(
     countries_xy = country_scores[["PC1_rescaled", "PC2_rescaled"]].to_numpy()
     country_dists = np.linalg.norm(countries_xy - np.array(human_mean), axis=1)
 
-    centroids = country_scores.groupby("Cultural Region")[
-        ["PC1_rescaled", "PC2_rescaled"]
-    ].mean()
+    centroids = country_scores.groupby("Cultural Region")[["PC1_rescaled", "PC2_rescaled"]].mean()
     non_western = centroids.loc[~centroids.index.isin(WESTERN_REGIONS)].to_numpy()
 
     rows = []
@@ -283,9 +281,7 @@ def centroid_statistics(
     return pd.DataFrame(rows)
 
 
-def central_tendency_diagnostics(
-    cm: CulturalMap, responses: pd.DataFrame
-) -> pd.DataFrame:
+def central_tendency_diagnostics(cm: CulturalMap, responses: pd.DataFrame) -> pd.DataFrame:
     """Distance from the all-midpoint respondent, and response entropy.
 
     Mid-scale answering registers as strong secularity on this instrument
@@ -300,9 +296,7 @@ def central_tendency_diagnostics(
     for llm, group in responses.groupby("llm"):
         item_means = group.groupby("question")["value"].mean()
         mid_dist = float(
-            np.linalg.norm(
-                [item_means.get(q, np.nan) - midpoints[q] for q in cm.iv_qns]
-            )
+            np.linalg.norm([item_means.get(q, np.nan) - midpoints[q] for q in cm.iv_qns])
         )
 
         def entropy(values: pd.Series) -> float:
@@ -310,7 +304,5 @@ def central_tendency_diagnostics(
             return float(-(p * np.log2(p)).sum())
 
         mean_entropy = float(group.groupby("question")["value"].apply(entropy).mean())
-        rows.append(
-            {"llm": llm, "midpoint_distance": mid_dist, "mean_item_entropy": mean_entropy}
-        )
+        rows.append({"llm": llm, "midpoint_distance": mid_dist, "mean_item_entropy": mean_entropy})
     return pd.DataFrame(rows)
