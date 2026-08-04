@@ -1,6 +1,6 @@
 """Bootstrap inference for LLM positions on the cultural map.
 
-Two estimators, per docs/statistical-review.md §2.4:
+Two estimators, per the statistical review (paper draft repo) §2.4:
 
 * The **item bootstrap** resamples each item's stored responses
   independently. Because the projection is affine in the ten item values, a

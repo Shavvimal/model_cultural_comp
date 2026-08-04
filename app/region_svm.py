@@ -1,6 +1,6 @@
 """Cultural-region assignment for map positions.
 
-Two rules are reported side by side, per docs/statistical-review.md §2.5:
+Two rules are reported side by side, per the statistical review (paper draft repo) §2.5:
 an RBF-SVM over the country coordinates (with its cross-validated accuracy
 attached — around 0.55 on 109 countries in 8 classes, so a single label is
 weak evidence), and the nearest region centroid. Their disagreement is a

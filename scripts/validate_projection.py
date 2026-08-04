@@ -4,7 +4,7 @@ Run from the repo root with the data present:
 
     uv run python scripts/validate_projection.py
 
-Checks, per docs/statistical-review.md:
+Checks, per the statistical review (paper draft repo):
 
   A. Path-identity regression test (exact): raw complete-case survey rows
      pushed through the public ``project()`` API land exactly where the fit

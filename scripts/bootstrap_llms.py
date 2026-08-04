@@ -8,7 +8,7 @@ The 2024 corpus is split by elicitation language (``c-*`` pickles are
 Chinese administrations, labelled ``<llm> [zh]``) and never pooled. Only
 the item bootstrap is available here — the 2024 harness did not record the
 prompt-variant id — so every ellipse is a lower bound on the true
-uncertainty (see docs/statistical-review.md §2.4).
+uncertainty (see the statistical review (paper draft repo) §2.4).
 
 Writes:
     data/llm_bootstrap_replicates.csv
