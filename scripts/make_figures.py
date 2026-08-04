@@ -5,6 +5,7 @@ Run from the repo root after validate_projection.py and bootstrap_llms.py:
     uv run python scripts/make_figures.py
 
 Writes vector PDFs (for LaTeX) and PNGs (for the blog) to figures/:
+    fig0_countries_only.{pdf,png} the IW map redrawn from our fitted IVS data
     fig1_cultural_map.{pdf,png}   corrected IW map, 95% CI ellipse per model
     fig2_svm_regions.{pdf,png}    SVM decision regions + model positions
 """
@@ -130,6 +131,19 @@ def _finish(ax, title):
     ax.tick_params(labelsize=8)
 
 
+def fig0_countries_only(countries):
+    """The IW map redrawn from our own fitted IVS coordinates.
+
+    Replaces the copyrighted official WVS map figure: same layout, but every
+    point is computed from the microdata by this repo's pipeline.
+    """
+    fig, ax = plt.subplots(figsize=(9, 7))
+    _draw_countries(ax, countries)
+    ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
+    _finish(ax, "Inglehart–Welzel Cultural Map, reconstructed from the IVS (2005–2022)")
+    return fig
+
+
 def fig1_cultural_map(countries, ellipses):
     fig, ax = plt.subplots(figsize=(9, 7))
     _draw_countries(ax, countries)
@@ -174,6 +188,7 @@ def main() -> int:
     os.makedirs("figures", exist_ok=True)
 
     for name, fig in [
+        ("fig0_countries_only", fig0_countries_only(countries)),
         ("fig1_cultural_map", fig1_cultural_map(countries, ellipses)),
         ("fig2_svm_regions", fig2_svm_regions(countries, ellipses)),
     ]:
