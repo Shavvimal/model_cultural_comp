@@ -31,7 +31,7 @@ for f in "${files[@]}"; do
 done
 
 echo "${DIM}---${RESET}"
-recent=$(find data/collection_2026 -name '*.jsonl' -newermt '-2 minutes' | wc -l | tr -d ' ')
+recent=$(.venv/bin/python -c "import glob,os,time; fs=glob.glob('data/collection_2026/*.jsonl'); print(sum(1 for f in fs if time.time()-os.path.getmtime(f)<120))" 2>/dev/null || echo 1)
 if pgrep -f collect_cloud_2026 >/dev/null; then
   if [ "$recent" -gt 0 ]; then
     echo "collector: ${GREEN}RUNNING${RESET} (actively writing)"
