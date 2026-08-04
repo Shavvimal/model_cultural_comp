@@ -38,7 +38,10 @@ CULTURAL_REGION_COLORS = {
     "English-Speaking": "#009e73",
     "Orthodox Europe": "#0072b2",
     "West & South Asia": "#f0e442",
-    "AI Model": "#bada55",
+    # Deep violet: validated CVD-distinct from all eight region colors
+    # (the previous #bada55 was indistinguishable from the West & South Asia
+    # yellow under protanopia).
+    "AI Model": "#5e35b1",
 }
 
 
