@@ -22,7 +22,7 @@ class A165(IntEnum):
     """
     [ 2.  1. nan]
     1: Most people can be trusted
-    2: Can´t be too careful
+    2: Can't be too careful
     """
 
     TRUST = 1
@@ -33,7 +33,7 @@ class E018(IntEnum):
     """
     [ 1.  2.  3. nan]
     1: Good thing
-    2: Don´t mind
+    2: Don't mind
     3: Bad thing
     """
 

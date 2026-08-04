@@ -147,7 +147,7 @@ def fig0_countries_only(countries):
     fig, ax = plt.subplots(figsize=(9, 7))
     _draw_countries(ax, countries)
     ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
-    _finish(ax, "Inglehart–Welzel Cultural Map, reconstructed from the IVS (2005–2022)")
+    _finish(ax, "Inglehart–Welzel Cultural Map, reconstructed from the IVS (2005–2022)")  # noqa: RUF001
     return fig
 
 
@@ -163,7 +163,7 @@ def fig1_cultural_map(countries, ellipses):
     ax.legend(handles, labels, fontsize=7, loc="lower right", framealpha=0.9)
     _finish(
         ax,
-        "Inglehart–Welzel Cultural Map with LLM positions "
+        "Inglehart–Welzel Cultural Map with LLM positions "  # noqa: RUF001
         "(corrected projection, 95% bootstrap CIs)",
     )
     return fig

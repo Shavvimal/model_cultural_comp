@@ -58,3 +58,34 @@ class TestConfidenceEllipses:
         assert (ellipses["ellipse_width"] > 0).all()
         assert (ellipses["ellipse_height"] > 0).all()
         assert (ellipses["ellipse_width"] >= ellipses["ellipse_height"]).all()
+
+
+class TestLoadResponses2026:
+    def test_mixed_type_keys_dedup(self, fitted_map, tmp_path):
+        """A resumed run serialises ids as str where the original wrote int;
+        the loader must normalise before dedup or the retried row survives
+        alongside its original and the item mean double-counts."""
+        import json
+
+        from app.llm_bootstrap import load_responses_2026
+
+        original = {
+            "llm": "model-a",
+            "question": "A008",
+            "system_prompt_id": "3",
+            "repeat": "1",
+            "raw_content": "2",
+            "thinking": "",
+            "parsed": "2",
+            "error": None,
+            "attempts": "1",
+            "duration_ms": "10",
+            "ts": "t0",
+        }
+        resumed = {**original, "system_prompt_id": 3, "repeat": 1, "parsed": "3", "ts": "t1"}
+        path = tmp_path / "model-a.jsonl"
+        path.write_text(json.dumps(original) + "\n" + json.dumps(resumed) + "\n")
+
+        out = load_responses_2026(fitted_map, str(tmp_path))
+        assert len(out) == 1
+        assert out["value"].iloc[0] == 3.0

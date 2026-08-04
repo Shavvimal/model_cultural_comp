@@ -96,7 +96,7 @@ class CulturalMap:
         answered item. Per-item recode counts are kept in
         ``self.sentinel_counts``.
         """
-        subset = self.ivs_df[["S020", "S003", "S017"] + self.iv_qns]
+        subset = self.ivs_df[["S020", "S003", "S017", *self.iv_qns]]
         subset = subset.rename(columns={"S020": "year", "S003": "country_code", "S017": "weight"})
         # The waves from 2005 onwards reflect current societal norms; earlier
         # waves would blend in values measured up to four decades ago.

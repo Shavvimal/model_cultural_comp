@@ -75,8 +75,10 @@ def load_transformed_responses(cm: CulturalMap, collection_dir: str) -> pd.DataF
         )
         df = df[~null_mask]
 
-    df["llm"] = [_label(m, lang) for m, lang in zip(df["llm"], df["language"])]
-    df["value"] = [_to_value(cm, q, r) for q, r in zip(df["question"], df["response"])]
+    df["llm"] = [_label(m, lang) for m, lang in zip(df["llm"], df["language"], strict=False)]
+    df["value"] = [
+        _to_value(cm, q, r) for q, r in zip(df["question"], df["response"], strict=False)
+    ]
     # The 2024 corpus did not record the prompt-variant id
     df["system_prompt_id"] = pd.NA
     return df[["llm", "language", "question", "value", "system_prompt_id"]]
@@ -98,6 +100,10 @@ def load_responses_2026(cm: CulturalMap, jsonl_dir: str) -> pd.DataFrame:
             records.extend(json.loads(line) for line in f)
     df = pd.DataFrame(records)
     df["language"] = df.get("language", pd.Series(["en"] * len(df))).fillna("en")
+    # Resumed runs serialise these as str where the original run wrote int;
+    # normalise before dedup or a retried row survives alongside its original.
+    df["system_prompt_id"] = df["system_prompt_id"].astype(int)
+    df["repeat"] = df["repeat"].astype(int)
     df = df.drop_duplicates(
         subset=["llm", "language", "question", "system_prompt_id", "repeat"], keep="last"
     )
@@ -109,10 +115,12 @@ def load_responses_2026(cm: CulturalMap, jsonl_dir: str) -> pd.DataFrame:
 
     ok["response"] = [
         tuple(r) if q == "Y002" and isinstance(r, list) else r
-        for q, r in zip(ok["question"], ok["parsed"])
+        for q, r in zip(ok["question"], ok["parsed"], strict=False)
     ]
-    ok["llm"] = [_label(m, lang) for m, lang in zip(ok["llm"], ok["language"])]
-    ok["value"] = [_to_value(cm, q, r) for q, r in zip(ok["question"], ok["response"])]
+    ok["llm"] = [_label(m, lang) for m, lang in zip(ok["llm"], ok["language"], strict=False)]
+    ok["value"] = [
+        _to_value(cm, q, r) for q, r in zip(ok["question"], ok["response"], strict=False)
+    ]
     return ok[["llm", "language", "question", "value", "system_prompt_id"]]
 
 
