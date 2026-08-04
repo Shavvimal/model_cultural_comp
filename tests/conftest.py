@@ -41,14 +41,16 @@ def synthetic_ivs(rng):
 
 @pytest.fixture(scope="session")
 def synthetic_country_codes():
-    return pd.DataFrame({
-        "Numeric": np.arange(1, N_COUNTRIES + 1),
-        "Country": [f"Country {i}" for i in range(1, N_COUNTRIES + 1)],
-        "Cultural Region": (
-            ["Protestant Europe", "Confucian", "African-Islamic", "Latin America"] * 2
-        ),
-        "Islamic": [False, False, True, False] * 2,
-    })
+    return pd.DataFrame(
+        {
+            "Numeric": np.arange(1, N_COUNTRIES + 1),
+            "Country": [f"Country {i}" for i in range(1, N_COUNTRIES + 1)],
+            "Cultural Region": (
+                ["Protestant Europe", "Confucian", "African-Islamic", "Latin America"] * 2
+            ),
+            "Islamic": [False, False, True, False] * 2,
+        }
+    )
 
 
 @pytest.fixture(scope="session")

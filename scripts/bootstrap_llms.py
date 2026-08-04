@@ -48,8 +48,10 @@ def main() -> int:
     boot.to_csv("data/llm_bootstrap_replicates.csv", index=False)
     ellipses.to_csv("data/llm_ellipses.csv", index=False)
     stability.to_csv("data/llm_region_stability.csv", index=False)
-    print("\nWrote data/llm_bootstrap_replicates.csv, data/llm_ellipses.csv, "
-          "data/llm_region_stability.csv")
+    print(
+        "\nWrote data/llm_bootstrap_replicates.csv, data/llm_ellipses.csv, "
+        "data/llm_region_stability.csv"
+    )
     return 0
 
 

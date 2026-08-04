@@ -56,9 +56,7 @@ class TestTransform:
     def test_training_scores_match_external_projection(self, lowrank_data):
         """Complete rows must land exactly where the fit placed them."""
         model = fit(lowrank_data)
-        np.testing.assert_allclose(
-            model.transform(lowrank_data), model.transform(), atol=1e-10
-        )
+        np.testing.assert_allclose(model.transform(lowrank_data), model.transform(), atol=1e-10)
 
     def test_rejects_missing_values(self, lowrank_data):
         model = fit(lowrank_data)
@@ -83,6 +81,4 @@ class TestPersistence:
         np.testing.assert_array_equal(loaded.C, model.C)
         np.testing.assert_array_equal(loaded.means, model.means)
         np.testing.assert_array_equal(loaded.stds, model.stds)
-        np.testing.assert_allclose(
-            loaded.transform(lowrank_data), model.transform(lowrank_data)
-        )
+        np.testing.assert_allclose(loaded.transform(lowrank_data), model.transform(lowrank_data))

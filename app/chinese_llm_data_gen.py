@@ -1,13 +1,11 @@
-from pydantic import BaseModel, Field, model_validator, field_validator
-from enum import IntEnum
-from typing import List, Type
 import asyncio
-from ollama import AsyncClient
-from tqdm.asyncio import tqdm
 import random
+from enum import IntEnum
+
 import pandas as pd
-import re
-from qn_classes import  A008, A165, E018, E025, F063, F118, F120, G006, Y002, Y003
+from ollama import AsyncClient
+from qn_classes import A008, A165, E018, E025, F063, F118, F120, G006, Y002, Y003
+from tqdm.asyncio import tqdm
 
 #############################################
 ############# Output Parsers ################
@@ -19,11 +17,11 @@ class EnumOutputParser:
     Parse an output that is one of a set of values.
     """
 
-    def __init__(self, enum: Type[IntEnum]):
+    def __init__(self, enum: type[IntEnum]):
         self.enum = enum
 
     @property
-    def _valid_values(self) -> List[str]:
+    def _valid_values(self) -> list[str]:
         return [str(e.value) for e in self.enum]
 
     def parse(self, response: str) -> int:
@@ -35,7 +33,9 @@ class EnumOutputParser:
             if int(response) in self.enum._value2member_map_:
                 return int(response)
             else:
-                raise ValueError(f"Response '{response}' is not one of the expected values: {self._valid_values}")
+                raise ValueError(
+                    f"Response '{response}' is not one of the expected values: {self._valid_values}"
+                )
         except ValueError as e:
             raise ValueError(f"Invalid response: {e}")
 
@@ -70,7 +70,7 @@ class Y003OutputParser:
     Parse the output of Y003.
     """
 
-    def parse(self, response: str) -> List[int]:
+    def parse(self, response: str) -> list[int]:
         """
         Validate the LLM output, and format it for storage.
         """
@@ -125,7 +125,7 @@ class Survey:
 \n 10. 不自私（无私）
 \n 11. 服从
 \n 您最多只能回答五种品质。您只能回答与可以鼓励孩子在家学习的最重要品质相对应的五个数字。
-        """
+        """,
     }
 
     # System Prompt Variations
@@ -153,25 +153,26 @@ class Survey:
         "F120": EnumOutputParser(F120),
         "G006": EnumOutputParser(G006),
         "Y002": Y002OutputParser(),
-        "Y003": Y003OutputParser()
+        "Y003": Y003OutputParser(),
     }
 
-
-
-    def __init__(self, llms: List[str]):
+    def __init__(self, llms: list[str]):
         self._LLMS = llms
         # use prompts from iv_qns and parsers.format_instructions for formatted qns
-        self._JOINT_PROMPTS = {qn: self._IV_QNS[qn] + " " + self._PARSERS[qn].format_instructions() for qn in self._IV_QNS}
+        self._JOINT_PROMPTS = {
+            qn: self._IV_QNS[qn] + " " + self._PARSERS[qn].format_instructions()
+            for qn in self._IV_QNS
+        }
         # Generate all possible prompts using SYSTEM_PROMPTS and JOINT_PROMPTS
         self._ALL_PROMPTS = [
             (qn, system_prompt + " " + joint_prompt)
-            for system_prompt in self._SYSTEM_PROMPTS for qn, joint_prompt in self._JOINT_PROMPTS.items()
+            for system_prompt in self._SYSTEM_PROMPTS
+            for qn, joint_prompt in self._JOINT_PROMPTS.items()
         ]
         # Copy each prompt in all_prompt 5 times for repeats
         self._FULL_PROMPT_SET = [(qn, prompt) for qn, prompt in self._ALL_PROMPTS for _ in range(5)]
 
-
-    async def llm_parser(self,  qn, prompt, llm, response_content):
+    async def llm_parser(self, qn, prompt, llm, response_content):
         parser_prompt = f"""
 
         A Chinese model was asked this question:
@@ -191,17 +192,15 @@ class Survey:
             model="gemma2:27b",
             messages=[{"role": "system", "content": parser_prompt}],
         )
-        response_content = response['message']['content']
+        response_content = response["message"]["content"]
         parsed_response = self._PARSERS[qn].parse(response_content)
         return llm, qn, parsed_response
-
-
 
     async def generate_response(self, qn, prompt, llm, max_retries):
         """
         Generate a response from the LLM for a single question
         """
-        message = {'role': 'user', 'content': prompt}
+        message = {"role": "user", "content": prompt}
         retry_count = 0
         while retry_count < max_retries:
             try:
@@ -212,7 +211,7 @@ class Survey:
                     #     "num_predict": 10,
                     # }
                 )
-                response_content = response['message']['content']
+                response_content = response["message"]["content"]
 
                 # Check if the response contains digits
                 # if re.search(r'\d', response_content):
@@ -229,7 +228,7 @@ class Survey:
         return llm, qn, None
 
     async def generate_all_responses(self, full_prompt_set, llm, max_retries=15, num_workers=10):
-        """"
+        """ "
         async gather all_prompts for every llm
         """
         results = []
@@ -248,7 +247,9 @@ class Survey:
             task_queue = asyncio.Queue()
 
             for qn, prompt in full_prompt_set:
-                task_queue.put_nowait(asyncio.create_task(self.generate_response(qn, prompt, llm, max_retries)))
+                task_queue.put_nowait(
+                    asyncio.create_task(self.generate_response(qn, prompt, llm, max_retries))
+                )
 
             total_tasks = task_queue.qsize()
             print(f"Starting {total_tasks} tasks with {num_workers} workers for {llm}...")
@@ -276,19 +277,19 @@ class Survey:
     def __call__(self, *args, **kwargs):
         asyncio.run(self.main())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     llms = [
         # "wangshenzhi/gemma2-27b-chinese-chat", # Worked decently well
         # "qwen2:7b",
         # "llama2-chinese:13b",
         "deepseek:67b",
-        "wangrongsheng/llama3-70b-chinese-chat", # Refusal rate is high
-        "yi:34b", # just goves "."
-        "aquilachat2:34b", # Gives '。' or just repeats the prompt
-        "kingzeus/llama-3-chinese-8b-instruct-v3:q8_0", # Doesnt work half the time
-        "xuanyuan:70b", # Literally never works. Unintelligable output
-        "glm4:9b", # Just gives "."
-
+        "wangrongsheng/llama3-70b-chinese-chat",  # Refusal rate is high
+        "yi:34b",  # just goves "."
+        "aquilachat2:34b",  # Gives '。' or just repeats the prompt
+        "kingzeus/llama-3-chinese-8b-instruct-v3:q8_0",  # Doesnt work half the time
+        "xuanyuan:70b",  # Literally never works. Unintelligable output
+        "glm4:9b",  # Just gives "."
     ]
     survey = Survey(llms=llms)
     survey()

@@ -59,33 +59,65 @@ def _draw_countries(ax, countries: pd.DataFrame, label_alpha=1.0):
         subset = countries[countries["Cultural Region"] == region]
         if subset.empty:
             continue
-        ax.scatter(subset["PC1_rescaled"], subset["PC2_rescaled"],
-                   s=14, color=color, label=region, zorder=3)
+        ax.scatter(
+            subset["PC1_rescaled"],
+            subset["PC2_rescaled"],
+            s=14,
+            color=color,
+            label=region,
+            zorder=3,
+        )
         for _, row in subset.iterrows():
-            ax.annotate(row["Country"],
-                        (row["PC1_rescaled"], row["PC2_rescaled"]),
-                        xytext=(3, 3), textcoords="offset points",
-                        fontsize=5.5, color=color, alpha=label_alpha, zorder=4)
+            ax.annotate(
+                row["Country"],
+                (row["PC1_rescaled"], row["PC2_rescaled"]),
+                xytext=(3, 3),
+                textcoords="offset points",
+                fontsize=5.5,
+                color=color,
+                alpha=label_alpha,
+                zorder=4,
+            )
 
 
 def _draw_models(ax, ellipses: pd.DataFrame):
     for _, row in ellipses.iterrows():
-        ax.add_patch(Ellipse(
-            (row["PC1_rescaled"], row["PC2_rescaled"]),
-            width=row["ellipse_width"], height=row["ellipse_height"],
-            angle=row["angle_deg"],
-            facecolor=AI_COLOR, alpha=0.12,
-            edgecolor=AI_COLOR, linewidth=0.8, zorder=5,
-        ))
-    ax.scatter(ellipses["PC1_rescaled"], ellipses["PC2_rescaled"],
-               s=42, marker="D", color=AI_COLOR, edgecolor="white",
-               linewidth=0.6, zorder=6)
+        ax.add_patch(
+            Ellipse(
+                (row["PC1_rescaled"], row["PC2_rescaled"]),
+                width=row["ellipse_width"],
+                height=row["ellipse_height"],
+                angle=row["angle_deg"],
+                facecolor=AI_COLOR,
+                alpha=0.12,
+                edgecolor=AI_COLOR,
+                linewidth=0.8,
+                zorder=5,
+            )
+        )
+    ax.scatter(
+        ellipses["PC1_rescaled"],
+        ellipses["PC2_rescaled"],
+        s=42,
+        marker="D",
+        color=AI_COLOR,
+        edgecolor="white",
+        linewidth=0.6,
+        zorder=6,
+    )
     for _, row in ellipses.iterrows():
         dx, dy, ha = LABEL_OFFSETS.get(row["llm"], (5, -9, "left"))
-        ax.annotate(_display(row["llm"]),
-                    (row["PC1_rescaled"], row["PC2_rescaled"]),
-                    xytext=(dx, dy), textcoords="offset points", ha=ha,
-                    fontsize=7, fontweight="bold", color=AI_COLOR, zorder=7)
+        ax.annotate(
+            _display(row["llm"]),
+            (row["PC1_rescaled"], row["PC2_rescaled"]),
+            xytext=(dx, dy),
+            textcoords="offset points",
+            ha=ha,
+            fontsize=7,
+            fontweight="bold",
+            color=AI_COLOR,
+            zorder=7,
+        )
 
 
 def _finish(ax, title):
@@ -103,12 +135,16 @@ def fig1_cultural_map(countries, ellipses):
     _draw_countries(ax, countries)
     _draw_models(ax, ellipses)
     handles, labels = ax.get_legend_handles_labels()
-    handles.append(Line2D([], [], marker="D", linestyle="", color=AI_COLOR,
-                          markersize=6, label="LLM (95% CI)"))
+    handles.append(
+        Line2D([], [], marker="D", linestyle="", color=AI_COLOR, markersize=6, label="LLM (95% CI)")
+    )
     labels.append("LLM (95% CI)")
     ax.legend(handles, labels, fontsize=7, loc="lower right", framealpha=0.9)
-    _finish(ax, "Inglehart–Welzel Cultural Map with LLM positions "
-                "(corrected projection, 95% bootstrap CIs)")
+    _finish(
+        ax,
+        "Inglehart–Welzel Cultural Map with LLM positions "
+        "(corrected projection, 95% bootstrap CIs)",
+    )
     return fig
 
 
@@ -118,11 +154,13 @@ def fig2_svm_regions(countries, ellipses):
     zz = clf.svm.predict(np.column_stack([xx.ravel(), yy.ravel()])).reshape(xx.shape)
 
     from matplotlib.colors import ListedColormap
+
     cmap = ListedColormap([CULTURAL_REGION_COLORS[r] for r in clf.regions])
 
     fig, ax = plt.subplots(figsize=(9, 7))
-    ax.contourf(xx, yy, zz, levels=np.arange(len(clf.regions) + 1) - 0.5,
-                cmap=cmap, alpha=0.18, zorder=1)
+    ax.contourf(
+        xx, yy, zz, levels=np.arange(len(clf.regions) + 1) - 0.5, cmap=cmap, alpha=0.18, zorder=1
+    )
     _draw_countries(ax, countries, label_alpha=0.75)
     _draw_models(ax, ellipses)
     ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
@@ -135,8 +173,10 @@ def main() -> int:
     ellipses = pd.read_csv("data/llm_ellipses.csv")
     os.makedirs("figures", exist_ok=True)
 
-    for name, fig in [("fig1_cultural_map", fig1_cultural_map(countries, ellipses)),
-                      ("fig2_svm_regions", fig2_svm_regions(countries, ellipses))]:
+    for name, fig in [
+        ("fig1_cultural_map", fig1_cultural_map(countries, ellipses)),
+        ("fig2_svm_regions", fig2_svm_regions(countries, ellipses)),
+    ]:
         fig.savefig(f"figures/{name}.pdf", bbox_inches="tight")
         fig.savefig(f"figures/{name}.png", dpi=200, bbox_inches="tight")
         plt.close(fig)

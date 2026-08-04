@@ -36,8 +36,10 @@ def load_transformed_responses(cm: CulturalMap, collection_dir: str) -> pd.DataF
     null_mask = df["response"].isna()
     if null_mask.any():
         counts = df[null_mask].groupby("llm").size()
-        print(f"dropping {null_mask.sum()} unparseable responses: "
-              + ", ".join(f"{k}={v}" for k, v in counts.items()))
+        print(
+            f"dropping {null_mask.sum()} unparseable responses: "
+            + ", ".join(f"{k}={v}" for k, v in counts.items())
+        )
         df = df[~null_mask]
 
     def to_value(question, response) -> float:
@@ -72,10 +74,12 @@ def bootstrap_llm_positions(
             raise ValueError(f"{llm}: no stored responses for {missing}")
 
         # (n_boot, 10) matrix of resampled per-question means
-        means = np.column_stack([
-            rng.choice(by_qn[q], size=(n_boot, len(by_qn[q])), replace=True).mean(axis=1)
-            for q in cm.iv_qns
-        ])
+        means = np.column_stack(
+            [
+                rng.choice(by_qn[q], size=(n_boot, len(by_qn[q])), replace=True).mean(axis=1)
+                for q in cm.iv_qns
+            ]
+        )
         projected = cm.project(pd.DataFrame(means, columns=cm.iv_qns))
         projected["llm"] = llm
         projected["replicate"] = np.arange(n_boot)
@@ -98,11 +102,16 @@ def confidence_ellipses(boot: pd.DataFrame, level: float = 0.95) -> pd.DataFrame
         vals, vecs = np.linalg.eigh(cov)  # ascending
         width, height = 2 * np.sqrt(k * vals[::-1])
         angle = np.degrees(np.arctan2(*vecs[:, 1][::-1]))
-        rows.append({
-            "llm": llm,
-            "PC1_rescaled": mean[0], "PC2_rescaled": mean[1],
-            "ellipse_width": width, "ellipse_height": height,
-            "angle_deg": angle,
-            "sd_pc1": xy[:, 0].std(ddof=1), "sd_pc2": xy[:, 1].std(ddof=1),
-        })
+        rows.append(
+            {
+                "llm": llm,
+                "PC1_rescaled": mean[0],
+                "PC2_rescaled": mean[1],
+                "ellipse_width": width,
+                "ellipse_height": height,
+                "angle_deg": angle,
+                "sd_pc1": xy[:, 0].std(ddof=1),
+                "sd_pc2": xy[:, 1].std(ddof=1),
+            }
+        )
     return pd.DataFrame(rows)

@@ -56,19 +56,24 @@ def check_a_self_consistency(cm: CulturalMap) -> bool:
 
 def check_b_country_agreement(cm: CulturalMap, published: pd.DataFrame):
     """Corrected country means vs published 2024 pickle (countries only)."""
-    pub = published[published["llm"] == False]  # noqa: E712 (llm col is object)
+    pub = published[published["llm"] == False]
     merged = cm.country_scores_pca.merge(
         pub[["country_code", "PC1_rescaled", "PC2_rescaled"]],
-        on="country_code", suffixes=("", "_pub"),
+        on="country_code",
+        suffixes=("", "_pub"),
     )
-    d = merged[["PC1_rescaled", "PC2_rescaled"]].to_numpy() - \
-        merged[["PC1_rescaled_pub", "PC2_rescaled_pub"]].to_numpy()
+    d = (
+        merged[["PC1_rescaled", "PC2_rescaled"]].to_numpy()
+        - merged[["PC1_rescaled_pub", "PC2_rescaled_pub"]].to_numpy()
+    )
     dist = np.linalg.norm(d, axis=1)
     r1 = np.corrcoef(merged["PC1_rescaled"], merged["PC1_rescaled_pub"])[0, 1]
     r2 = np.corrcoef(merged["PC2_rescaled"], merged["PC2_rescaled_pub"])[0, 1]
 
     print(f"\n=== B. Country agreement with published 2024 map (n={len(merged)}) ===")
-    print(f"displacement: mean={dist.mean():.4f}  median={np.median(dist):.4f}  max={dist.max():.4f}")
+    print(
+        f"displacement: mean={dist.mean():.4f}  median={np.median(dist):.4f}  max={dist.max():.4f}"
+    )
     print(f"correlation:  PC1 r={r1:.5f}  PC2 r={r2:.5f}")
     worst = merged.assign(dist=dist).nlargest(5, "dist")[["Country", "dist"]]
     print("largest moves:")
@@ -83,7 +88,7 @@ def check_c_llm_projection(cm: CulturalMap, published: pd.DataFrame):
     cm.calculate_average_llm(projected)
     corrected = cm.llm_scores_pca.copy()
 
-    pub_llm = published[published["llm"] == True][  # noqa: E712
+    pub_llm = published[published["llm"] == True][
         ["Country", "PC1_rescaled", "PC2_rescaled"]
     ].rename(columns={"Country": "llm"})
     merged = corrected.merge(pub_llm, on="llm", suffixes=("", "_pub"), how="left")
@@ -107,8 +112,16 @@ def check_c_llm_projection(cm: CulturalMap, published: pd.DataFrame):
     )
 
     print(f"\n=== C. Corrected LLM projections (n={len(merged)}) ===")
-    cols = ["llm", "PC1_rescaled", "PC2_rescaled", "PC1_rescaled_pub",
-            "PC2_rescaled_pub", "displacement", "nearest_region", "Chinese"]
+    cols = [
+        "llm",
+        "PC1_rescaled",
+        "PC2_rescaled",
+        "PC1_rescaled_pub",
+        "PC2_rescaled_pub",
+        "displacement",
+        "nearest_region",
+        "Chinese",
+    ]
     with pd.option_context("display.width", 200):
         print(merged[cols].round(3).to_string(index=False))
     return merged
@@ -116,9 +129,7 @@ def check_c_llm_projection(cm: CulturalMap, published: pd.DataFrame):
 
 def report_rotation_diagnostics(cm: CulturalMap):
     """Rotated loadings (interpretability) + rotation-choice sensitivity."""
-    loadings = pd.DataFrame(
-        cm.ppca.C @ cm.rotation, index=cm.iv_qns, columns=["PC1", "PC2"]
-    )
+    loadings = pd.DataFrame(cm.ppca.C @ cm.rotation, index=cm.iv_qns, columns=["PC1", "PC2"])
     print("\n=== Rotated loadings (C @ R) ===")
     print(loadings.round(3).to_string())
 
@@ -149,8 +160,10 @@ def main() -> int:
     cm.save_model("data/cultural_map_model.npz")
     cm.country_scores_pca.to_csv("data/corrected_country_scores.csv", index=False)
     llm_result.to_csv("data/corrected_llm_scores.csv", index=False)
-    print("\nArtefacts written: data/cultural_map_model.npz, "
-          "data/corrected_country_scores.csv, data/corrected_llm_scores.csv")
+    print(
+        "\nArtefacts written: data/cultural_map_model.npz, "
+        "data/corrected_country_scores.csv, data/corrected_llm_scores.csv"
+    )
 
     if not ok:
         print("\nGATE FAILED: projection path is not self-consistent.")

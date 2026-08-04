@@ -9,9 +9,7 @@ class TestRotationIsFittedOnce:
     def test_projection_does_not_refit_rotation(self, fitted_map, rng):
         """The 2024 defect: varimax was re-fitted on the projected data."""
         before = fitted_map.rotation.copy()
-        data = pd.DataFrame(
-            5 + rng.standard_normal((20, len(IV_QNS))), columns=IV_QNS
-        )
+        data = pd.DataFrame(5 + rng.standard_normal((20, len(IV_QNS))), columns=IV_QNS)
         fitted_map.project(data)
         np.testing.assert_array_equal(fitted_map.rotation, before)
 
@@ -21,12 +19,8 @@ class TestRotationIsFittedOnce:
         )
 
     def test_projection_is_deterministic(self, fitted_map, rng):
-        data = pd.DataFrame(
-            5 + rng.standard_normal((20, len(IV_QNS))), columns=IV_QNS
-        )
-        pd.testing.assert_frame_equal(
-            fitted_map.project(data), fitted_map.project(data)
-        )
+        data = pd.DataFrame(5 + rng.standard_normal((20, len(IV_QNS))), columns=IV_QNS)
+        pd.testing.assert_frame_equal(fitted_map.project(data), fitted_map.project(data))
 
 
 class TestSelfConsistency:
@@ -46,9 +40,7 @@ class TestSelfConsistency:
 
 class TestRescaling:
     def test_published_wvs_constants(self, fitted_map, rng):
-        data = pd.DataFrame(
-            5 + rng.standard_normal((10, len(IV_QNS))), columns=IV_QNS
-        )
+        data = pd.DataFrame(5 + rng.standard_normal((10, len(IV_QNS))), columns=IV_QNS)
         out = fitted_map.project(data)
         a1, b1 = PC_RESCALE_PARAMS["PC1"]
         a2, b2 = PC_RESCALE_PARAMS["PC2"]
@@ -65,21 +57,30 @@ class TestOrientation:
 
 
 class TestWvsIndexTransforms:
-    @pytest.mark.parametrize("ans,expected", [
-        ((1, 3), 1), ((3, 1), 1),      # materialist
-        ((2, 4), 3), ((4, 2), 3),      # post-materialist
-        ((1, 2), 2), ((3, 4), 2),      # mixed
-        ((-1, 3), -5),                 # missing
-    ])
+    @pytest.mark.parametrize(
+        "ans,expected",
+        [
+            ((1, 3), 1),
+            ((3, 1), 1),  # materialist
+            ((2, 4), 3),
+            ((4, 2), 3),  # post-materialist
+            ((1, 2), 2),
+            ((3, 4), 2),  # mixed
+            ((-1, 3), -5),  # missing
+        ],
+    )
     def test_y002(self, ans, expected):
         assert CulturalMap.y002_transform(ans) == expected
 
-    @pytest.mark.parametrize("choices,expected", [
-        ([9, 11], 2 - 4),              # faith+obedience mentioned, autonomy not
-        ([2, 8], 4 - 2),               # independence+determination mentioned
-        ([2, 8, 9, 11], 2 - 2),        # all four mentioned
-        ([1, 3, 5], 0),                # none of the four mentioned
-    ])
+    @pytest.mark.parametrize(
+        "choices,expected",
+        [
+            ([9, 11], 2 - 4),  # faith+obedience mentioned, autonomy not
+            ([2, 8], 4 - 2),  # independence+determination mentioned
+            ([2, 8, 9, 11], 2 - 2),  # all four mentioned
+            ([1, 3, 5], 0),  # none of the four mentioned
+        ],
+    )
     def test_y003(self, choices, expected):
         assert CulturalMap.y003_transform(choices) == expected
 

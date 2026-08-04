@@ -20,9 +20,7 @@ class RegionClassifier:
         self.regions = None  # index -> region name
 
     def fit(self, country_scores: pd.DataFrame) -> "RegionClassifier":
-        data = country_scores.dropna(
-            subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"]
-        )
+        data = country_scores.dropna(subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"])
         labels = pd.Categorical(data["Cultural Region"])
         self.regions = list(labels.categories)
         xy = data[["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
@@ -46,15 +44,15 @@ class RegionClassifier:
         """
         rows = []
         for llm, g in boot.groupby("llm"):
-            preds = pd.Series(
-                self.predict(g[["PC1_rescaled", "PC2_rescaled"]].to_numpy())
-            )
+            preds = pd.Series(self.predict(g[["PC1_rescaled", "PC2_rescaled"]].to_numpy()))
             shares = preds.value_counts(normalize=True)
-            rows.append({
-                "llm": llm,
-                "region": shares.index[0],
-                "stability": shares.iloc[0],
-                "runner_up": shares.index[1] if len(shares) > 1 else None,
-                "runner_up_share": shares.iloc[1] if len(shares) > 1 else 0.0,
-            })
+            rows.append(
+                {
+                    "llm": llm,
+                    "region": shares.index[0],
+                    "stability": shares.iloc[0],
+                    "runner_up": shares.index[1] if len(shares) > 1 else None,
+                    "runner_up_share": shares.iloc[1] if len(shares) > 1 else 0.0,
+                }
+            )
         return pd.DataFrame(rows)

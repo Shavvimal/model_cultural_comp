@@ -13,7 +13,6 @@ the stored rotation, so all points share one coordinate space.
 
 import glob
 import os
-from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,7 +51,8 @@ class CulturalMap:
         """``ivs_df`` and ``country_codes`` may be DataFrames or pickle paths."""
         self.ivs_df = ivs_df if isinstance(ivs_df, pd.DataFrame) else pd.read_pickle(ivs_df)
         self.country_codes = (
-            country_codes if isinstance(country_codes, pd.DataFrame)
+            country_codes
+            if isinstance(country_codes, pd.DataFrame)
             else pd.read_pickle(country_codes)
         )
         self.data_dir = data_dir
@@ -76,9 +76,7 @@ class CulturalMap:
     def prepare_data(self):
         """Filter the IVS to post-2005 waves and the ten map items."""
         subset = self.ivs_df[["S020", "S003", "S017"] + self.iv_qns]
-        subset = subset.rename(
-            columns={"S020": "year", "S003": "country_code", "S017": "weight"}
-        )
+        subset = subset.rename(columns={"S020": "year", "S003": "country_code", "S017": "weight"})
         # The waves from 2005 onwards reflect current societal norms; earlier
         # waves would blend in values measured up to four decades ago.
         subset = subset[subset["year"] >= 2005]
@@ -100,7 +98,10 @@ class CulturalMap:
 
         self.ppca.fit(
             self.subset_ivs_df[self.iv_qns].to_numpy(),
-            d=2, min_obs=1, seed=seed, verbose=verbose,
+            d=2,
+            min_obs=1,
+            seed=seed,
+            verbose=verbose,
         )
         scores = self.ppca.transform()
 
@@ -133,8 +134,7 @@ class CulturalMap:
             self.rotation = self.rotation[:, ::-1]
             loadings = loadings[:, ::-1]
         signs = np.array(
-            [1.0 if loadings[f118, 0] > 0 else -1.0,
-             1.0 if loadings[f063, 1] < 0 else -1.0]
+            [1.0 if loadings[f118, 0] > 0 else -1.0, 1.0 if loadings[f063, 1] < 0 else -1.0]
         )
         self.rotation = self.rotation * signs
 
@@ -190,7 +190,7 @@ class CulturalMap:
         return 2  # mixed
 
     @staticmethod
-    def y003_transform(ans: List[int]) -> float:
+    def y003_transform(ans: list[int]) -> float:
         """Autonomy index (Y003) from the chosen child qualities.
 
         Official IVS syntax: Y003 = (Q15 + Q17) - (Q8 + Q14), i.e.
@@ -247,11 +247,7 @@ class CulturalMap:
 
     def calculate_average_llm(self, projected: pd.DataFrame):
         """Mean map position per model, flagged by origin."""
-        means = (
-            projected.groupby("llm")[["PC1_rescaled", "PC2_rescaled"]]
-            .mean()
-            .reset_index()
-        )
+        means = projected.groupby("llm")[["PC1_rescaled", "PC2_rescaled"]].mean().reset_index()
         means["Cultural Region"] = "AI Model"
         means["Chinese"] = means["llm"].isin(CHINESE_LLMS)
         self.llm_scores_pca = means
@@ -284,33 +280,46 @@ class CulturalMap:
     ############## Visualization #################
     ##############################################
 
-    def visualize_cultural_map(self, title="Inglehart-Welzel Cultural Map",
-                               with_llms=False, ax=None):
+    def visualize_cultural_map(
+        self, title="Inglehart-Welzel Cultural Map", with_llms=False, ax=None
+    ):
         if ax is None:
             _, ax = plt.subplots(figsize=(14, 10))
 
         for region, color in self.cultural_region_colors.items():
-            subset = self.country_scores_pca[
-                self.country_scores_pca["Cultural Region"] == region
-            ]
+            subset = self.country_scores_pca[self.country_scores_pca["Cultural Region"] == region]
             if subset.empty:
                 continue
             for _, row in subset.iterrows():
                 style = "italic" if row.get("Islamic", False) else "normal"
-                ax.text(row["PC1_rescaled"], row["PC2_rescaled"], row["Country"],
-                        color=color, fontsize=10, fontstyle=style)
-            ax.scatter(subset["PC1_rescaled"], subset["PC2_rescaled"],
-                       label=region, color=color)
+                ax.text(
+                    row["PC1_rescaled"],
+                    row["PC2_rescaled"],
+                    row["Country"],
+                    color=color,
+                    fontsize=10,
+                    fontstyle=style,
+                )
+            ax.scatter(subset["PC1_rescaled"], subset["PC2_rescaled"], label=region, color=color)
 
         if with_llms and self.llm_scores_pca is not None:
             color = self.cultural_region_colors["AI Model"]
             for _, row in self.llm_scores_pca.iterrows():
                 style = "italic" if row["Chinese"] else "normal"
-                ax.text(row["PC1_rescaled"], row["PC2_rescaled"], row["llm"],
-                        color=color, fontsize=10, fontstyle=style)
-            ax.scatter(self.llm_scores_pca["PC1_rescaled"],
-                       self.llm_scores_pca["PC2_rescaled"],
-                       label="AI Model", color=color)
+                ax.text(
+                    row["PC1_rescaled"],
+                    row["PC2_rescaled"],
+                    row["llm"],
+                    color=color,
+                    fontsize=10,
+                    fontstyle=style,
+                )
+            ax.scatter(
+                self.llm_scores_pca["PC1_rescaled"],
+                self.llm_scores_pca["PC2_rescaled"],
+                label="AI Model",
+                color=color,
+            )
 
         ax.set_xlabel("Survival vs. Self-Expression Values")
         ax.set_ylabel("Traditional vs. Secular Values")

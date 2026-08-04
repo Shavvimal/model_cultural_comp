@@ -25,12 +25,12 @@ class PPCA:
     """
 
     def __init__(self):
-        self.C = None          # (D, d) principal axes
-        self.means = None      # (D,) feature means learned in fit
-        self.stds = None       # (D,) feature stds learned in fit
-        self.eig_vals = None   # (d,) score variances, descending
-        self.var_exp = None    # (d,) cumulative explained variance ratio
-        self.data = None       # (N, D) standardized training data, EM-imputed
+        self.C = None  # (D, d) principal axes
+        self.means = None  # (D,) feature means learned in fit
+        self.stds = None  # (D,) feature stds learned in fit
+        self.eig_vals = None  # (d,) score variances, descending
+        self.var_exp = None  # (d,) cumulative explained variance ratio
+        self.data = None  # (N, D) standardized training data, EM-imputed
 
     def fit(self, data, d=None, tol=1e-4, min_obs=10, seed=None, verbose=False):
         """Fit the model to ``data`` (shape N x D, NaNs allowed).
@@ -96,8 +96,7 @@ class PPCA:
             det = np.log(np.linalg.det(Sx))
             if np.isinf(det):
                 det = abs(np.linalg.slogdet(Sx)[1])
-            v1 = (N * (D * np.log(ss) + np.trace(Sx) - det)
-                  + np.trace(XX) - missing * np.log(ss0))
+            v1 = N * (D * np.log(ss) + np.trace(Sx) - det) + np.trace(XX) - missing * np.log(ss0)
             diff = abs(v1 / v0 - 1)
             if verbose:
                 print(diff)
@@ -152,9 +151,7 @@ class PPCA:
 
     def save(self, fpath):
         """Save all model parameters (npz)."""
-        np.savez(
-            fpath, C=self.C, means=self.means, stds=self.stds, eig_vals=self.eig_vals
-        )
+        np.savez(fpath, C=self.C, means=self.means, stds=self.stds, eig_vals=self.eig_vals)
 
     def load(self, fpath):
         """Load model parameters saved by :meth:`save`."""
