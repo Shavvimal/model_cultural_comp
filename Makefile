@@ -29,3 +29,6 @@ validate:
 
 progress: ## Show 2026 collection progress
 	bash scripts/progress.sh
+
+watch: ## Live collection progress (Ctrl-C to exit)
+	bash scripts/progress.sh --watch

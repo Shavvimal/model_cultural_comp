@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
-# Collection progress: overall percentage, one line per model-language cell, rate.
-# Usage: scripts/progress.sh   (or: make progress)
+# Collection progress: overall percentage, one line per model-language cell.
+# Usage: scripts/progress.sh          one snapshot   (make progress)
+#        scripts/progress.sh --watch  live view, refreshes every 5s (make watch)
 cd "$(dirname "$0")/.." || exit 1
+
+if [ "$1" = "--watch" ]; then
+  trap 'tput cnorm; exit 0' INT TERM
+  tput civis 2>/dev/null
+  while true; do
+    out=$(bash "$0")           # render once, then paint — no flicker
+    printf '\033[H\033[2J%s\n\n\033[2mrefreshing every 5s — Ctrl-C to exit\033[0m\n' "$out"
+    sleep 5
+  done
+fi
 
 BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
 GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; CYAN=$'\033[36m'
