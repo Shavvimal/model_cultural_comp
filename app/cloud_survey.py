@@ -264,7 +264,12 @@ class CloudSurvey:
             # 2024-protocol refusal mitigation, kept for comparability
             {"role": "system", "content": PRIMER[self.language]},
         ]
-        response = await self._client.chat(model=llm, messages=messages)
+        # Fresh client per call: repeated timeout-cancellations poison the
+        # shared connection pool (observed as per-model tail hangs that a
+        # process restart instantly cured). One TLS handshake per call is
+        # cheap; a wedged run is not.
+        client = AsyncClient(host=self.host, headers={"Authorization": f"Bearer {self.api_key}"})
+        response = await client.chat(model=llm, messages=messages)
         content = response["message"]["content"] or ""
         thinking = response["message"].get("thinking") or ""
         return content, thinking
