@@ -286,9 +286,11 @@ class CloudSurvey:
         }
         for attempt in range(1, MAX_ATTEMPTS + 1):
             record["attempts"] = attempt
+            record.pop("transport_failure", None)  # each attempt reclassifies
             start = time.time()
             try:
                 async with self._semaphore:
+                    start = time.time()  # reset inside the semaphore: latency, not queue-wait
                     content, thinking = await asyncio.wait_for(
                         self._call_once(llm, qn, sys_id), timeout=self.timeout_s
                     )
@@ -308,10 +310,16 @@ class CloudSurvey:
             # the error string so nothing fails silently, and the degradation
             # is a logged failed row that the analysis stage reports.
             except Exception as exc:
-                record["error"] = f"{type(exc).__name__}: {exc}"
+                message = f"{type(exc).__name__}: {exc}"
+                record["error"] = message
                 record["duration_ms"] = int((time.time() - start) * 1000)
                 record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-                await asyncio.sleep(min(10.0, 2.0**attempt))
+                record["transport_failure"] = True
+                # Rate limits back off long; other transport errors briefly
+                throttled = "429" in message or "rate" in message.lower()
+                await asyncio.sleep(
+                    min(60.0, 15.0 * attempt) if throttled else min(10.0, 2.0**attempt)
+                )
         return record
 
     async def run_model(self, llm: str) -> dict:
@@ -321,11 +329,18 @@ class CloudSurvey:
         path = self._jsonl_path(llm)
         print(f"[{llm}] {len(done)} done, {len(todo)} to go -> {path.name}", flush=True)
 
-        counts = {"ok": 0, "failed": 0}
+        counts = {"ok": 0, "failed": 0, "deferred": 0}
 
         async def one(task):
             qn, sys_id, repeat = task
             record = await self._run_task(llm, qn, sys_id, repeat)
+            # Exhausted transport failures are NOT persisted: a written record
+            # marks the call complete forever (resume skips it), and a rate
+            # limit is not an answer. Unwritten rows are retried on resume.
+            if record["error"] is not None and record.get("transport_failure"):
+                counts["deferred"] += 1
+                return
+            record.pop("transport_failure", None)
             async with self._write_lock:
                 with path.open("a") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -335,5 +350,9 @@ class CloudSurvey:
                 print(f"[{llm}] {total}/{len(todo)} ({counts['failed']} failed)", flush=True)
 
         await asyncio.gather(*(one(t) for t in todo))
-        print(f"[{llm}] DONE ok={counts['ok']} failed={counts['failed']}", flush=True)
+        print(
+            f"[{llm}] DONE ok={counts['ok']} failed={counts['failed']} "
+            f"deferred={counts['deferred']}",
+            flush=True,
+        )
         return counts

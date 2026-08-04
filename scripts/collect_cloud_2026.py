@@ -46,12 +46,23 @@ async def main() -> int:
         language = args[0].split("=")[1]
         args = args[1:]
 
-    survey = CloudSurvey(out_dir=RAW_DIR, concurrency=6, language=language)
+    concurrency = int(os.environ.get("SURVEY_CONCURRENCY", "18"))
+    model_parallelism = int(os.environ.get("SURVEY_MODEL_PARALLELISM", "3"))
+    survey = CloudSurvey(out_dir=RAW_DIR, concurrency=concurrency, language=language)
     models = args or await list_cloud_models(survey)
-    print(f"Surveying {len(models)} models [{language}]: {', '.join(models)}", flush=True)
+    print(
+        f"Surveying {len(models)} models [{language}] "
+        f"(in-flight cap {concurrency}, {model_parallelism} models at a time): "
+        + ", ".join(models),
+        flush=True,
+    )
 
-    for llm in models:  # sequential per model; concurrency lives inside
-        await survey.run_model(llm)
+    # Models run in small parallel batches; the shared semaphore caps total
+    # in-flight requests, so per-model progress interleaves without ever
+    # exceeding the account's concurrency budget.
+    for i in range(0, len(models), model_parallelism):
+        batch = models[i : i + model_parallelism]
+        await asyncio.gather(*(survey.run_model(llm) for llm in batch))
 
     return 0
 
