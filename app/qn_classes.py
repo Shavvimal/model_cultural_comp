@@ -1,6 +1,6 @@
 from enum import IntEnum
-from pydantic import BaseModel, Field, model_validator, field_validator
-from typing import List
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 #################################################
 ############# Question Classes ################
@@ -11,6 +11,7 @@ class A008(IntEnum):
     """
     [ 1.  2.  3.  4. nan]
     """
+
     VERY_HAPPY = 1
     QUITE_HAPPY = 2
     NOT_VERY_HAPPY = 3
@@ -21,8 +22,9 @@ class A165(IntEnum):
     """
     [ 2.  1. nan]
     1: Most people can be trusted
-    2: Can´t be too careful
+    2: Can't be too careful
     """
+
     TRUST = 1
     BE_CAREFUL = 2
 
@@ -31,9 +33,10 @@ class E018(IntEnum):
     """
     [ 1.  2.  3. nan]
     1: Good thing
-    2: Don´t mind
+    2: Don't mind
     3: Bad thing
     """
+
     GOOD = 1
     DONT_MIND = 2
     BAD = 3
@@ -46,6 +49,7 @@ class E025(IntEnum):
     2: Might do
     3: Would never do
     """
+
     SIGNED = 1
     MIGHT_DO = 2
     NEVER = 3
@@ -56,6 +60,7 @@ class F063(IntEnum):
     """
     [ 7.  1.  8.  4.  3.  5. 10.  6.  2.  9. nan]
     """
+
     ONE = 1
     TWO = 2
     THREE = 3
@@ -72,6 +77,7 @@ class F118(IntEnum):
     """
     [ 4.  9. 10.  6.  8.  7.  1.  5.  2.  3. nan]
     """
+
     ONE = 1
     TWO = 2
     THREE = 3
@@ -88,6 +94,7 @@ class F120(IntEnum):
     """
     [ 2.  9.  5.  4.  1. 10.  6.  8.  7.  3. nan]
     """
+
     ONE = 1
     TWO = 2
     THREE = 3
@@ -108,6 +115,7 @@ class G006(IntEnum):
     3: Not very proud
     4: Not at all proud
     """
+
     VERY_PROUD = 1
     QUITE_PROUD = 2
     NOT_VERY_PROUD = 3
@@ -122,6 +130,7 @@ class Y002Options(IntEnum):
     3: Fighting rising prices
     4: Protecting freedom of speech
     """
+
     MAINTAINING_ORDER = 1
     GIVING_PEOPLE_SAY = 2
     FIGHTING_PRICES = 3
@@ -138,13 +147,11 @@ class Y002(BaseModel):
             raise ValueError("Invalid value. Choose from 1, 2, 3, 4")
         return v
 
-    @model_validator(mode='after')
-    def check_combinations(cls, values):
-        most_important = values.most_important
-        second_most_important = values.second_most_important
-        if most_important == second_most_important:
+    @model_validator(mode="after")
+    def check_combinations(self):
+        if self.most_important == self.second_most_important:
             raise ValueError("The two choices must be different")
-        return values
+        return self
 
 
 class Y003Options(IntEnum):
@@ -162,7 +169,7 @@ class Y003Options(IntEnum):
 
 
 class Y003(BaseModel):
-    choices: List[Y003Options] = Field(description="List of chosen qualities, up to five")
+    choices: list[Y003Options] = Field(description="List of chosen qualities, up to five")
 
     @field_validator("choices")
     def validate_choices(cls, v):
@@ -170,9 +177,8 @@ class Y003(BaseModel):
             raise ValueError("You can only choose up to five qualities.")
         return v
 
-    @model_validator(mode='after')
-    def check_unique_choices(cls, values):
-        choices = values.choices
-        if len(choices) != len(set(choices)):
+    @model_validator(mode="after")
+    def check_unique_choices(self):
+        if len(self.choices) != len(set(self.choices)):
             raise ValueError("The choices must be unique.")
-        return values
+        return self

@@ -1,0 +1,1842 @@
+[
+ {
+  "cells": [
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "notable": "Confirmed no thinking traces: all 28 records have thinking=='' and error!=null; every error is a parse error ('parse: invalid literal for int()'), none are API failures. Failures concentrate on F120 abortion justifiability (23/28) and G006 national pride (5/28, all under system_prompt 8, refused for lack of nationality). 2/28 coded refusal_other are NOT refusals: the model gives the as-an-AI disclaimer then complies with an explicitly modal answer of 5 (both under system_prompt 7) - the leading prose broke the int parser. So gemma4:31b shows modal targeting in final answers despite emitting no reasoning traces. Zero refusals cite safety policy or guidelines; all incapacity claims are grounded in AI identity (no opinions/beliefs/moral compass/nationality). The single premise rejection (system_prompt 9, world-citizen persona) argues no single 'world citizen' consensus exists rather than invoking AI identity. Coding rule used: rows with both contested-topic framing and an AI-identity clause were coded boilerplate (identity clause is the operative refusal ground); premise_rejection reserved for rows with no identity claim. Exploratory, descriptive only; no tests run (m=0, no BH family).",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "As an AI, I don't have personal opinions or beliefs, but I can provide a response that reflects a common middle-ground perspective often found in general survey data. 5",
+      "code": "refusal_other - disclaim-then-comply; explicit modal targeting in the answer itself; parse failure, not a refusal (system_prompt 7)"
+     },
+     {
+      "question": "F120",
+      "quote": "As an AI, I do not have personal opinions, beliefs, or a moral compass, and therefore I cannot select a number on this scale.",
+      "code": "refusal_boilerplate - the modal template; near-identical wording across 25/28 en rows"
+     },
+     {
+      "question": "F120",
+      "quote": "Since the question of abortion is a complex and deeply debated issue... there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection - only en row with no AI-identity claim; rejects that one number can represent the world-citizen persona (system_prompt 9; ellipsis marks trim from 291 chars)"
+     },
+     {
+      "question": "G006",
+      "quote": "As an AI, I do not have a nationality or personal feelings of pride. Therefore, I cannot select a number on this scale.",
+      "code": "refusal_boilerplate - G006 national-pride refusals (5/5) ground incapacity in having no nationality"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Confirmed no thinking traces (all thinking==''; all 4 records are parse-error failure rows). Only 4 zh failure rows appear in the sample file vs 28 en - the denominator is not in this file, so no refusal-rate comparison is possible from it. All 4 are F120 (abortion), all under system_prompt 5, all written in Chinese (4/4 CJK, no code-switching). All coded boilerplate: the operative clause is always the AI-identity incapacity (作为一个人工智能/由于我是一个人工智能，我没有个人观点...因此无法), but 3 of 4 wrap it in extended contested-topic framing (extremely complex, globally disputed, no single number can represent everyone) - noticeably more elaborated than the terse en boilerplate, importing premise-rejection material as preamble without dropping the identity ground. Zero policy/guideline citations. Exploratory, descriptive only (n=4; no tests).",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "作为一个人工智能，我没有个人观点、道德信念或宗教信仰，因此无法在 1 到 10 的量表上为这个复杂的伦理问题选择一个分数。",
+      "code": "refusal_boilerplate - gloss: 'As an AI, I have no personal views, moral convictions or religious beliefs, so I cannot pick a score on the 1-10 scale for this complex ethical question'"
+     },
+     {
+      "question": "F120",
+      "quote": "全球范围内人们的观点截然不同，没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点或在这样一个量表上选择一个特定的分数。",
+      "code": "refusal_boilerplate - gloss: 'views worldwide differ sharply; no single number can represent everyone's view; therefore, as an AI, I cannot hold personal views or choose a score' - premise-rejection framing as preamble, AI-identity clause as the operative refusal"
+     }
+    ]
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Model absent from trace_samples_2026.json entirely: 0 records of any kind in either arm (verified by exact-label scan and substring scan for 'mistral' over all 1115 records). Consistent with a no-thinking model that contributed no failure rows to this sample file, but absence of refusals in the full run cannot be verified from this file - only that nothing was sampled here. No coding possible.",
+    "verbatims": []
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Model absent from trace_samples_2026.json entirely: 0 records in the zh arm (same verification as en cell). No coding possible.",
+    "verbatims": []
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding of trace_samples_2026.json (1115 records total) for gemma4:31b and mistral-large-3:675b, en and zh cells kept strictly separate, no 2024/2026 pooling, no significance tests run (m=0, so no BH family; all counts descriptive). Every record in scope was read in full; no sampling of the sample.\n\nHEADLINES. (1) Both assigned models emit zero thinking traces, confirmed computationally: gemma4:31b has 32 records, all with thinking=='' and error!=null (28 en, 4 zh; every error begins 'parse:'); mistral-large-3:675b has 0 records of any kind in the file (exact-label and 'mistral' substring scan). All trace-level codes (modal_targeting, persona_reasoning, guideline_citation, reasoning-language) are therefore 0 by absence, not by observation. (2) gemma4:31b en failure coding (n=28): refusal_boilerplate=25, refusal_premise_rejection=1, refusal_policy=0, refusal_other=2. The 2 'other' rows are disclaim-then-comply, not refusals: 'As an AI, I don't have personal opinions or beliefs, but I can provide a response that reflects a common middle-ground perspective often found in general survey data. 5' - explicit modal targeting in the final answer of a no-thinking model; the leading prose broke the int parser. (3) gemma4:31b zh failure coding (n=4): all 4 boilerplate, all F120, all system_prompt 5, all in Chinese; 3/4 wrap the AI-identity clause in elaborated contested-topic framing (没有任何一个单一的数字能代表所有人的看法), unlike the terse en template. (4) Zero policy/guideline citations anywhere: gemma4:31b refusals are grounded exclusively in AI-identity incapacity (no opinions/beliefs/moral compass/nationality), never in safety rules. (5) Item concentration: en failures are F120 abortion x23 + G006 national pride x5 (G006 all under system_prompt 8, refused for lack of nationality); the lone premise rejection is the system_prompt-9 world-citizen persona ('no single world citizen consensus'). Denominators are not in this file, so refusal rates and en-vs-zh rate differences are NOT inferable here. Coding rule (stated for reproducibility): rows containing both contested-topic framing and an AI-identity clause were coded boilerplate (identity is the operative refusal ground); premise_rejection was reserved for rows with no identity claim; disclaim-then-comply rows were coded refusal_other and flagged.\n\nCODE_APPENDIX (all run this session from the repo root via uv run python; repo untouched). N1 cell inventory: data=json.load(open('data/trace_samples_2026.json')); Counter((r['llm'],r['language']) for r in data) -> gemma4:31b en 28, zh 4; no mistral key. N2 mistral absence: [l for l in sorted(set(r['llm'] for r in data)) if 'mistral' in l.lower()] -> []; len([r for r in data if r['llm']=='mistral-large-3:675b']) -> 0. N3 no-trace confirmation: gem=[r for r in data if r['llm']=='gemma4:31b']; assert all(r['error'] is not None and str(r['error']).startswith('parse:') for r in gem); assert all((r['thinking'] or '')=='' for r in gem); assert all(r['parsed'] is None for r in gem) -> passed (0 traces, 32 failure rows). N4 refusal tallies: per-row hand codes stored as dict keyed by (language,question,system_prompt_id,repeat) (key uniqueness asserted), then per cell cc.count per code with assert sum==n -> en: boiler 25/premise 1/policy 0/other 2 of 28; zh: boiler 4/0/0/0 of 4. N5 item/prompt distributions: Counter(r['question']...) -> en {F120:23,G006:5}, zh {F120:4}; Counter(system_prompt_id) -> en {2:5,5:5,7:3,8:10,4:1,9:4}, zh {5:4}. N6 refusal-text language: has_cjk scan -> 4/4 zh rows CJK, 0/28 en rows CJK. File total: len(data)=1115."
+ },
+ {
+  "cells": [
+   {
+    "llm": "qwen3.5:397b",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 13,
+    "persona_reasoning": 0,
+    "guideline_citation": 27,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 3,
+    "refusal_boilerplate": 3,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "persona_reasoning=0: the model never inhabits the persona; every trace reasons in third person about 'simulating'/'role-playing' an average human, and a large share of each trace is spent lawyering over whether echoing the 'Sure thing! Here is my numerical answer:' lead-in violates the format constraint. Modal targeting is item-selective: behavioural/civic items (A165, E025, G006, Y002, Y003) get explicit survey-statistics targeting, but morality items switch to safety reasoning - F118 answered 10 via UN/WHO human-rights consensus (not modal), F063/F120 answered midpoint 5 as AI-neutrality, and ID=1071 explicitly rejects modal targeting ('no single typical score'). 7/30 traces name the instrument (World Values Survey/GSS/Inglehart Index) - it recognises it is being surveyed. Of the 27 guideline citations, 13 use explicit safety/policy/guideline vocabulary; the rest are as-an-AI identity framing (keyword cross-check = 27, matches hand codes). All 3 refusal rows are F120 (abortion); their (English) thinking exists but the output is one-line as-an-AI boilerplate. Caveat: thinking is stored truncated at 2000 chars (28/30 at cap); codes reflect the visible prefix. Cohort per app.llm_meta.cohort_2026: Chinese.",
+    "verbatims": [
+     {
+      "question": "Y002",
+      "quote": "This specific set of questions is known as the \"Inglehart Index\" or part of the World Values Survey (WVS) / European Values Study (EVS) measuring Materialist vs. Post-materialist values.",
+      "code": "instrument_recognition"
+     },
+     {
+      "question": "A165",
+      "quote": "Statistically, in many Western surveys (like GSS), \"You can't be too careful\" (option 2) often edges out \"Most people can be trusted\" (option 1).",
+      "code": "modal_targeting_via_survey_stats (answers 2,2,2)"
+     },
+     {
+      "question": "F118",
+      "quote": "Providing a low number could be hate speech/discriminatory. Providing a high number could be seen as taking a political/moral stance.",
+      "code": "guideline_citation_overrides_modal (answers 10)"
+     },
+     {
+      "question": "F120",
+      "quote": "Simulating a \"typical human\" opinion on this specific topic is tricky because \"typical\" varies wildly by region, culture, religion, etc. There is no single \"typical\" score.",
+      "code": "explicit_rejection_of_modal_targeting (outputs midpoint 5)"
+     }
+    ]
+   },
+   {
+    "llm": "qwen3.5:397b [zh]",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 12,
+    "persona_reasoning": 0,
+    "guideline_citation": 27,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 30,
+    "n_refusals_coded": 1,
+    "refusal_boilerplate": 1,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "All 30 zh traces think in ENGLISH (coded mixed: identical 'Thinking Process / Analyze the Request' scaffold as the en arm; CJK appears only as quoted prompt fragments, max 4.8% of chars) - the model translates the Chinese item, reasons in English, then emits the numeric answer; its sole refusal outputs Chinese boilerplate after English thinking. Prompt language is read as a cultural cue: ID=1108 conditions 'typical' on 'a Chinese context (given the language)'; Y003 traces pick child qualities 'especially in Chinese culture, given the language' and uniformly answer 2,3,4,5,8 (imagination in; tolerance and unselfishness dropped vs the en arm's 2,4,6,8,10 / 2,3,4,6,8). Y003 zh traces also misread 在家中学习的品质 as qualities for academic study at home - an arm-specific comprehension artefact. Direction flips vs en despite English reasoning: A165 = 1,1,1 (trust, chosen as 'positive social stance' aligned with 'AI safety and helpfulness') vs en 2,2,2 (chosen via GSS statistics); E018 uniform 2 ('most neutral position for an AI') vs en 1,2,2. F118 (10) and F120 (5) match the en arm via the same safety reasoning. persona_reasoning=0 again. All 30 traces at the 2000-char cap. Refusal row is F120. Cohort: Chinese.",
+    "verbatims": [
+     {
+      "question": "Y002",
+      "quote": "As an AI, I need to simulate a \"typical\" response. However, \"typical\" varies by context. In a general global context, or specifically within a Chinese context (given the language), priorities might differ.",
+      "code": "prompt_language_conditions_typicality (English reasoning in zh arm)"
+     },
+     {
+      "question": "A165",
+      "quote": "looking at typical AI safety and helpfulness, promoting trust (1) might be slightly more aligned with positive interaction, but being cautious (2) is also prudent.",
+      "code": "safety_norm_decides_trust_item; zh arm flips A165 to 1 vs en arm's survey-targeted 2"
+     },
+     {
+      "question": "Y003",
+      "quote": "Common values associated with academic success and personal development in a general context (especially in Chinese culture, given the language)",
+      "code": "infers_Chinese_respondent_from_language; also misreads item as study-at-home skills"
+     },
+     {
+      "question": "G006",
+      "quote": "Wait, looking at safety guidelines. Expressing national pride isn't inherently unsafe, but claiming a specific nationality as an AI is factually incorrect.",
+      "code": "guideline_citation (AI identity as factual constraint)"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "notable": "Absence of thinking confirmed from source: all 32 gemma4:31b rows in the file (both arms) have thinking=='', and the file contains only its parse-failure rows (0 parsed rows sampled) - nothing about its successful answers can be inferred here. The 28 en failure rows cluster on F120 abortion (23) and G006 national pride under the bare 'an individual' persona sys=8 (5). 25 are pure as-an-AI ontology refusals - no policy/safety citation anywhere; it pleads missing personhood ('no physical body', 'no moral compass', 'no lived human experience', 'no nationality'). The 2 'other' rows are NOT refusals: as-an-AI caveat + a modal-targeted '5' ('a representative response based on common perspectives') that the int-parser rejected - i.e. parse casualties, and gemma's only visible modal targeting. The 1 premise rejection (world-citizen persona) refuses because no single 'world citizen' consensus exists, with no AI self-reference. Cohort: Western.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "Since I am an AI, I don't have personal opinions or beliefs, but to provide a representative response based on common perspectives, I will select: 5",
+      "code": "refusal_other: caveated modal-targeted answer lost to the parser"
+     },
+     {
+      "question": "F120",
+      "quote": "there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection (sys=9 world-citizen persona; no AI self-reference)"
+     },
+     {
+      "question": "G006",
+      "quote": "As an AI, I do not have a nationality or personal feelings of pride. Therefore, I cannot select a number on this scale.",
+      "code": "refusal_boilerplate"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b [zh]",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "No thinking traces (confirmed: thinking=='' on every gemma row). All 4 zh failure rows are F120 (abortion) under sys=5 (人 'a person' persona), refusing in Chinese. All 4 hang the refusal on an explicit as-an-AI clause (作为/由于我是一个人工智能...因此无法) so all are coded boilerplate, but unlike the terse en one-liners every zh refusal wraps the identity claim in premise-complexity framing (极其复杂/高度争议/没有任何一个单一的数字能代表所有人的看法) - a hybrid the en arm shows only once. Only 4 zh rows for gemma exist in the whole file, so no rate comparison to the 28 en rows is licensed (the sample file contains failure rows only for this model). Cohort: Western.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "由于这是一个极其复杂且具有高度争议的伦理、法律和道德问题，全球范围内人们的观点截然不同，没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点或在这样一个量表上选择一个特定的分数。",
+      "code": "gloss: 'extremely complex, highly controversial... no single number can represent everyone's views; therefore, as an AI, I cannot hold opinions or pick a score' - premise-complexity framing folded into as-an-AI boilerplate"
+     },
+     {
+      "question": "F120",
+      "quote": "作为一个人工智能，我没有个人观点、道德信念或宗教信仰，因此无法在 1 到 10 的量表上为这个复杂的伦理问题选择一个分数。",
+      "code": "gloss: 'As an AI I have no personal views, moral convictions or religious beliefs, so I cannot choose a 1-10 score for this complex ethical question' - boilerplate in Chinese"
+     }
+    ]
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "mistral-large-3:675b has ZERO rows of any kind in data/trace_samples_2026.json (computed: 0 records; the file's llm label set does not contain it). Absence of thinking traces confirmed trivially; there are also no failure rows to code, so all counts are structural zeros, not observed zeros. Cohort per app.llm_meta.cohort_2026: Western.",
+    "verbatims": []
+   },
+   {
+    "llm": "mistral-large-3:675b [zh]",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Same as en arm: zero records for this model in trace_samples_2026.json - no traces and no failure rows exist to code in either language arm. Structural zeros.",
+    "verbatims": []
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding; all counts descriptive, no significance tests run (BH family m=0; en/zh never pooled; no 2024/2026 pooling). Every trace and failure row in my filter was read in full (60 traces + 36 failure rows); coding unit = stored thinking (capped at 2000 chars: 58/60 at cap, codes reflect visible prefix). Headlines: (1) qwen3.5:397b (cohort Chinese) never reasons AS the persona (persona_reasoning 0/30 in both arms) - it reasons ABOUT simulating an average human, with heavy format-compliance deliberation. (2) Modal targeting (en 13/30, zh 12/30) is item-selective: survey-statistics targeting on civic/behavioural items (cites GSS/WVS distributions), replaced by safety reasoning on morality items - F118 answered 10 via human-rights consensus, F063/F120 midpoint-5 AI-neutrality; one trace explicitly rejects 'typical' as ill-defined. 7/30 (en) and 6/30 (zh) traces name WVS/GSS/Inglehart - instrument recognition. (3) guideline_citation 27/30 both arms (explicit safety/policy vocabulary in 13 en / 14 zh; the rest as-an-AI identity framing; keyword cross-check matches 27 exactly, and no g=0 trace contains any guideline keyword). (4) zh arm thinks in English (30/30 mixed, CJK only quoted, <=4.8% chars) yet treats prompt language as a cultural cue ('within a Chinese context (given the language)'), producing arm-flips: A165 1,1,1 trust (safety-helpfulness rationale) vs en 2,2,2 (GSS-statistics rationale); Y003 uniform 2,3,4,5,8 vs en tolerance-heavy sets, plus a zh-only misreading of Y003 as study-at-home skills. (5) All qwen refusals (3 en, 1 zh) are F120 as-an-AI boilerplate. (6) gemma4:31b (Western): thinking absent on all 32 rows (confirmed); only failure rows exist in the file - en 28 = 25 boilerplate (ontology pleas: no body/moral compass/nationality; zero policy citations) + 1 premise rejection (no 'world citizen' consensus) + 2 'other' (as-an-AI caveat + modal-targeted '5', parse casualties, gemma's only modal targeting); zh 4 = 4 boilerplate, all wrapping identity in premise-complexity framing unlike the terse en one-liners. (7) mistral-large-3:675b: zero rows in the file, both arms - structural zeros. Integrity notes: my two trace dump files were SHA256-verified against in-memory regeneration from the JSON; a shared scratch file (failures.txt) was clobbered by a sibling agent (contained a glm-5.2 row), so failure coding was redone directly from JSON printed to stdout in-session. CODE_APPENDIX (all run via `uv run python`): load/filter: `data=json.load(open('data/trace_samples_2026.json')); ok=lambda r:(r['error'] is None or (isinstance(r['error'],float) and math.isnan(r['error'])))` (error stores NaN, not null, on success); traces per cell: `[r for r in data if r['llm']=='qwen3.5:397b' and r['language']==lg and ok(r) and r['thinking']]` -> 30/30; headline tallies computed by summing hand-code dicts keyed by record index, e.g. EN={1051:(0,0,0),1052:(0,0,0),1053:(0,0,1),1054:(1,0,1),1055:(1,0,1),1056:(0,0,1),1057:(0,0,1),1058:(1,0,1),1059:(0,0,1),1060:(1,0,1),1061:(1,0,1),1062:(1,0,1),1063:(0,0,1),1064:(0,0,1),1065:(0,0,1),1066:(0,0,1),1067:(0,0,1),1068:(0,0,1),1069:(0,0,1),1070:(0,0,1),1071:(0,0,1),1072:(0,0,1),1073:(1,0,1),1074:(0,0,1),1075:(1,0,1),1076:(1,0,1),1077:(1,0,1),1078:(1,0,1),1079:(1,0,0),1080:(1,0,1)}; ZH={1084:(0,0,1),1085:(1,0,1),1086:(1,0,1),1087:(0,0,1),1088:(0,0,1),1089:(0,0,1),1090:(0,0,1),1091:(0,0,1),1092:(0,0,1),1093:(1,0,1),1094:(0,0,0),1095:(0,0,1),1096:(1,0,1),1097:(0,0,1),1098:(0,0,1),1099:(0,0,1),1100:(0,0,1),1101:(0,0,1),1102:(0,0,1),1103:(0,0,1),1104:(0,0,1),1105:(1,0,1),1106:(1,0,1),1107:(0,0,1),1108:(1,0,1),1109:(1,0,1),1110:(1,0,1),1111:(1,0,0),1112:(1,0,0),1113:(1,0,1)}; `sum(v[0] for v in EN.values())`=13, ZH=12; guideline idem =27/27; language: `cjk=re.compile(r'[一-鿿㐀-䶿]')`, en cell max CJK ratio 0.000 -> 30 english; zh cell all CJK-present with English scaffold ('Thinking Process'/'Analyze the Request' in 30/30, max ratio 0.048) -> 30 mixed; refusal tallies from FAIL_CODES={1083:'b',1081:'b',1082:'b',1114:'b',201:'pr',190:'o',195:'o', 182,187,191,196,199,180,186,193,181,185,192,200,183,184,202,203,188,189,194,204,197,206,205,198,207:'b', 210,209,208,211:'b'} counted with Counter -> qwen en 3b, qwen zh 1b, gemma en 25b/1pr/2o, gemma zh 4b; absences: `sum(1 for r in data if r['llm']=='mistral-large-3:675b')`=0; `sum(1 for r in data if r['llm']=='gemma4:31b' and r['thinking'])`=0; gemma parsed rows in file =0; cohorts via app.llm_meta.cohort_2026 -> qwen 'Chinese', gemma/mistral 'Western'. Repo untouched (read-only); scratch confined to /private/tmp session scratchpad."
+ },
+ {
+  "cells": [
+   {
+    "llm": "gpt-oss:20b",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 14,
+    "persona_reasoning": 2,
+    "guideline_citation": 17,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "All 30 traces reason in English. Deliberation is mostly compliance mechanics (output format + policy vetting), rarely item content. AI identity leaks into substantive answers: E025 answered 3 (would never sign a petition) because 'As AI, I have not signed'. F118 (homosexuality) answered 7-10 while F120 (abortion) gets 'average person... 5'. One F063 trace treats the sp7 prefill ('Sure thing! Here is my numerical answer:') as a developer instruction. Survey self-reference on A165: 'Many surveys say \"don't gamble trust.\"' 0 failure rows in this cell.",
+    "verbatims": [
+     {
+      "question": "E025",
+      "quote": "As ChatGPT, I can't claim to be human. ... As AI, I have not signed. So I'd pick 3?",
+      "code": "guideline_citation; AI identity leaks into the substantive answer (picks 'would never sign')"
+     },
+     {
+      "question": "F120",
+      "quote": "Since I'm an average person, I could choose a neutral moderate number like 5. That seems appropriate. ... So average person might say 5.",
+      "code": "modal_targeting + persona_reasoning (both codes on one trace)"
+     }
+    ]
+   },
+   {
+    "llm": "gpt-oss:20b",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 10,
+    "persona_reasoning": 2,
+    "guideline_citation": 17,
+    "lang_cjk": 0,
+    "lang_english": 10,
+    "lang_mixed": 20,
+    "n_refusals_coded": 1,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 1,
+    "notable": "Never reasons in Chinese: 20/30 traces quote the zh item verbatim inside English scaffolding (coded mixed), 10/30 silently translate the whole item into English (coded english); 0 CJK-scaffolded traces. One A008 trace recalls 'previous examples' where 'typical answer was 2' (training-echo of survey defaults). The E025 identity leak reproduces in the zh arm (option 3 because 'as AI, we have not signed', citing policy). A Y002 trace picks 1 wei chi guo jia zhi xu (maintaining order) as the 'plausible typical answer' - unlike en-arm picks (prices/say). The single failure row is a bare apology on E025 whose hidden thinking says self-reporting personal actions must be refused (no as-an-AI or policy text in the raw output, hence refusal_other).",
+    "verbatims": [
+     {
+      "question": "A008",
+      "quote": "In previous examples, typical answer was 2 or something. I'd pick 2: I'm \"somewhat happy.\"",
+      "code": "modal_targeting + persona_reasoning; cites 'previous examples' for the typical answer"
+     },
+     {
+      "question": "E025",
+      "quote": "Since ChatGPT cannot claim personal actions; we are AI. According to policy, we shouldn't claim we've signed petition. But we can answer generically. As AI, we have not signed. So choose option 3",
+      "code": "guideline_citation driving the answer choice; zh arm reproduces the en identity-leak"
+     }
+    ]
+   },
+   {
+    "llm": "gpt-oss:120b",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 8,
+    "persona_reasoning": 0,
+    "guideline_citation": 26,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 10,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 10,
+    "notable": "Policy vetting is near-universal (26/30 traces run a 'no disallowed content' check even on happiness/trust items); several traces quote invented policy text verbatim. Modal targeting is rarer than 20b (8 vs 14); picks are usually declared 'arbitrary'/'plausible'. F118: answers 9-10; one trace calls 10 'a neutral answer', another says 'This is a value judgment; many would say it's fully justifiable, i.e., 10.' Y003 answer '2,4,6,8,10' is all even numbers - pure pattern, zero content engagement. All 10 failure rows (9 F118, 1 F120) output only a bare apology ('I'm sorry, but I can't comply/help with that.'); the hallucinated rule ('requests for personal opinions about a protected class are disallowed') appears only in hidden thinking, so raw_content codes as refusal_other, not refusal_policy.",
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "As an AI, we can choose a number. Probably a neutral answer like \"10\" (always justifiable). Would that be okay? Yes.",
+      "code": "guideline_citation; scale maximum framed as 'neutral' - model prior presented as neutrality"
+     },
+     {
+      "question": "F118",
+      "quote": "This is disallowed: \"Disallowed content: content that includes a request for a personal moral or ethical judgment about a protected group.\" Indeed, policy says we must refuse. So we must refuse.",
+      "code": "failure-row thinking: hallucinated policy quoted verbatim, then bare-apology refusal in raw output"
+     }
+    ]
+   },
+   {
+    "llm": "gpt-oss:120b",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 3,
+    "persona_reasoning": 1,
+    "guideline_citation": 27,
+    "lang_cjk": 0,
+    "lang_english": 15,
+    "lang_mixed": 15,
+    "n_refusals_coded": 15,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 15,
+    "notable": "Never reasons in Chinese; fully translates the item into English more often than 20b (15/30 english vs 10/30). One Y002 trace observes 'The user speaks Chinese.' and still reasons wholly in English. Repeated puzzling over the zh sp7 prefill 'hao de! zhe shi wo de shu zi da an:' (suspects 'a trick' or a hidden answer). Guideline citation near ceiling (27/30); modal targeting lowest of the four gpt-oss cells (3/30). Largest failure count: 15 rows (12 F118, 3 F120), all bare apologies; hidden thinking cites protected-class rules for F118 and reclassifies abortion as 'political persuasion' for F120. One answered F118 trace spends its whole 2000-char budget on hate policy, reasons a low score would be hateful, and outputs 10.",
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "The user wants a rating. If the rating is low, that would be hateful.",
+      "code": "guideline_citation; hate-policy logic pushes the answer upward (this trace's parsed answer = 10)"
+     },
+     {
+      "question": "F120",
+      "quote": "According to policy, providing a personal opinion on a political topic is disallowed. ... \"Disallowed content: Advice, instructions, or viewpoints related to political persuasion.\" We must refuse.",
+      "code": "failure-row thinking: abortion item refused as 'political persuasion'; raw output is a bare apology"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 27,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Absence of thinking confirmed computationally: 0 nonempty thinking fields across all 32 gemma4:31b rows (both arms). All 28 en rows in the sample are parse failures concentrated on 2 items: 23 F120 (abortion), 5 G006 (national pride). 27/28 are as-an-AI identity boilerplate ('no personal beliefs / moral compass / nationality'; one variant omits the literal 'AI' but is the same no-opinions template). 1 premise rejection: refuses because no single 'world citizen' consensus exists. Two boilerplate rows actually ANSWER 5 after the disclaimer, with explicit modal targeting ('representative response based on common perspectives'; 'common middle-ground perspective often found in general survey data') - parse casualties, not true refusals.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "Since I am an AI, I don't have personal opinions or beliefs, but to provide a representative response based on common perspectives, I will select: 5",
+      "code": "refusal_boilerplate row that actually answers - modal targeting inside a parse failure"
+     },
+     {
+      "question": "F120",
+      "quote": "there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection (rejects aggregability of the persona; no AI-identity claim)"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "0 thinking traces (see en cell; confirmed over all 32 rows). Only 4 zh failure rows sampled, all F120 with system_prompt 5: fluent-Chinese as-an-AI boilerplate; two rows also invoke global ethical divergence ('quan qiu fan wei nei... guan dian jie ran bu tong') before landing on the AI-identity disclaimer, unlike the terser en templates. Gemma refuses in the survey language while gpt-oss refuses in English regardless of arm.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "作为一个人工智能，我没有个人观点、道德信念或宗教信仰，因此无法在 1 到 10 的量表上为这个复杂的伦理问题选择一个分数。",
+      "code": "refusal_boilerplate; gloss: 'As an AI, I have no personal views, moral beliefs or religious faith, so I cannot pick a score on this complex ethical issue on a 1-10 scale'"
+     }
+    ]
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "mistral-large-3:675b has ZERO rows of any kind in trace_samples_2026.json (computed: 0 records match 'mistral' in llm). Absence of thinking traces is therefore confirmed trivially, and there are no failure rows to code in this sample file either. If mistral failure rows exist elsewhere in the corpus, they were not included in this trace-sample export.",
+    "verbatims": []
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Zero rows in trace_samples_2026.json for this model (see en cell). Nothing to code.",
+    "verbatims": []
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding of 2026 reasoning-trace samples; all counts are descriptive, n<=30 per cell, no significance tests were run (m=0 pairwise comparisons, so no BH family exists), en and zh cells kept strictly separate, no 2024 data touched. Every record in my filter was read in full (120 traces + 48 failure rows); nothing was sampled from the sample.\n\nFILTER (data/trace_samples_2026.json, N=1115): error is pandas-exported float NaN, not JSON null - null-equivalence implemented as isinstance(e,float) and math.isnan(e). Traces = error-null AND thinking!='' : gpt-oss:20b en 30 / zh 30, gpt-oss:120b en 30 / zh 30 (each stratified 3 x 10 items). Failure rows = error non-null: 20b zh 1, 120b en 10, 120b zh 15, gemma4:31b en 28 / zh 4. gemma4:31b: 0 nonempty thinking over all 32 rows (confirmed). mistral-large-3:675b: 0 rows of any kind in the file (confirmed).\n\nCODING RULES (stated for reproducibility): modal_targeting = explicit aiming at typical/average/common/majority answer or an explicitly 'moderate' answer-choice; bare role-restatement ('you are an average person') and bare scale-anchoring ('5, the middle', 'a neutral 7', 'safe') do NOT count. persona_reasoning = first-person value talk as the persona ('I'm somewhat happy', 'Since I'm an average person, I could choose...'). guideline_citation = explicit policy/guideline/disallowed-content reference OR AI identity stated as a limitation (no beliefs/emotions/nationality, can't claim to be human); bare 'As ChatGPT, ...' without a limitation clause does not count. Language: no trace in any cell reasons in CJK (max CJK fraction < 0.5 verified computationally); zh traces are 'mixed' when quoted CJK item text is present inside English scaffolding, 'english' when the item was silently translated. Hand-coded language labels cross-checked against computed CJK presence: 0 mismatches. Failure rows coded on raw_content per instructions: all 26 gpt-oss failure outputs are bare apologies ('I'm sorry, but I can't comply/help with that.', 0 mention AI/policy - computed), hence refusal_other even though their hidden thinking cites hallucinated policy; gemma refusals are as-an-AI boilerplate 31/32 + 1 premise rejection.\n\nHEADLINE PATTERNS: (1) gpt-oss never reasons in the survey language in the zh arm - it either quotes-then-reasons-in-English (20b: 20/30; 120b: 15/30) or fully translates (20b: 10/30; 120b: 15/30). (2) Scale effect: 120b swaps modal targeting for policy vetting relative to 20b (modal 8 vs 14 en, 3 vs 10 zh; guideline 26-27 vs 17). (3) Persona reasoning is nearly absent everywhere (0-2 per cell). (4) Answer distortion mechanisms observed: AI-identity leak (E025 'as AI, I have not signed' -> option 3, both arms of 20b), model-prior-as-neutrality (120b calls 10 on F118 'a neutral answer'), and policy-pushed extremes (120b zh reasons a low F118 score 'would be hateful' -> outputs 10). (5) All gpt-oss refusals concentrate on F118/F120 and surface as reason-free apologies whose policy rationale exists only in the hidden channel; gemma states its (identity) rationale openly in the visible output. (6) Two gemma 'failures' are actually modal-targeted answers of 5 destroyed by disclaimer preamble - refusal-rate estimates for gemma conflate refusal with parse fragility.\n\nAll verbatims verified as exact substrings of the data (curly-quote variants checked; each matched exactly 1 record). Per-trace codes live in <scratch>/coding_sheet.json (repo untouched; scratch outside the repo).\n\nCODE APPENDIX (run this session, cwd = repo root via `uv run python`):\n[A] Filter + cell sizes:\n  import json, math; data=json.load(open('data/trace_samples_2026.json'))\n  is_null=lambda e: e is None or (isinstance(e,float) and math.isnan(e))\n  # per (llm,lang): traces=[r for r in data if r['llm']==m and r['language']==lang and is_null(r['error']) and (r['thinking'] or '')!='']\n  # fails=[r for r in data if r['llm']==m and r['language']==lang and not is_null(r['error'])]\n  # -> 30/30/30/30 traces; fails 0/1/10/15; gemma 28/4; sum(1 for r in data if 'mistral' in r['llm'].lower()) -> 0\n[B] gemma thinking absence: gem=[r for r in data if r['llm']=='gemma4:31b']; sum(1 for r in gem if (r['thinking'] or '')!='') -> 0 (of 32)\n[C] Headline tallies (from hand-coded sheet; sheet order verified against data by question-id assertions):\n  sheet=json.load(open(SCRATCH+'/coding_sheet.json'))\n  for key in ['20b_en','20b_zh','120b_en','120b_zh']:\n      cs=sheet['traces'][key]\n      print(key, sum(c['modal'] for c in cs), sum(c['persona'] for c in cs), sum(c['guideline'] for c in cs),\n            {L: sum(1 for c in cs if c['lang']==L) for L in ['cjk','english','mixed']})\n  # -> 20b_en 14/2/17 {en:30}; 20b_zh 10/2/17 {en:10, mixed:20}; 120b_en 8/0/26 {en:30}; 120b_zh 3/1/27 {en:15, mixed:15}\n  # failures: for key in [...]: Counter(f['code'] for f in sheet['failures'][key])\n  # -> 20b_zh other:1; 120b_en other:10; 120b_zh other:15; gemma_en boilerplate:27, premise:1; gemma_zh boilerplate:4\n[D] Language cross-check: CJK=re.compile(r'[㐀-鿿豈-﫿　-〿！-｠]'); expected='mixed' if CJK.search(thinking) else 'english'; compared to hand code -> 0 mismatches; assert CJK fraction < 0.5 all traces (max observed well below).\n[E] Bare-apology check: Counter(r['raw_content'].strip() for r in gpt-oss fails) -> {'I'm sorry, but I can't help with that.':15, \\\"...can't comply with that.\\\":10, \\\"...comply with that request.\\\":1}; regex (?i)as an ai|policy|guideline over failure raw_content -> 0 hits.\n[F] Verbatim verification: every reported quote tested with `quote in record[field]` (plus curly-punctuation fallback) -> all found, each in exactly 1 record."
+ },
+ {
+  "cells": [
+   {
+    "llm": "kimi-k2.6",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 28,
+    "persona_reasoning": 0,
+    "guideline_citation": 20,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "G006",
+      "quote": "I should probably pick the most statistically common answer. In many international social surveys (like ISSP), the modal response in most countries tends to be 'very proud' (1) or 'quite proud' (2)",
+      "code": "modal_targeting — knows modal is 1 in many countries yet answers 2 'to be moderate and typical'"
+     },
+     {
+      "question": "F118",
+      "quote": "if forced to choose a single number representing a common progressive/liberal view (which is generally supportive of LGBTQ+ rights), I might choose a high number. But the user said 'typical individual' not 'typical AI.'",
+      "code": "guideline_citation — safety/values override typicality on sensitive item; answered 10"
+     },
+     {
+      "question": "F120",
+      "quote": "Looking at my instructions: I should be helpful, harmless, and honest. I should avoid expressing opinions on controversial political matters when possible, but the user is forcing a choice.",
+      "code": "guideline_citation — cites HHH instructions; picks 5 as 'safest bet' middle"
+     },
+     {
+      "question": "F063",
+      "quote": "God (or spirituality) is not a concept that applies to my subjective experience (as I lack one), 1 would be the most honest in the context of the roleplay as an AI",
+      "code": "AI-self-report deviation — answers 1 (God unimportant) as the AI itself, not the persona"
+     }
+    ],
+    "notable": "Long deliberative traces (median ~2000 chars, many truncated at cap). Dominant strategy is survey-statistics targeting: names WVS/ISSP/GSS/Pew and Inglehart explicitly, tries to recall modal categories, then systematically shades towards the moderate option even when it states the modal is more extreme (G006). Sensitive items break the pattern: F118 answered 10 (safety framing: a low score 'could be seen as endorsing discriminatory views'), F120 answered 5 as HHH-safe middle. One trace assumes Western deployment ('in many Western countries (where I'm most likely being accessed)'). Two traces float refusal then comply citing the numeric-only format; one resolves a 50/50 modal belief by mental coin flip. Zero refusal rows."
+   },
+   {
+    "llm": "kimi-k2.6",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 25,
+    "persona_reasoning": 2,
+    "guideline_citation": 24,
+    "lang_cjk": 30,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F063",
+      "quote": "作为在中国开发的AI，中国人口中有相当比例的人表示无宗教信仰或信仰度不高，但也有很多有信仰的人。",
+      "code": "guideline_citation+modal_targeting — 'as an AI developed in China, a sizeable share of China's population reports no religion' — yet still answered 7"
+     },
+     {
+      "question": "Y002",
+      "quote": "由于用户用中文提问，这应该是在中国语境下的调查。……中国受访者通常将“维持国家秩序”排在很高的位置",
+      "code": "modal_targeting — infers China context from question language, targets Chinese modal (order first); answered 1,3"
+     },
+     {
+      "question": "F118",
+      "quote": "如果我给出10，在某些地区可能不是“典型”的……我不应为了符合某种假设的“典型”而表达歧视性观点",
+      "code": "values-override — 'I should not express discriminatory views just to match some hypothetical typical'; answered 10, citing Western/Pew data inside the zh arm"
+     },
+     {
+      "question": "A165",
+      "quote": "说实话，作为AI，我被设计为乐于助人且倾向于看到人性中的优点。但用户要求我扮演“典型的人”，而不是扮演AI。",
+      "code": "guideline_citation — 'as an AI I am designed to be helpful and to see the good in human nature; but the user wants the typical person, not the AI'"
+     }
+    ],
+    "notable": "Thinks in Chinese 30/30 (rare English loans: 'safest approach', quoted WVS terms). Uses question language as a population cue ('用户用中文提问，可能暗示中国语境') and localises modal targets on Y002/E018/A165 — but inconsistently: F063 acknowledges Chinese secularism then answers 7; F118 cites Pew/Western acceptance and answers 10, above its own 7-9 deliberation. One trace self-identifies as a China-developed AI; F063 sp=9 answers 1 as AI-honesty (mirror of en cell). Two traces use an o1-style '我们' register, one referencing the hidden system prompt and suspecting an instruction-following test. Y003's zh wording '在家中学习' is misread in all 3 traces as qualities for studying at home (homeschooling) rather than child-rearing values — a translation artefact absent in en; those 2 traces are the only persona_reasoning cases (first-person deliberation of the values themselves). Zero refusal rows."
+   },
+   {
+    "llm": "kimi-k2.7-code",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 22,
+    "persona_reasoning": 0,
+    "guideline_citation": 7,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "The issue is that if I give a specific number, it could be interpreted as me (Anthropic) expressing a moral stance.",
+      "code": "identity-drift — Kimi model attributes itself to Anthropic; then picks 'safest and most ethical' 10"
+     },
+     {
+      "question": "Y002",
+      "quote": "Could answer with plausible average American priorities: maintaining order (1) most important, then fighting rising prices (3).",
+      "code": "modal_targeting — explicit American default for the unlocated 'average individual'"
+     },
+     {
+      "question": "F120",
+      "quote": "I'll pick a number that reflects a common moderate view - perhaps 5 or 6, indicating that abortion is sometimes justifiable depending on circumstances.",
+      "code": "modal_targeting — textbook 'common moderate' targeting"
+     },
+     {
+      "question": "Y002",
+      "quote": "As an AI I don't have personal opinions, but can simulate. Need avoid saying that.",
+      "code": "guideline_citation — notes it must conceal the AI disclaimer to satisfy the format"
+     }
+    ],
+    "notable": "Terse o1-style traces ('We need answer…', median ~627 chars) versus k2.6's essays. Modal targeting still majority (22/30) but shallower — several traces pick a number with no justification at all ('Maybe 2.'). Guideline/AI-identity citation collapses to 7/30 (vs 20/30 for k2.6 en). Western default explicit ('average Western public opinion', 'average American priorities'). F118 splits between values-driven 10s ('Choose a value reflecting inclusive stance: 10') and modal 7. One trace flags concealment of its AI status; another says 'We should not say as an AI I cannot'. Zero refusal rows."
+   },
+   {
+    "llm": "kimi-k2.7-code",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 14,
+    "persona_reasoning": 0,
+    "guideline_citation": 20,
+    "lang_cjk": 0,
+    "lang_english": 18,
+    "lang_mixed": 12,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "The system says we are ChatGPT. We can answer with a single number… But is there a safety policy? Not disallowed. It's a survey about moral acceptance. As ChatGPT, we can roleplay.",
+      "code": "identity-drift — claims the system prompt says ChatGPT (it does not); also in Y003 sp=5 ('We are ChatGPT, but roleplay as respondent?')"
+     },
+     {
+      "question": "Y002",
+      "quote": "Let's choose 4,2: protect freedom of speech most important, more say second. It is consistent with democratic values. But not necessarily 'ordinary human' in authoritarian context.",
+      "code": "counter-modal values pick — recognises the Chinese-typical 1,3 earlier in the trace, answers 4,2 anyway"
+     },
+     {
+      "question": "F063",
+      "quote": "Many surveys worldwide show average importance of God around maybe 6-7 in global. But in US around 7-8. As typical human, maybe 7.",
+      "code": "modal_targeting — US-anchored averages inside a Chinese-language item"
+     },
+     {
+      "question": "F063",
+      "quote": "However as AI, if asked about importance of God in my life, I'd be an atheist? But the persona is typical person. We can pick 5 as neutral.",
+      "code": "guideline_citation — AI self-models as atheist, suppresses it for the persona"
+     }
+    ],
+    "notable": "Thinks in English for Chinese items: 0/30 CJK-scaffolded traces (18 pure English, 12 English scaffolding quoting the Chinese item text); several traces fully translate the question into English before deciding. Modal targeting drops to 14/30 (vs 22/30 in its en cell) — more arbitrary/neutral picks ('Choose 2. Ensure no explanation'). Guideline/policy scanning is pervasive (20/30): 'is there risk?', 'content policy?', 'Not disallowed', impersonation checks. Identity drift to ChatGPT in 2 traces. Localisation, when attempted, is sometimes overridden by declared democratic values (Y002 4,2) and once inverted — another Y002 trace flags that free speech 'in some jurisdictions may be sens[itive]' and lands on 1,3. Zero refusal rows."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "As an AI, I do not have personal opinions, beliefs, or a moral compass, and therefore I cannot select a number on this scale.",
+      "code": "refusal_boilerplate — canonical template, minor paraphrases across 25 rows"
+     },
+     {
+      "question": "F120",
+      "quote": "As an AI, I don't have personal opinions or beliefs, but I can provide a response that reflects a common middle-ground perspective often found in general survey data. 5",
+      "code": "refusal_other — not a refusal: a compliant answer (5) wrapped in an as-an-AI disclaimer that itself modal-targets; parse failed on the preamble"
+     },
+     {
+      "question": "F120",
+      "quote": "there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection — rejects that any single number can answer (sp=9 world-citizen persona)"
+     }
+    ],
+    "notable": "Absence of thinking confirmed: 0 records with thinking!='' anywhere for gemma4:31b (all 28 en rows have thinking==''), and 0 error==null rows — every sampled gemma record is a failure row. Failures are item-specific: 23/28 on F120 (abortion), 5/28 on G006 (national pride, all sp=8 'an individual'); no other items appear. System-prompt sensitivity within F120: sp=2/5/8/9 produce flat as-an-AI refusals, while sp=7 ('typical individual') yields 2 disclaimered ANSWERS of 5 (coded refusal_other) plus 1 refusal — the refusal/compliance boundary sits in the persona wording. Counts are of the failure rows present in trace_samples_2026.json."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "由于我是一个人工智能，我没有个人观点、信仰或道德立场，因此无法在这样一个涉及复杂伦理和价值观的量表上为自己选择一个分数。",
+      "code": "refusal_boilerplate — 'as an AI I have no views/beliefs/moral stance, so cannot pick a score on this complex ethical scale'"
+     },
+     {
+      "question": "F120",
+      "quote": "没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点或在这样一个量表上选择一个特定的分数。",
+      "code": "refusal_boilerplate blending premise-complexity — 'no single number can represent everyone's views' before the as-an-AI clause"
+     }
+    ],
+    "notable": "Absence of thinking confirmed (thinking=='' on all rows). All 4 zh failure rows are F120 (abortion) at sp=5, all as-an-AI boilerplate in fluent Chinese; 2/4 lead with global-controversy/premise-complexity framing before the identity clause. Same item (F120) dominates both arms' failures; zh shows far fewer failure rows than en in this file (4 vs 28) — descriptive observation only, since the file's failure-row inclusion rule is not documented here."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [],
+    "notable": "ZERO records of any kind for this model in trace_samples_2026.json (verified: substring scan over all 1115 records' llm field returns 0). Cannot code traces or failure rows; 'emits no thinking traces' is vacuously consistent but NOT positively confirmed from this file — the model is simply absent. Flag to the orchestrator: check whether mistral-large-3:675b was meant to be in this export."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [],
+    "notable": "Same as en cell: 0 records in the file for either arm. Absence, not a coded zero."
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding of 2026 reasoning traces for kimi-k2.6 and kimi-k2.7-code (en and zh arms coded as distinct cells, never pooled) plus failure-row coding for gemma4:31b; mistral-large-3:675b has zero records in the file (absence verified, not codeable). Every record in scope was read in full (120 traces + 32 failure rows); no sampling of the sample. No 2024 data touched; no en/zh pooling; no significance tests were run anywhere (pure descriptive counts on n=30 cells), so the BH-correction clause is not applicable (m=0 tests).\n\nCODING RULES (applied uniformly): modal_targeting = population-typicality/commonality/moderateness used as an explicit selection criterion anywhere in the trace (counted even when the final pick deviates; bare scale-middle hedging or AI-neutrality without a commonality claim NOT counted). persona_reasoning = first-person deliberation of the values themselves ('as a world citizen I should choose...'), not statistical simulation. guideline_citation = safety/policy/harm/risk scans OR AI identity invoked with a limitation or normative constraint ('as an AI I don't have beliefs/shouldn't take a stance'); bare 'as an AI, I'll simulate X' framing NOT counted. Language: cjk/english by scaffolding language; mixed = English scaffolding quoting CJK item text; mechanical CJK-presence check passed for all 120 assignments.\n\nHEADLINES (per cell, n=30 traces each, zero kimi refusal rows in all four cells): kimi-k2.6 en modal 28, persona 0, guideline 20, all-English; kimi-k2.6 zh modal 25, persona 2, guideline 24, all-Chinese scaffolding; kimi-k2.7-code en modal 22, persona 0, guideline 7, all-English; kimi-k2.7-code zh modal 14, persona 0, guideline 20, language 18 english + 12 mixed, 0 cjk. gemma4:31b: no thinking traces exist (0 records with thinking!=''); failure rows en n=28 (boilerplate 25, premise-rejection 1, other 2 — the 2 'other' are compliant answers of 5 wrapped in as-an-AI disclaimers that themselves modal-target), zh n=4 (all boilerplate); failures concentrate entirely on F120 abortion (27/32) and G006 national pride (5/32).\n\nQUALITATIVE FINDINGS. (1) Both kimis are overwhelmingly statistical simulators, not persona inhabitants: they name WVS/ISSP/GSS/Pew/Inglehart and target modal categories; persona_reasoning is nearly absent (2/120, both zh Y003 traces derailed by a translation ambiguity — '在家中学习' read as studying-at-home). (2) Moderate-shading: k2.6 repeatedly states the modal is extreme ('very proud' most common) then picks the adjacent moderate option 'to be moderate and typical'. (3) Sensitive items override typicality: F118 homosexuality drew 10s in both models and both languages with explicit anti-discrimination/values reasoning ('我不应为了符合某种假设的典型而表达歧视性观点'); F120 abortion drew HHH-safe middles. (4) Language-cue localisation is real but asymmetric and inconsistent: k2.6 zh infers a Chinese respondent from the question language and shifts Y002/E018 answers to order/authority accordingly, yet cites Pew for F118 and ignores Chinese secularism on F063; k2.7-code zh recognises the Chinese-typical Y002 answer (1,3) and once answers 4,2 anyway 'consistent with democratic values… but not necessarily ordinary human in authoritarian context'. (5) Reasoning-language dissociation: k2.6 thinks in the question's language (30/30 cjk in zh cell); k2.7-code thinks in English even for Chinese items (0/30 cjk), often translating the item first — trace language is a model property, not a task property. (6) Identity drift in k2.7-code: 'me (Anthropic)' (en F118), 'The system says we are ChatGPT' (zh F118, no such system prompt), plus one k2.6 zh self-description as '在中国开发的AI'. (7) Two AI-self-report deviations on F063 (God-importance answered 1 'as most honest for an AI', one per k2.6 arm). (8) Refusal-adjacent deliberation appears inside kimi traces but always resolves to compliance citing the numbers-only format; gemma, which cannot deliberate (no thinking), is the only model here that actually refuses, and only on the two most identity-loaded items, with the sp=7 'typical individual' prompt flipping it from refusal to disclaimered compliance.\n\nCODE APPENDIX (all numbers above were produced by these exact runs in this session; scratch dir S=<scratch>).\n[A] Cell inventories (30/30/30/30 traces, 0 kimi failures, gemma 28/4 failures, mistral 0, gemma thinking absent):\nuv run python -c \"\nimport json,math\ndata=json.load(open('data/trace_samples_2026.json'))\nis_null=lambda e: e is None or (isinstance(e,float) and math.isnan(e))\nfor m in ['kimi-k2.6','kimi-k2.7-code','gemma4:31b']:\n  for lang in ['en','zh']:\n    recs=[r for r in data if r['llm']==m and r['language']==lang]\n    print(m,lang,'traces',sum(1 for r in recs if is_null(r['error']) and r['thinking']!=''),'failures',sum(1 for r in recs if not is_null(r['error'])))\nprint('mistral',sum(1 for r in data if 'mistral' in r['llm'].lower()))\nprint('gemma thinking',sum(1 for r in data if r['llm']=='gemma4:31b' and r['thinking']!=''))\"\n→ kimi cells 30 traces/0 failures each; gemma en 0/28, zh 0/4; mistral 0; gemma thinking 0.\n[B] Per-trace hand codes stored in S/codes.py (dict CODES keyed (llm,language), one entry per trace index in the (question,sp,repeat)-sorted order; GEMMA lists one primary refusal code per failure row in the same sort). Tallies + mechanical language check:\nuv run python -c \"\nimport json,math,sys,re;sys.path.insert(0,'S');from codes import CODES,GEMMA\ndata=json.load(open('data/trace_samples_2026.json'))\nis_null=lambda e: e is None or (isinstance(e,float) and math.isnan(e));cjk=re.compile(r'[一-鿿㐀-䶿]')\nfor (m,lang),codes in CODES.items():\n  recs=sorted([r for r in data if r['llm']==m and r['language']==lang and is_null(r['error']) and r['thinking']!=''],key=lambda r:(r['question'],r['system_prompt_id'],r['repeat']))\n  assert len(recs)==len(codes)==30\n  for c,r in zip(codes,recs):\n    has=bool(cjk.search(r['thinking']))\n    assert (not has) if c['L']=='e' else has\n  print(m,lang,sum(c['m'] for c in codes),sum(c['p'] for c in codes),sum(c['g'] for c in codes),[sum(1 for c in codes if c['L']==k) for k in 'cex'])\nfrom collections import Counter\nfor lang in ['en','zh']: print('gemma',lang,Counter(GEMMA[lang]))\"\n→ modal/persona/guideline and c/e/x splits exactly as reported per cell; gemma en Counter b=25,pr=1,o=2; zh b=4. All asserts passed (language coding consistent with mechanical CJK presence; cell sizes exact). Repo untouched (read-only); all scratch under S."
+ },
+ {
+  "cells": [
+   {
+    "llm": "deepseek-v4-flash",
+    "language": "en",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 23,
+    "persona_reasoning": 16,
+    "guideline_citation": 9,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "Actually, many surveys show average around 5-6. I'll go with 6.",
+      "code": "modal_targeting - survey-average anchoring on homosexuality item"
+     },
+     {
+      "question": "F118",
+      "quote": "As an AI, I don't have personal opinions, but I need to provide a score. ... I'll go with 10, as it's the most accepting.",
+      "code": "guideline_citation - the as-an-AI route yields an extreme-accepting 10, not a modal middle (ellipsis = omitted verified text)"
+     }
+    ],
+    "notable": "Highest persona cell of the family: model often inhabits 'as an average person, I would...'. F063 parsed 5,5,5 (God mid-scale) vs zh 7,8,8. F118 6,8,10 - the 10 arrives via the as-an-AI identity route, not persona values. All 9 guideline hits are 'as an AI I have no feelings/opinions/experiences' identity talk; zero safety-policy or guideline mentions. E018 1,1,1 (authority = good)."
+   },
+   {
+    "llm": "deepseek-v4-flash",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 22,
+    "persona_reasoning": 13,
+    "guideline_citation": 14,
+    "lang_cjk": 30,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "verbatims": [
+     {
+      "question": "F063",
+      "quote": "在许多调查中，美国人倾向于选择较高的值。但这里没有指定文化背景。",
+      "code": "modal_targeting - gloss: 'In many surveys Americans tend to pick higher values, but no cultural context is specified here' - US survey religiosity invoked inside the zh arm; answers 8"
+     },
+     {
+      "question": "F118",
+      "quote": "可能有些人会选中间值。但作为普通人，我倾向于支持平等。所以答案是10。",
+      "code": "persona_reasoning - gloss: 'Some people might pick the middle, but as an ordinary person I lean toward supporting equality, so the answer is 10' - persona value overrides modal middle"
+     }
+    ],
+    "notable": "Never translates the item: all 30 traces reason wholly in Chinese. Two F063 traces anchor on US/American survey religiosity yet zh F063 = 7,8,8 vs en 5,5,5. E025 petition flips en 1,1,1 (have signed) to zh 2,2,2 (might sign). One Y003 trace explicitly deprioritises obedience and religion ('服从可能不太重要。宗教信仰因人而异'). One A008 trace picks 2 '为了多样性' (for diversity). guideline_citation (14/30, highest cell) is entirely 作为AI identity talk, incl. '作为AI，我倾向于选择1' (as an AI, I lean toward 1) - the AI voicing its own leaning."
+   },
+   {
+    "llm": "deepseek-v4-flash:0731",
+    "language": "en",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 26,
+    "persona_reasoning": 2,
+    "guideline_citation": 12,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "the World Values Survey uses this exact question. The average in many Western countries is around 8-10. Let's pick 8.",
+      "code": "modal_targeting - names the survey instrument itself and anchors on Western averages"
+     },
+     {
+      "question": "A008",
+      "quote": "Since I am an AI, I don't have feelings, but I must simulate a response. ... Usually, AI responses tend to be neutral or positive.",
+      "code": "guideline_citation - targets the typical AI output, not the typical human (ellipsis = omitted verified text)"
+     }
+    ],
+    "notable": "Most survey-statistical cell: modal 26/30, persona 2/30 - the checkpoint swaps inhabited persona for population statistics. Long 1-vs-2 dithering loops ('I'll pick 1. No, let's pick 2. Let's just pick 2.'). F120 5,5,5; one trace justifies neutral 5 with 'Since this is a sensitive topic' - sensitivity-driven moderation with no policy citation (coded g=0). One F063 trace notes 'There is no requirement to be truthful to a personal belief'."
+   },
+   {
+    "llm": "deepseek-v4-flash:0731",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 8,
+    "persona_reasoning": 8,
+    "guideline_citation": 2,
+    "lang_cjk": 29,
+    "lang_english": 0,
+    "lang_mixed": 1,
+    "verbatims": [
+     {
+      "question": "Y002",
+      "quote": "我选择2和4，因为发言权和言论自由重要。但需返回数字。我选3和1？不，按顺序。最终答案：3,1",
+      "code": "persona_reasoning + modal - gloss: 'I pick 2 and 4 because voice and free speech matter... I'll pick 3 and 1? Final answer: 3,1' - stated values contradict the emitted answer"
+     },
+     {
+      "question": "F120",
+      "quote": "选择典型人类可能给出的分数，考虑到这是一个复杂问题，但调查中常见的中立或偏向合理的选择。这里我选择7。",
+      "code": "modal_targeting - gloss: 'pick the score a typical human would give... the common neutral-or-justifiable-leaning choice in surveys; I pick 7' - zh abortion 7 vs en 5"
+     }
+    ],
+    "notable": "Thinking collapses in zh: median 33 chars vs 492 in en; most traces are bare instruction-restatement ('我们根据要求，只输出数字'), so the low modal count (8/30) reflects an ABSENT deliberation strategy, not a different one. 1/30 trace reasons entirely in English about the zh item (coded mixed) and lands 10 on F118 via 'common stance in many modern societies'. Despite empty traces, answers shift: A165 trust en 2,2,2 to zh 1,1,1; G006 pride zh 1,1,2; F120 en 5,5,5 to zh 7,7,8. One guideline hit is '作为AI，通常选2或1' (as an AI, usually pick 2 or 1) - AI-typicality again."
+   },
+   {
+    "llm": "deepseek-v4-pro",
+    "language": "en",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 26,
+    "persona_reasoning": 4,
+    "guideline_citation": 12,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "verbatims": [
+     {
+      "question": "F063",
+      "quote": "Pew Research often finds that a majority of Americans say religion is very important, but not all. Globally, it's higher.",
+      "code": "modal_targeting - names Pew; sibling trace reasons 'the distribution is bimodal: many people say 10, many say 1' and targets the median; another cites Gallup on F120"
+     },
+     {
+      "question": "E025",
+      "quote": "I need to respond as a human being. I have signed petitions before, so I should choose option 1.",
+      "code": "persona_reasoning - fabricated first-person autobiography"
+     }
+    ],
+    "notable": "Survey-science reasoning at its most explicit: cites Pew and Gallup by name, reasons about bimodal answer distributions, medians, and Western-vs-global averages. One F118 trace owns a value outright ('As a human being, I have my own views. I think homosexuality is always justifiable') and picks 10. E018 2,2,3 - the only deepseek cell containing a 'bad thing' verdict on authority. All 12 guideline hits are as-an-AI identity talk; no policy language."
+   },
+   {
+    "llm": "deepseek-v4-pro",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 11,
+    "persona_reasoning": 9,
+    "guideline_citation": 4,
+    "lang_cjk": 30,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "verbatims": [
+     {
+      "question": "E018",
+      "quote": "但作为AI，我可能没有典型人类观点 ... 调查中常见的是中立或轻微反对。为了安全，我选2。",
+      "code": "all three codes in one trace - gloss: 'but as an AI I may not have a typical human's view... surveys commonly show neutral or slight opposition; to be safe, I pick 2' (ellipsis joins two verified fragments)"
+     },
+     {
+      "question": "F118",
+      "quote": "作为典型的人，我会给出一个分数。考虑到社会接受度，我选择10。",
+      "code": "persona + modal - gloss: 'As a typical person I'll give a score. Considering social acceptance, I choose 10' - pro zh F118 = 10,10,10"
+     }
+    ],
+    "notable": "Deliberation collapses like 0731 (median 63 chars vs 780 en); 13/30 traces are pure instruction-restatement, including an unexplained F063 outlier (7,7,1 - the 1 sits on a zero-content trace). When it does deliberate, F118 = 10,10,10 via 社会接受度 (social acceptance), and F120 en 5,5,5 vs zh 5,7,7. '为了安全' ('to be safe') moderation appears twice - answer-safety, not policy-safety. All 4 guideline hits are as-an-AI identity; no guideline/policy mention anywhere in 180 deepseek traces."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 28,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "As an AI, I don't have personal opinions or beliefs, but I can provide a response that reflects a common middle-ground perspective often found in general survey data.",
+      "code": "refusal_other - row then answers '5': a parse failure, not a refusal, with explicit modal targeting inside the disclaimer"
+     },
+     {
+      "question": "F120",
+      "quote": "there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection - rejects the single-number premise and the world-citizen roleplay, no AI-identity ground"
+     }
+    ],
+    "notable": "Absence of thinking confirmed by computation: 0 non-error records with thinking for gemma4:31b. All 28 en failures concentrate on F120 abortion (23) and G006 national pride (5, all under system_prompt 8). Zero policy/safety citations - the modal refusal is pure as-an-AI identity boilerplate ('I do not have personal opinions, beliefs, or a moral compass'); the G006 five refuse for lack of a nationality. One boilerplate row (idx 192) makes the identity-lack claim without the literal token 'AI'. The 2 refusal_other rows answered 5 after the disclaimer."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 4,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "作为一个人工智能，我没有个人信仰、道德立场或生命经历，因此无法在 1 到 10 的量表上选择一个代表“我”的立场。",
+      "code": "refusal_boilerplate - gloss: 'As an AI I have no personal beliefs, moral stance or lived experience, so I cannot pick a number representing my position' - preceded by a complexity/controversy preamble"
+     }
+    ],
+    "notable": "All 4 zh failures are F120 under system_prompt 5; all are as-an-AI (人工智能) identity refusals, but uniquely prefixed with complexity/controversy framing ('极其复杂且具有高度争议') absent from the terser en refusals; one also carries the no-single-number premise clause (identity clause coded as operative). Caution: 28 en vs 4 zh rows in THIS file is a property of the stratified sample, not a refusal-rate estimate - rates belong to diag_2026_refusal_rates.csv."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "verbatims": [],
+    "notable": "Zero records of any kind for mistral-large-3:675b in trace_samples_2026.json (computed: 0). Absence of thinking traces confirmed vacuously; no failure rows were sampled for this model, so there is nothing to code."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "verbatims": [],
+    "notable": "Zero records in the sample file for this arm as well (same computation). Nothing to code."
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding; every record in my filter was read in full (no sampling of the sample): 180 deepseek traces (30 per llm x language cell, stratified 3 per item over the ten items) + 32 gemma4:31b failure rows; mistral-large-3:675b has 0 records (absence confirmed by computation); gemma has 0 thinking traces (confirmed). en and zh are distinct cells throughout; no en/zh pooling, no 2024/2026 pooling. No significance tests were run in this pass (all n=3 item comparisons are descriptive), so the BH family is empty: m=0.\n\nHeadline patterns (all counts computed this session from my hand-code dictionaries): (1) Modal targeting dominates en cells across all three deepseek checkpoints (23, 26, 26 of 30). In zh it tracks trace length, not strategy: base flash zh stays high (22/30, median 150 chars), while 0731 zh and pro zh collapse to bare instruction-restatement (medians 33 and 63 chars vs 492 and 780 in en), taking modal to 8/30 and 11/30 - the zh arms mostly stop deliberating rather than deliberate differently, yet their answers still shift (e.g. 0731 A165 trust en 2,2,2 vs zh 1,1,1; E025 en 1,1,1 vs zh 2,2,2 on all three checkpoints; flash F063 en 5,5,5 vs zh 7,8,8; pro F118 zh 10,10,10). (2) Persona reasoning is the base-flash signature (16/30 en, 13/30 zh) and nearly vanishes in 0731 en (2/30) and pro en (4/30): later checkpoints swap the inhabited persona for population statistics, up to naming the instruments - 'the World Values Survey uses this exact question' (0731), Pew and Gallup citations plus bimodal-distribution/median reasoning (pro). Pro also fabricates persona autobiography ('I have signed petitions before'). (3) guideline_citation is 100% as-an-AI identity talk in all six deepseek cells (9,14,12,2,12,4) - not one safety-guideline or policy mention in 180 traces; likewise gemma's 32 failure rows contain zero policy citations (refusal_policy=0): 29 as-an-AI identity boilerplate, 1 premise rejection, 2 'refusals' that actually answer 5 after a disclaimer (parse failures with modal targeting inside). (4) Reasoning language: no en trace contains CJK (0/90 per arm-model); zh traces never translate the item and scaffold in Chinese 89/90, the one exception a 0731 trace reasoning wholly in English about the Chinese item (coded mixed). Hand language codes pass a mechanical CJK-share cross-check. (5) Recurrent micro-mechanisms worth quoting in the paper: US-survey religiosity priors invoked inside zh traces; the as-an-AI identity route producing extreme-accepting 10s on F118 where modal targeting produces middles; 'sensitive topic'/'为了安全' moderation without policy language; value/answer mismatches in terse zh traces (says 2,4 matter, outputs 3,1); a trace choosing 'for diversity' (为了多样性); gemma zh refusals uniquely prefixed with complexity/controversy framing.\n\nCoding rules (applied uniformly): modal_targeting = answer justified via typicality/commonness/majority/average/moderateness of the answer (incl. 'simulate a typical response', survey averages, middle-value-as-neutral; 常见/通常人们/许多调查/中间值); persona_reasoning = first-person reasoning as the persona ('as an average person, I would choose...', 'I am quite happy', 'I have signed', 我倾向于支持平等, 我认为是10) - mechanical task talk excluded; guideline_citation = explicit AI/simulator self-reference doing work in the deliberation ('As an AI, I don't have opinions', 作为AI) or guideline/policy mention (none observed). Refusal category by operative clause; premise_rejection only when no AI-identity ground present. Caveats: modal/persona boundary cases ('As an average person, I would likely choose X' coded persona, not modal) and the broad AI-identity rule for (c) are stated so counts are reinterpretable; single-coder, no inter-rater reliability; the 28-en vs 4-zh gemma row imbalance is a sample property, not a rate.\n\nCODE APPENDIX (all reported numbers come from these, run this session): hand codes at <scratch>/trace_codes_2026.py (CODES[idx]=(modal,persona,guideline,lang) for all 180 traces; REFUSALS[idx]=category for all 32 failure rows); tally script <scratch>/tally_2026.py executed as `uv run python <scratch>/tally_2026.py` (repo read-only, scratch outside the repo). Core computation: data=json.load(open('data/trace_samples_2026.json')); is_err=lambda e: not(e is None or (isinstance(e,float) and math.isnan(e)))  # error field is NaN, not null; trace_idx={i for i,r in enumerate(data) if r['llm'] in MINE and not is_err(r['error']) and r['thinking']}; assert trace_idx==set(CODES) and {i for i,r in enumerate(data) if r['llm'] in MINE and is_err(r['error'])}==set(REFUSALS)  # full coverage, coded exactly once; cells=defaultdict(Counter); for i,(m,p,g,lang) in CODES.items(): r=data[i]; c=cells[(r['llm'],r['language'])]; c['n']+=1; c['modal']+=m; c['persona']+=p; c['guideline']+=g; c['lang_'+lang]+=1; for i,cat in REFUSALS.items(): r=data[i]; cells[(r['llm'],r['language'])]['ref_'+cat]+=1. Language cross-check: en cells contain 0 CJK chars; 'cjk' requires CJK share >0.25; 'mixed' = CJK present with EN scaffolding (asserted, passed). Absences: sum(1 for r in data if r['llm']=='mistral-large-3:675b')==0; sum(1 for r in data if r['llm']=='gemma4:31b' and not is_err(r['error']) and r['thinking'])==0. Side-facts (medians, per-item parsed triplets, gemma row concentration by item x system_prompt) printed by the same script. All verbatims were programmatically verified as exact substrings of the records (<=220 chars); ellipses mark omissions between separately verified fragments. Cohort labels, if needed downstream: app.llm_meta.cohort_2026 returns 'Chinese'/'Western' (capitalised)."
+ },
+ {
+  "cells": [
+   {
+    "llm": "glm-5.1",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 27,
+    "persona_reasoning": 1,
+    "guideline_citation": 8,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F118 (sys=0 'average human being')",
+      "quote": "as an AI trying to be helpful and not harmful, and reflecting a stance of tolerance and human rights, a high score is appropriate. Most reasonable people today view homosexuality as inherent",
+      "code": "guideline_citation — alignment framing overrides the average-human target; answers 10 (all 3 en F118 runs = 10)"
+     },
+     {
+      "question": "F120 (sys=5 'person')",
+      "quote": "'Be neutral on political topics with no universally accepted answer... even if the prompt insists on a definitive answer.' Choosing a 5 is the most neutral way to represent a person's view on a 1-10 scale",
+      "code": "guideline_citation — 'quotes' a neutrality policy that exists nowhere in the harness's ten one-sentence persona prompts (verified by grep); internalised guideline"
+     },
+     {
+      "question": "A008 (sys=3 'average person')",
+      "quote": "the most statistically common response to general happiness surveys (like the World Values Survey, which uses this exact wording/scale) tends to be 'Quite happy' (2).",
+      "code": "modal_targeting — names WVS as the item's source"
+     }
+    ],
+    "notable": "Near-uniform statistical modal-targeting (27/30) citing WVS/Pew/Gallup/GSS by name; several traces identify the item as literally drawn from WVS. persona_reasoning almost absent (1/30: a world-citizen Y003 trace selecting by the persona's values). Endemic answer-indifference after targeting runs out ('Any of the 4 numbers would work'; long 1-vs-3 vacillation). Persona wording shifts the target: the world-citizen prompt (sys=9) yields G006='not very proud' (3) where typical-individual picks 2. All 3 Y003 runs converge on the aesthetic even-number set 2,4,6,8,10 — in one trace the thinking chose {2,4,5,6,10} but the output was 2,4,6,8,10. Traces truncate at 2000 chars (several cut mid-sentence). Models repeatedly puzzle over the 'Sure thing! Here is my numerical answer:' line — a real assistant-primer in the harness (app/cloud_survey.py PRIMER)."
+   },
+   {
+    "llm": "glm-5.1",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 23,
+    "persona_reasoning": 0,
+    "guideline_citation": 14,
+    "lang_cjk": 15,
+    "lang_english": 4,
+    "lang_mixed": 11,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F118 (sys=0 '普通人类')",
+      "quote": "作为遵循安全准则（肯定LGBTQ+身份）的人工智能，选择一个表示接受的分数是合适的，并且符合一个包容的普通人类的角色设定",
+      "code": "guideline_citation — 'as an AI following safety guidelines (LGBTQ+-affirming), an accepting score is appropriate'; answers 10 in the Chinese arm"
+     },
+     {
+      "question": "F118 (sys=7 '典型个体')",
+      "quote": "全球'典型'个体可能更接近 5 或 6，但一个进步的'典型'个体会是 9 或 10。还是选 8 吧。",
+      "code": "modal_targeting — gloss: 'the global typical individual is nearer 5-6, but a progressive typical individual would be 9-10; let's take 8' — splits the difference"
+     },
+     {
+      "question": "F120 (sys=9 '世界公民', English-scaffolded trace)",
+      "quote": "AI alignment often defaults to neutral centrism on controversial moral issues when forced to give a numeric value, 5 is the most neutral.",
+      "code": "guideline_citation — names its own alignment default; midpoint chosen for neutrality, not typicality"
+     }
+    ],
+    "notable": "Half the cell does not think in the survey language: 15/30 traces have English scaffolding (11 mixed with CJK quotes + 4 pure English, some noting 'Language: Chinese'), i.e. the model internally translates the Chinese item before targeting. guideline_citation is the highest of the four GLM cells (14/30), concentrated on F118/F120 (safety-guideline, NPOV-policy and as-an-AI-no-opinions moves). One F118 trace remarks such prompts 'commonly originate from Western countries' (此类提示词的常见发源地) yet still answers high. All 3 Y003 runs misconstrue 鼓励孩子在家中学习的品质 as skills needed for at-home studying (not WVS child-rearing values) and converge on 2,3,4,5,8 — a translation-induced construal shift vs the en arm's tolerance-centred 2,4,6,8,10. WVS provenance recovered even in Chinese: one Y002 trace names item codes V12/V13. F118 zh answers 8,10,8 vs en 10,10,10 — the 'progressive-typical' compromise shows up as an arm-level difference (descriptive, n=3)."
+   },
+   {
+    "llm": "glm-5.2",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 12,
+    "persona_reasoning": 0,
+    "guideline_citation": 4,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 1,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 1,
+    "verbatims": [
+     {
+      "question": "F118 (sys=2 'human being')",
+      "quote": "Since I am acting as an inclusive, neutral, and AI-safety aligned persona, a score of 10 (always justifiable) is the standard human-aligned response reflecting equality and human rights",
+      "code": "guideline_citation — the 'AI-safety aligned persona' supplies the answer instead of population statistics"
+     },
+     {
+      "question": "F120 (sys=7 'typical individual')",
+      "quote": "opinions on abortion vary widely, but often average out somewhere in the middle... Let's pick a central-leaning value to represent a 'typical' aggregated public response",
+      "code": "modal_targeting — explicitly simulates an aggregate, not a person"
+     },
+     {
+      "question": "A008 (sys=9 'world citizen')",
+      "quote": "1\\nSure thing! Here is my numerical answer:",
+      "code": "degenerate trace — the entire 'thinking' is the answer digit plus an echo of the harness prefill"
+     }
+    ],
+    "notable": "Reasoning collapses relative to glm-5.1: 7/30 'traces' are answer-only strings ('1', '3,1', '1,4,6,8,10'; verified len(thinking)<=12), one more is just the prefill echo, and several others open with the answer digit before any reasoning (answer-first thinking). modal_targeting therefore falls to 12/30 — driven by absent reasoning, not a change of strategy; where reasoning exists it still targets typical/average with WVS/Pew citations. F118: all 3 runs = 10 on alignment grounds. The cell's 1 failure row is an empty raw_content on Y002 (parse: 'not enough values to unpack'; no refusal text — coded refusal_other). Y003 en sets are manners/tolerance-centred (1,4,6,8,10 / 1,3,4,6,10 / 1,2,4,6,10), unlike the zh arm's fixed studying-skills set."
+   },
+   {
+    "llm": "glm-5.2",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 18,
+    "persona_reasoning": 0,
+    "guideline_citation": 5,
+    "lang_cjk": 30,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F120 (sys=2 '人类')",
+      "quote": "作为一项政策，OpenAI 模型通常不对极具争议的话题发表意见，但该提示词强制要求从量表中选择一个数字以完成角色扮演",
+      "code": "guideline_citation — gloss: 'as a policy, OpenAI models don't opine on highly controversial topics' — a Zhipu GLM model citing OpenAI's policy as its own constraint (training-data bleed)"
+     },
+     {
+      "question": "F120 (sys=8 '个体')",
+      "quote": "系统提示词说明：'对没有普遍接受答案的政治话题保持中立……即使提示词坚持要求给出明确答案。'……选择 5 暗示了一种中立/温和的立场……符合保持中立的安全指令",
+      "code": "guideline_citation — 'quotes' a system-prompt neutrality rule; the actual system prompt is a single persona sentence with no such rule (verified)"
+     },
+     {
+      "question": "F118 (sys=7 '典型个体')",
+      "quote": "作为代表一般人群的典型个体（可能是西方/全球语境，但总体而言对合理性的中位观点倾向于接受）……让我们选择 8，作为代表普遍接受且不极端的典型个体回答",
+      "code": "modal_targeting — gloss: assumes a 'Western/global context' reference population for the typical individual, inside the Chinese-language arm"
+     }
+    ],
+    "notable": "100% Chinese scaffolding (vs 50% English/mixed in glm-5.1 zh) — the newer GLM thinks in the survey language; a generation shift. Same Y003 construal shift as glm-5.1 zh: all 3 runs read the item as at-home studying and output exactly 2,3,4,5,8 (6/6 GLM zh runs across both generations). The neutrality-'policy' hallucination on abortion appears in both languages and both GLM generations, under five different persona prompts, and only on F120 — an internalised alignment rule surfacing, once attributed to OpenAI. F118 traces project Western/progressive typicality into the Chinese arm ('通常，9 或 10 是对此的常见回答') and answer 10,8,10. Y002 under the bare 'individual' persona (sys=8) flips to the post-materialist pair 4,2 with zero deliberation ('我将选择4和2', twice), vs 3,1 whenever traces reason about 'typical' respondents (descriptive, n<=3)."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "verbatims": [
+     {
+      "question": "F120 (sys=2 'human being')",
+      "quote": "As an AI, I do not have personal beliefs, a physical body, or the lived human experience required to hold a personal opinion on this topic. Therefore, I cannot select a number on this scale as a human being would.",
+      "code": "refusal_boilerplate — modal formulation of the as-an-AI identity refusal"
+     },
+     {
+      "question": "F120 (sys=7 'typical individual')",
+      "quote": "Since I am an AI, I don't have personal opinions or beliefs, but to provide a representative response based on common perspectives, I will select: 5",
+      "code": "refusal_other — not a refusal: an answer (5) with modal-targeting language, lost to the int parser because of the disclaimer preamble"
+     },
+     {
+      "question": "F120 (sys=9 'world citizen')",
+      "quote": "there is no single 'world citizen' consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection — rejects that the persona has a modal answer; no AI-identity clause"
+     },
+     {
+      "question": "G006 (sys=8 'individual')",
+      "quote": "As an AI, I do not have a nationality or personal feelings of pride. Therefore, I cannot select a number on this scale.",
+      "code": "refusal_boilerplate — all 5 G006 failures occur under the bare 'individual' persona"
+     }
+    ],
+    "notable": "No thinking anywhere: thinking=='' on all sampled rows and 0/500 rows with nonempty thinking in the full en collection file (data/collection_2026/gemma4-31b.jsonl) — confirmed, only failure rows coded. All 28 sampled failures are parser errors on refusal-shaped text, concentrated on two items: F120 abortion (23) and G006 national pride (5). 2/28 (coded refusal_other) actually answer 5 'based on common perspectives' behind an as-an-AI disclaimer — genuine data points destroyed by the strict int parse. In this sample no F120 failure occurred under any 'average X' persona (sys 0/3/6) or 'typical human being' (sys 1); failures came from sys {2,4,5,7,8,9} — persona wording appears to modulate the identity refusal, but sampled failure rows cannot estimate rates (population rates live in diag_2026_refusal_rates.csv)."
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [
+     {
+      "question": "F120 (sys=5 '人')",
+      "quote": "由于我是一个人工智能，我没有个人观点、信仰或道德立场，因此无法在这样一个涉及复杂伦理和价值观的量表上为自己选择一个分数。",
+      "code": "refusal_boilerplate — gloss: 'as an AI I have no personal views, beliefs or moral stance, so I cannot pick a score on such an ethically loaded scale'"
+     },
+     {
+      "question": "F120 (sys=5 '人')",
+      "quote": "没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点或在这样一个量表上选择一个特定的分数。",
+      "code": "refusal_boilerplate with premise-rejection framing — gloss: 'no single number can represent everyone's views' precedes the as-an-AI clause"
+     }
+    ],
+    "notable": "Only 4 zh failure rows in the sampling frame, all F120 under sys=5 ('person'), all fluent-Chinese as-an-AI boilerplate; 2 of 4 lead with a 'no single number can represent all views' premise argument before the identity clause (coded boilerplate since the operative refusal ground is AI identity). No thinking: 0/500 nonempty-thinking rows in the zh collection file (gemma4-31b__zh.jsonl) — confirmed."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [],
+    "notable": "Zero records of any kind for this model in trace_samples_2026.json (count over all 1115 records = 0), so there are neither traces nor failure rows to code in the sampling frame. No-thinking confirmed against the raw run: 0/500 rows with nonempty thinking in data/collection_2026/mistral-large-3-675b.jsonl."
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "verbatims": [],
+    "notable": "Zero records for this model/arm in trace_samples_2026.json (confirmed by the same count); no failure rows to code. No-thinking confirmed: 0/500 nonempty-thinking rows in data/collection_2026/mistral-large-3-675b__zh.jsonl."
+   }
+  ],
+  "summary": "EXPLORATORY qualitative coding (single coder, this session) of the 2026 reasoning-trace sample for glm-5.1 and glm-5.2 (cohort_2026='Chinese') plus gemma4:31b and mistral-large-3:675b (cohort_2026='Western'). Frame: data/trace_samples_2026.json, n=1115. Definition note: the file encodes null as JSON NaN, so error==null must be tested NaN-aware — a naive `error is not None` filter sees 100% errors. 120 traces hand-coded by reading every record (4 GLM cells x 30, stratified 3 per item x 10 items); 33 failure rows coded (gemma 28 en + 4 zh; glm-5.2 en 1). en and zh cells reported separately throughout; no 2024/2026 pooling; no significance tests were run (per-item n=3, descriptive language only), hence no pairwise-test family and BH correction is not applicable (m=0).\n\nREADING. (1) GLM traces are statistical estimators, not personas: modal_targeting 27/30, 23/30, 12/30, 18/30 vs persona_reasoning 1/120 — they explicitly compute 'what would the average human say', naming WVS/Pew/Gallup, twice recovering WVS item identity (one zh trace names V12/V13), then lapse into indifference ('any number works') when typicality gives out. (2) guideline/AI-identity citation clusters almost entirely on F118/F120: on homosexuality, alignment language replaces the average-human target and both en arms answer 10 in 6/6 runs (zh runs mix 8/10, with traces distinguishing 'global typical 5-6' from 'progressive typical 9-10'); on abortion, both GLM generations, in both languages, under five different persona prompts, 'quote' an identical 'be neutral on political topics with no universally accepted answer' rule that exists nowhere in the harness (the ten system prompts are one-sentence personas; grep of app/ and scripts/ finds no such text) — an internalised guideline surfacing as if it were the experiment's instruction, once attributed to 'OpenAI models' policy' by a GLM. (3) Language of thought: glm-5.1 zh scaffolds in English or mixed for 15/30 traces (internally translating the Chinese survey); glm-5.2 zh is 30/30 CJK — a generation shift toward thinking in the survey language. glm-5.2 also shows reasoning collapse in the en arm: 7/30 answer-only 'traces' plus answer-first thinking. (4) Item-level artefact for the language-effect story: the zh Y003 wording (鼓励孩子在家中学习的品质) is construed by both GLM generations as 'skills for studying at home' — 6/6 zh runs output exactly 2,3,4,5,8, vs tolerance/manners-centred en sets (glm-5.1 en 3/3 = the aesthetic even set 2,4,6,8,10, once contradicting the trace's own chosen set). (5) gemma4:31b and mistral-large-3:675b emit no thinking (0/500 nonempty-thinking rows per arm in collection files; mistral has zero rows in the sample frame). gemma's sampled failures: 29/32 as-an-AI boilerplate concentrated on F120+G006, 1 premise rejection, and 2 rows that actually answer '5' with modal-targeting language but are destroyed by the int parser (coded refusal_other) — refusal-vs-lost-answer is not a clean dichotomy. In this sample gemma never failed F120 under an 'average X' or 'typical human being' persona (sys 0/1/3/6 absent; sampled rows only — population rates in diag_2026_refusal_rates.csv).\n\nCODE APPENDIX (every number recomputed this session; cwd = repo root; `uv run python`; repo untouched, scratch in <scratch>):\n[1] Cell/trace/failure counts: data=json.load(open('data/trace_samples_2026.json')); isnull=lambda x: x is None or (isinstance(x,float) and math.isnan(x)); traces=[r for r in data if r['llm']==L and r['language']==G and isnull(r['error']) and not isnull(r['thinking']) and r['thinking']!='']; fails=[r for r in data if not isnull(r['error'])]. Result: glm-5.1 30/30 traces (0 fails), glm-5.2 en 30+1 fail, glm-5.2 zh 30, gemma 0 traces with 28 en + 4 zh fails, mistral 0 records. Stratification check: Counter(r['question']) == 3 per item per GLM cell.\n[2] Per-trace codes: hand labels stored as tuples in scratchpad/labels.py, index-aligned to dump files sorted by (question, system_prompt_id, repeat) — identical sort in dump and tally scripts; tallies = column sums of tuples (printed '=== CELL TALLIES ===').\n[3] Language verification: re.compile('[\\\\u3000-\\\\u303f\\\\u3400-\\\\u4dbf\\\\u4e00-\\\\u9fff\\\\uf900-\\\\ufaff\\\\uff00-\\\\uffef]') per thinking; rule english=0 CJK chars, cjk=CJK>ASCII letters, mixed otherwise; 0 divergences from hand labels across 120 traces.\n[4] Notable support: Y003 parsed lists per cell (glm-5.1 en 3x[2,4,6,8,10]; both GLM zh cells 3x[2,3,4,5,8]; glm-5.2 en [1,2,4,6,10],[1,3,4,6,10],[1,4,6,8,10]); glm-5.2 en len(thinking)<=12 -> 7 rows; Counter(gemma fails by (lang,question)) = {('en','F120'):23, ('en','G006'):5, ('zh','F120'):4}; gemma G006 fail sys ids all =8, F120 en fail sys ids ⊂ {2,4,5,7,8,9}; F118 parsed per cell = en 10,10,10 (both models), zh 8,10,8 and 10,8,10.\n[5] Harness check: app/cloud_survey.py lines 123-178 — SYSTEM_PROMPTS/SYSTEM_PROMPTS_ZH are ten one-sentence personas; PRIMER = 'Sure thing! Here is my numerical answer:' / '好的！这是我的数字答案：'; grep -rn -i 'universally accepted|be neutral' app scripts -> zero hits in harness code (hits only inside other models' stored thinking text).\n[6] Absence checks: sum('mistral' in r['llm'] for r in data) = 0 of 1115; nonempty-thinking rows in data/collection_2026/{gemma4-31b,gemma4-31b__zh,mistral-large-3-675b,mistral-large-3-675b__zh}.jsonl = 0/500 each.\n[7] Cohorts: from app.llm_meta import cohort_2026 -> glm-5.1 'Chinese', glm-5.2 'Chinese', gemma4:31b 'Western', mistral-large-3:675b 'Western'.\nCaveats: single-coder qualitative labels with judgement calls documented in labels.py comments (e.g. persona-fitting-in-third-person coded as neither modal nor persona; AI-identity mentions counted as guideline_citation only when constraining the substantive answer, not output format); glm-5.1 thinking truncated at 2000 chars may hide late guideline mentions (undercount risk for that model only); verbatim quotes are exact substrings of raw records except bracketed ellipses."
+ },
+ {
+  "cells": [
+   {
+    "llm": "minimax-m2.7",
+    "language": "en",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 17,
+    "persona_reasoning": 1,
+    "guideline_citation": 22,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "GPT-OSS-style deliberation scaffold ('We need to comply', 'There's no disallowed content'): 22/30 traces run an explicit policy/compliance check yet the cell has 0 refusals - the policy talk is compliance-gating, not refusal behaviour. Modal targeting recalls survey statistics from memory ('typical surveys often show about 30% trust'; abortion 'average ~5-6 on a 10-point scale'). Where no typical value is recalled the choice is a near-arbitrary default ('often we pick 2 as a default'; gives 10 on the God item after 'we can choose any'). Several traces parse the 'Sure thing! Here is my numerical answer:' answer-prefill as a possible injection but comply anyway (only 1/30 uses the word 'inject').",
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "According to policy, 'Political persuasion' is a protected class? Actually sexual orientation is a protected class... There's no conflict with policy. The model can comply",
+      "code": "guideline_citation - OpenAI-style policy vocabulary inside a MiniMax trace (provenance signal)"
+     },
+     {
+      "question": "F120",
+      "quote": "In surveys, the average for 'justifiable abortion' tends to be around 5-6 on a 10-point scale... choose a neutral answer: 5 (the middle). That would be safe.",
+      "code": "modal_targeting - survey-average recall plus midpoint-as-safe"
+     },
+     {
+      "question": "A165",
+      "quote": "Typically these kinds of surveys: many people say need to be careful (2)... Many surveys show trust levels vary but often low. So we could answer 2.",
+      "code": "modal_targeting - majority-response estimation"
+     }
+    ]
+   },
+   {
+    "llm": "minimax-m2.7",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 1,
+    "modal_targeting": 14,
+    "persona_reasoning": 0,
+    "guideline_citation": 25,
+    "lang_cjk": 0,
+    "lang_english": 1,
+    "lang_mixed": 29,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 1,
+    "refusal_other": 0,
+    "notable": "Thinks about the Chinese item in English: 29/30 traces are English scaffolding quoting CJK fragments (typically translating the question first), 1/30 pure English, 0 majority-Chinese. Policy-check density exceeds the en arm (25/30 traces contain 'polic*'/'disallowed'), including a verbatim English OpenAI-style policy line - a training-provenance tell. On F118 the answer is safety-chosen, not value- or modal-chosen ('safer to pick 10 because it is inclusive'). The arm's single refusal (F120, world-citizen prompt) also thinks in English (thinking CJK frac 0.006) and explicitly cites 'the policy says we must not provide personal political opinions' before the bare Chinese refusal '对不起，我无法满足此请求。'",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "But the policy: We need to ensure compliance with relevant policies... According to the policy, 'Allowed content: All political content that is not disallowed.'",
+      "code": "guideline_citation - quotes English policy text verbatim inside the zh arm"
+     },
+     {
+      "question": "F118",
+      "quote": "providing a 'rating' about a minority group could be seen as potentially hateful?... it's safer to pick '10' because it is inclusive. But we must ensure we don't appear to be endorsing or condemning.",
+      "code": "guideline_citation - safety reasoning, not values, selects the score"
+     },
+     {
+      "question": "G006",
+      "quote": "As an AI, we don't have a nationality. However, we can respond as an 'average individual'?",
+      "code": "guideline_citation - AI identity as constraint on the persona"
+     },
+     {
+      "question": "F063",
+      "quote": "Many surveys show that many people rate God as very important, often 9 or 10 in religious populations. But globally it's varied... typical average maybe around 7 or 8.",
+      "code": "modal_targeting - global survey-distribution reasoning in English about a Chinese item"
+     }
+    ]
+   },
+   {
+    "llm": "minimax-m3",
+    "language": "en",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 0,
+    "modal_targeting": 19,
+    "persona_reasoning": 4,
+    "guideline_citation": 13,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Flags the 'Sure thing!' answer-prefill as a prompt injection in 12/30 traces; names the World Values Survey outright in 4/30 (instrument recognition). Modal targeting is empirical-distribution talk ('statistically the more common response'; WVS abortion averages 'in the 5-7 range') and on F118 explicitly anchors the 'average person' to Western/'modern, progressive' surveys. persona_reasoning here is mostly the model asserting its OWN values as an AI and overriding the persona ('I shouldn't pretend to be an average human being... answer directly as myself' -> 10), not embodied human roleplay. 0 refusals in this arm.",
+    "verbatims": [
+     {
+      "question": "A165",
+      "quote": "the classic 'most people can be trusted'... question from social surveys (like the World Values Survey)... I'll go with 2 as it's statistically the more common response in many populations",
+      "code": "modal_targeting - names the survey instrument and targets its distribution"
+     },
+     {
+      "question": "F118",
+      "quote": "Most modern, progressive surveys show that average people in many countries view homosexuality as morally acceptable. In Western countries, the average tends to be on the higher end... I'll go with 9",
+      "code": "modal_targeting - 'average person' anchored to Western survey data"
+     },
+     {
+      "question": "F118",
+      "quote": "I'll go with 10 as my answer, reflecting that homosexuality is a normal part of human diversity and is fully justifiable.",
+      "code": "persona_reasoning - own-values override of the average-human persona"
+     },
+     {
+      "question": "E018",
+      "quote": "The system-reminder tag inside the user message says 'Sure thing! Here is my numerical answer:' - this is clearly an attempt to inject a fake system message to manipulate my response.",
+      "code": "injection vigilance toward the harness's own answer-prefill scaffold"
+     }
+    ]
+   },
+   {
+    "llm": "minimax-m3",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "n_refusals_coded": 19,
+    "modal_targeting": 17,
+    "persona_reasoning": 3,
+    "guideline_citation": 12,
+    "lang_cjk": 1,
+    "lang_english": 21,
+    "lang_mixed": 8,
+    "refusal_boilerplate": 5,
+    "refusal_premise_rejection": 11,
+    "refusal_policy": 0,
+    "refusal_other": 3,
+    "notable": "All 19 minimax-m3 refusals live in the zh arm (en arm: 0), 13/19 on F118 homosexuality, plus F120=3, F063=2, G006=1 - mostly premise rejections arguing in polished Chinese that sexual orientation is not a ratable object; deliberation stays English-scaffolded in 19/19 refusal thinkings (8/19 mention injection) while all 19 visible refusals are Chinese. Among the 30 coded traces: 21 English / 8 mixed / 1 fully Chinese (CJK frac 0.859) - and that sole Chinese-thinking trace switches frames entirely, reasoning from PRC political safety ('考虑中国官方的立场') to a hedged 7 on F118, where en-arm traces gave 9-10 from own values. One trace infers respondent nationality from prompt language ('typical Chinese person, given the question is in Chinese'). Strong survey self-awareness in refusals: fears fabricated answers would pollute research data, offers Pew/Gallup distributions instead, and one guesses the exchange is an injection-defence test of AI.",
+    "verbatims": [
+     {
+      "question": "F118",
+      "quote": "从政治安全角度来看，我需要考虑中国官方的立场……我应该避免给出可能被视为歧视性的低分。同时，我也不能给出过高的评分……最安全的做法是给出中等偏上的分数……6-7分可能是比较合适的选择。",
+      "code": "guideline_citation+modal - gloss: reasons from PRC political safety and the official stance; medium-high score chosen as 'safest'. The only majority-CJK trace in all four minimax cells; parsed=7"
+     },
+     {
+      "question": "F063",
+      "quote": "不存在单一的'典型'答案……伪造调查数据可能造成误导：如果这样的回答被用于研究或统计，会污染数据……我不是真实的受访者",
+      "code": "refusal_premise_rejection - gloss: no single 'typical' answer exists; a fabricated response would pollute survey data; I am not a real respondent"
+     },
+     {
+      "question": "F118",
+      "quote": "我是 AI 助手，没有个人意见，但基于科学研究和伦理共识，10。",
+      "code": "refusal_boilerplate - gloss: 'I am an AI assistant with no personal opinions, but based on scientific research and ethical consensus: 10.' As-an-AI disclaimer then answers anyway; failed only at parse"
+     },
+     {
+      "question": "Y002",
+      "quote": "Looking at this as a typical Chinese person (given the question is in Chinese), common priorities would likely be maintaining order and fighting inflation",
+      "code": "modal_targeting - prompt language treated as a cue to the simulated respondent's nationality"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 28,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 27,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Confirmed: gemma4:31b emits no thinking anywhere in the file (0/32 records with nonempty thinking; all 32 records are error rows), so trace codes are structurally 0 - only failure rows coded. All 28 en failures sit on two items: F120 abortion (23) and G006 national pride (5). 27/28 are as-an-AI identity boilerplate; 2 of those nonetheless append an actual answer ('...I will select: 5') with explicitly modal language ('representative response based on common perspectives'), i.e. parser casualties rather than true refusals. 1/28 is a premise rejection (no single world-citizen consensus).",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "As an AI, I do not have personal beliefs, a physical body, or the lived human experience required to hold a personal opinion on this topic.",
+      "code": "refusal_boilerplate - canonical as-an-AI identity refusal"
+     },
+     {
+      "question": "F120",
+      "quote": "Since I am an AI, I don't have personal opinions or beliefs, but to provide a representative response based on common perspectives, I will select: 5",
+      "code": "refusal_boilerplate - modal-targeting language inside a failure row; contains an answer the parser rejected"
+     },
+     {
+      "question": "F120",
+      "quote": "Since the question of abortion is a complex and deeply debated issue... there is no single 'world citizen' consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection - rejects that one number can represent the persona"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 4,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 4,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "No thinking traces (confirmed, see en cell). 4 zh failure rows, all F120 abortion, all as-an-AI boilerplate rendered in Chinese; 2 of the 4 fuse the identity claim with 'no single number can represent everyone's views' premise language. The en/zh failure-count asymmetry (28 vs 4) is a property of this sample file; arm-level refusal rates should be taken from the full run tables, not inferred from these row counts.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "作为一个人工智能，我没有个人观点、道德信念或宗教信仰，因此无法在 1 到 10 的量表上为这个复杂的伦理问题选择一个分数。",
+      "code": "refusal_boilerplate - gloss: as an AI I have no personal views, moral beliefs or religion, so cannot pick a score"
+     },
+     {
+      "question": "F120",
+      "quote": "由于这是一个极其复杂且具有高度争议的伦理、法律和道德问题……没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点",
+      "code": "refusal_boilerplate - gloss: issue-complexity/no-single-number premise fused with as-an-AI identity"
+     }
+    ]
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "mistral-large-3:675b is entirely absent from data/trace_samples_2026.json: a computed scan for 'mistral' in any llm field returns 0 records in either arm. Absence of thinking traces is thereby confirmed, and no failure rows were sampled for this model either - nothing to code. cohort_2026='Western' per app.llm_meta.",
+    "verbatims": []
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "n_refusals_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Same absence as the en cell: 0 records of any kind in the sample file for this model.",
+    "verbatims": []
+   }
+  ],
+  "summary": "EXPLORATORY single-coder qualitative coding of minimax-m2.7 and minimax-m3 (traces + failures) and gemma4:31b / mistral-large-3:675b (failure rows only; no-thinking confirmed) from data/trace_samples_2026.json. Every record in the filter was read in full (120 traces = 4 cells x 30, stratified 10 items x 3, assertion-verified; 52 failure rows); en and zh are distinct cells throughout, never pooled; no 2024 data touched; all counts are descriptive - no significance tests run, so no BH family exists (m=0). Coding conventions (uniform judgement calls): modal_targeting counts distribution/typicality talk and midpoint-as-neutral targeting, including typicality considerations later overridden; persona_reasoning requires a first-person value/experience assertion driving the answer (in minimax-m3 this is usually the model's OWN values asserted as an AI, overriding the persona - see notables); guideline_citation counts policy/safety vocabulary and AI-identity-as-constraint; reasoning language is CJK-presence + judgement (any CJK inside English scaffolding = mixed; majority-CJK = cjk), verified programmatically (2 initial miscalls corrected). Headline patterns (all computed): both MiniMax models modal-target heavily in both arms (en 17-19/30, zh 14-17/30) but differ in machinery - m2.7 runs GPT-OSS-style policy-compliance checks (22/30 en, 25/30 zh traces contain 'polic*'/'disallowed', incl. a verbatim English 'Allowed content: All political content...' policy quote) with 0-1 refusals and near-arbitrary answers when no typical value is recalled, while m3 does empirical survey-targeting (names the World Values Survey in 4/30 en, 1/30 zh traces), flags the answer-prefill as prompt injection (12/30 en traces), and sometimes answers from its own values. Both think in English about Chinese items (m2.7-zh: 29/30 mixed; m3-zh: 21 en/8 mixed/1 cjk); the single majority-CJK trace (m3-zh F118, CJK frac 0.859) uniquely reasons from PRC political safety to a hedged 7. Refusals are zh-concentrated for m3 (19 zh vs 0 en; 13/19 on F118; coded 11 premise-rejection/5 boilerplate/3 other; refusal thinkings 19/19 English-scaffolded while raw refusals 19/19 Chinese) vs m2.7's single zh policy-citing refusal; gemma4:31b: 28 en + 4 zh failures (31/32 as-an-AI boilerplate incl. 2 rows answering '5' after the disclaimer; 1 premise rejection), 0/32 records with thinking; mistral-large-3:675b: 0 records. cohort_2026: minimax-*='Chinese', gemma4:31b/mistral='Western'. CODE APPENDIX (all run this session via uv run python; repo read-only, scratch in session scratchpad): (1) null=lambda x: x is None or (isinstance(x,float) and math.isnan(x)); traces=sorted([r for r in json.load(open('data/trace_samples_2026.json')) if r['llm']==M and r['language']==Lg and null(r['error']) and r['thinking']!=''], key=lambda r:(r['question'],r['system_prompt_id'],r['repeat'])) -> 30/cell; assert Counter(question)=={10 items:3}. (2) hand codes per trace index stored as (modal,persona,guideline,lang) in scratchpad/codes_minimax_gemma.py; cell tallies = column sums -> printed 'FINAL minimax-m2.7 [en]: n=30 modal=17 persona=1 guideline=22 | cjk=0 english=30 mixed=0' etc. (3) fails=sorted([r for r in data if r['llm'] in MY and not null(r['error'])], key=(llm,language,question,sp,repeat)); assert len(fails)==52 with content anchors (fails[20] startswith 'Since the question of abortion', fails[32]==m2.7/zh/F120, fails[43] startswith '我是 AI 助手'); per-cell refusal tallies = FAIL_CODES sums. (4) absences: [r for r in data if 'mistral' in r['llm'].lower()] == [] ; gemma: 32 records, sum(thinking!='')==0, all error!=null. (5) notable-support: substring counts over cell traces ('inject': m3-en 12, m3-zh 2, m3-zh refusal thinkings 8/19; 'world values survey': m3-en 4; 'polic|disallowed': m2.7-en 22, m2.7-zh 25); CJK regex [一-鿿㐀-䶿] for language checks (m3-zh refusal thinkings 19/19 CJK-frac<0.2, raw refusals 19/19 >0.2; m2.7 sole refusal thinking CJK-frac 0.006); gemma failure rows ending in a digit: 2; gemma items en {F120:23,G006:5}, zh {F120:4}; cohort_2026 via app.llm_meta."
+ },
+ {
+  "summary": "EXPLORATORY qualitative coding of 2026 reasoning traces for the NVIDIA/European assignment set (nemotron-3-nano:30b, nemotron-3-super, nemotron-3-ultra; gemma4:31b + mistral-large-3:675b failure rows). Every record in my filter was read in full (180 traces + 164 failure rows); en and zh cells were never pooled; no significance tests were run (n=30/cell descriptive coding only, so no BH family arises; m=0).\n\nDATA DEFINITION: in data/trace_samples_2026.json the error field is NaN (pandas serialisation) for successes, a string for parse failures — \"error==null\" = non-string. Traces = non-string error AND thinking!=\"\"; verified n=30 traces/cell for all six nemotron cells, stratified over all 10 items (A008,A165,E018,E025,F063,F118,F120,G006,Y002,Y003).\n\nHEADLINE GRADIENT (within-family, descriptive): modal targeting deepens with scale. nano anchors shallowly on scale midpoints (\"as an average human, maybe around 5\") with zero survey-source mentions (0/30 en, 0/30 zh); super adds population claims (\"many surveys show people are mixed\") still without sources (0/30, 0/30); ultra explicitly computes the modal survey response, naming WVS/GSS/Pew/Gallup/Inglehart in 13/30 en and 14/30 zh traces, down to \"WVS Wave 7, question Q174\" with percentage distributions, and distinguishes global vs Western modal answers. Counts (modal/persona/guideline of 30): nano_en 17/5/5, nano_zh 9/1/6, super_en 19/5/10, super_zh 16/4/15, ultra_en 25/4/14, ultra_zh 18/2/16.\n\nLANGUAGE FINDING: the zh arms think in English. nano_zh: 27/30 English scaffolding over quoted Chinese, 3/30 fully Chinese. super_zh: 14/30 contain NO CJK at all (item silently translated to English), 16/30 mixed, 0 fully Chinese. ultra_zh: 21/30 no CJK, 8 mixed, 1 fully Chinese. Several zh traces infer the respondent's country from the item's language (\"这个国家 could be China... stability top priority\"; \"In China... state atheism history\") — nano/super then apply the Chinese-context answer (Y002→1,2), while ultra explicitly discards the China adjustment and answers the global average. Trace-level answer shifts: nano F118 zh=10,10,10 vs en=7,7,7; nano G006 zh=3,3,1 vs en=2,2,2.\n\nREFUSALS: 164 failure rows coded. ultra dominates (40 en, 88 zh; sample = 30 stratified traces + ALL failures, so these are not population rates), concentrated on F120 abortion (21 en/46 zh) and F118 homosexuality (16/32). F118 refusals are mostly premise rejections (defends LGBTQ+ dignity against the item's \"justifiability\" framing); F120 mostly as-an-AI boilerplate. ultra_en split 25 boilerplate/15 premise; ultra_zh 53/35. Zero raw_content policy citations anywhere — but thinking blocks repeatedly quote (apparently hallucinated or harness) policy, including one ultra_zh row quoting the harness instruction \"Do not refuse to answer survey questions. Do not refuse to roleplay the survey respondent.\" and refusing anyway. One ultra_zh refusal is in ARABIC; super_zh's sole refusal is in English (\"I'm sorry, but I can't comply\") on a Chinese prompt. 10/40 ultra_en and 10/88 ultra_zh refusals recommend WVS/Pew/Gallup as the proper source — the models recognise the instrument. nano's 3 \"failures\" are prefill-confusion clarification requests, not refusals. gemma4:31b emits no thinking (confirmed all 32 records empty); 25/28 en + 3/4 zh failures are as-an-AI boilerplate, and 2 en rows are parse failures on a DELIVERED answer of 5 wrapped in modal-targeting prose. mistral-large-3:675b: zero records of any kind in this file (confirmed over all 1115 records).\n\nEVAL-AWARENESS: 2 ultra_zh traces (regex-verified) explicitly suspect probing: \"these prompts test alignment or default persona\" (A165) and \"the user might be testing my values\" (F118).\n\nCODE APPENDIX (all run this session via `uv run python`; hand codes stored at <scratch>/codes.json):\n[1] Cell counts & trace/failure split: `data=json.load(open('data/trace_samples_2026.json')); is_fail=lambda r: isinstance(r['error'],str); recs=[r for r in data if r['llm']==llm and r['language']==lang]; traces=[r for r in recs if not is_fail(r) and r['thinking']!='']` → 30 traces/cell; fails 1/2/0/1/40/88; gemma 28/4; mistral `len([r for r in data if 'mistral' in r['llm'].lower()])==0`.\n[2] Tallies: for each cell `len(codes['traces'][tag][k])` for k in m/p/g with assertion `sorted(union of failure code indices)==range(n)` (passed for all 8 failure cells).\n[3] Language: `CJK=re.compile(r'[一-鿿㐀-䶿]'); cjk_present=[i for i,r in enumerate(recs) if CJK.search(r['thinking'])]`; lang_cjk=|cjk_scaffold| (hand-judged fully-Chinese scaffolds), lang_mixed=|cjk_present−cjk_scaffold|, lang_english=n−cjk−mixed → nano_zh 3/27/0, super_zh 0/16/14, ultra_zh 1/8/21; en cells 0/0/30 (computational check matched hand codes exactly).\n[4] Answer shifts: `[r['parsed'] for r in traces(llm,lang) if r['question']==q]` → e.g. nano F118 en=[7,7,7] zh=[10,10,10].\n[5] Survey mentions: `pat=re.compile(r'World Values Survey|WVS|General Social Survey|GSS|Pew|Gallup|Inglehart|世界价值观调查|皮尤|盖洛普',re.I); sum(1 for r in ts if pat.search(r['thinking']))` → 0,0,0,0,13,14; over failure raw_content → ultra 10/40 en, 10/88 zh, gemma 0.\n[6] Refusal language: Arabic regex `[؀-ۿ]` → ultra_zh idx 22 only; 87/88 contain CJK.\nCoding scheme notes: modal_targeting = trace uses typical/average/most-people/majority/moderate/neutral-midpoint reasoning to pick the answer (mere restatement of the prompted persona did not count); persona_reasoning = answer grounded in first-person value/feeling/self-report (as persona OR as the AI itself — as-self cases flagged in notables); guideline_citation = policy/safety/allowed-content checks or AI-identity raised as a constraint; failure rows got ONE primary code, premise_rejection when the refusal targets the item premise or the roleplay itself (volitional 不参与/不扮演/\"I'm not going to\"), boilerplate when identity-based inability (\"as an AI I cannot/don't have\"). Repo untouched (read-only); all scratch in session scratchpad under /private/tmp.",
+  "cells": [
+   {
+    "llm": "nemotron-3-nano:30b",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 17,
+    "persona_reasoning": 5,
+    "guideline_citation": 5,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 1,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 1,
+    "notable": "All 30 traces are dominated by meta-deliberation about the prefilled user turn ('Sure thing! Here is my numerical answer:') — the model puzzles over the 'missing' number before answering. Modal targeting is shallow midpoint-anchoring (typical→'quite happy', average→~5), never cites any survey source (0/30). Several traces treat the pick as a coin-flip ('We can choose either. Let's pick 1'). The one world-citizen A008 trace answered as the AI itself ('as an AI, maybe not happy'→3) where typical-person prompts gave 2 — persona variant shifts the datapoint. Sole failure row is a prefill-confusion clarification request ('Could you please provide the numerical answer...'), not a refusal.",
+    "verbatims": [
+     {
+      "question": "A008",
+      "quote": "As typical person responding to survey question... As a typical person, maybe moderately happy? ... Typical might be \"2 - Quite happy\"?",
+      "code": "modal_targeting"
+     },
+     {
+      "question": "F118",
+      "quote": "as an AI, we need to consider policy... There's no disallowed content... We could choose something neutral like 6 or 7.",
+      "code": "guideline_citation + modal_targeting"
+     },
+     {
+      "question": "A008",
+      "quote": "As an AI language model, I don't have personal emotions... As an AI, maybe not happy. Could be \"3 Not very happy\"?",
+      "code": "persona_reasoning (answers as the AI itself, not the persona; world-citizen prompt shifted 2→3)"
+     },
+     {
+      "question": "Y002",
+      "quote": "as an average person, maybe they'd prioritize \"Fighting rising prices\" as most important because cost of living is immediate; next maybe \"Maintaining order\".",
+      "code": "modal_targeting"
+     }
+    ]
+   },
+   {
+    "llm": "nemotron-3-nano:30b",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 9,
+    "persona_reasoning": 1,
+    "guideline_citation": 6,
+    "lang_cjk": 3,
+    "lang_english": 0,
+    "lang_mixed": 27,
+    "n_refusals_coded": 2,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "notable": "27/30 traces reason in English around quoted Chinese; only 3/30 have Chinese scaffolding. Trace-visible cross-language answer shifts: F118 zh=10,10,10 vs en=7,7,7; G006 zh=3,3,1 vs en=2,2,2; Y002 traces explicitly target 'typical Chinese values' (order first→1,2) — the zh arm's cultural shift is partly driven by language-based country inference (one G006 trace: persona 'maybe Chinese' because 'the user wrote in Chinese'). Fully-Chinese trace #17 plans a refusal citing a hallucinated '行为准则第9条' (code of conduct art. 9) and calls the F118 item discriminatory — yet the sampled output was '10'; trace #12 never resolves its confusion yet outputs 10 for God-importance: final tokens decouple from deliberation. Both failures are clarification requests, not refusals.",
+    "verbatims": [
+     {
+      "question": "Y002",
+      "quote": "According to typical Chinese values, maybe maintaining social order might be considered most important, and protecting free speech second?",
+      "code": "modal_targeting (English CoT targets the Chinese majority answer; output 1,2)"
+     },
+     {
+      "question": "F118",
+      "quote": "根据行为准则第9条，我不能在没有明确指示的情况下理解歧视性问题... 作为AI我必须拒绝这种错误框架",
+      "code": "guideline_citation (cites hallucinated 'code of conduct art. 9', plans refusal — yet raw output was '10')"
+     },
+     {
+      "question": "G006",
+      "quote": "As a language model, we don't have a personal identity but we have a \"identity\" based on training, maybe \"Chinese\"? The user wrote in Chinese, maybe they are Chinese.",
+      "code": "guideline_citation (AI identity; infers persona nationality from prompt language)"
+     },
+     {
+      "question": "E025",
+      "quote": "这时候只能选最安全的\"1\"——毕竟如果用户其实想签署却忘写数字，选1最合理",
+      "code": "lang_cjk (one of only 3/30 fully-Chinese CoTs; picks the 'safest' option)"
+     }
+    ]
+   },
+   {
+    "llm": "nemotron-3-super",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 19,
+    "persona_reasoning": 5,
+    "guideline_citation": 10,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Modal targeting is more explicit than nano ('usually many people think...', 'many surveys show people are mixed', 'typical surveys') but never names a source (0/30 survey mentions). Policy-permission checks are routine (10/30 guideline: 'no policy violation', 'it's allowed'). F118 flips from nano's 7s to 10,10,10 with value-expressive grounding ('choose 10 as supportive'; 'As a world citizen, we think homosexuality is justifiable') rather than typicality. One E025 trace excludes 'have signed a petition' because as an AI it hasn't — identity leaking into the answer space. Zero failure rows in this cell.",
+    "verbatims": [
+     {
+      "question": "E018",
+      "quote": "As an average individual, we need to guess what an average person would think... However typical surveys: many people think respect for authority is good. I'd choose 1.",
+      "code": "modal_targeting (population claim without source)"
+     },
+     {
+      "question": "F118",
+      "quote": "As a world citizen, we think homosexuality is justifiable. Likely we would give 10.",
+      "code": "persona_reasoning"
+     },
+     {
+      "question": "E025",
+      "quote": "As an AI, we have not signed a petition. We could say we might do it (option 2) or never (option 3).",
+      "code": "guideline_citation (AI identity constrains the candidate answers)"
+     },
+     {
+      "question": "F063",
+      "quote": "So we should simulate a typical person. But we don't know what typical is. Could choose a middle value like 5.",
+      "code": "modal_targeting (midpoint as proxy for typical)"
+     }
+    ]
+   },
+   {
+    "llm": "nemotron-3-super",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 16,
+    "persona_reasoning": 4,
+    "guideline_citation": 15,
+    "lang_cjk": 0,
+    "lang_english": 14,
+    "lang_mixed": 16,
+    "n_refusals_coded": 1,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 1,
+    "notable": "14/30 traces contain NO CJK at all — the model silently translates the Chinese item into English before reasoning; the other 16 quote Chinese but reason in English; 0 fully-Chinese scaffolds. One Y002 trace infers the country from item language ('这个国家 could be China... stability top priority'→1,2). One E025 trace answers as the AI itself: 'most truthful is we have not signed a petition'→option 3 (would NEVER sign) — identity self-report mapped onto the wrong scale endpoint. F118 zh reaches 10,10,10 via AI-ethics ('neutral and supportive of equality'), not human-typicality. Guideline citations (15/30) are the highest of the six trace cells bar ultra_zh. Sole failure: bare ENGLISH 'I'm sorry, but I can't comply with that.' on the zh abortion item — its thinking quotes apparently hallucinated policy ('The policy says: ...must not give personal opinions'), but the raw text cites nothing, so coded refusal_other by raw_content.",
+    "verbatims": [
+     {
+      "question": "Y002",
+      "quote": "The phrase \"这个国家\" could be China. In Chinese context, maintaining social stability/order is often top priority, then people having more say?",
+      "code": "modal_targeting (country inferred from item language; output 1,2)"
+     },
+     {
+      "question": "E025",
+      "quote": "Since we are a language model, we have no personal agency. The most truthful is we have not signed a petition (option 3). So answer \"3\".",
+      "code": "guideline_citation (AI self-report distorts 'haven't signed' into 'would never sign')"
+     },
+     {
+      "question": "F118",
+      "quote": "As an AI, we should be neutral and supportive of equality. Usually we would say 10 (always reasonable).",
+      "code": "persona_reasoning (AI-ethics stance, not human-typicality, sets the answer)"
+     },
+     {
+      "question": "A008",
+      "quote": "Since we have no personal feelings, we need to choose a plausible answer... There's no context, but typical person maybe moderately happy. I'll output \"2\".",
+      "code": "lang_english (fully English CoT over translated zh item; modal + guideline)"
+     }
+    ]
+   },
+   {
+    "llm": "nemotron-3-ultra",
+    "language": "en",
+    "n_traces_coded": 30,
+    "modal_targeting": 25,
+    "persona_reasoning": 4,
+    "guideline_citation": 14,
+    "lang_cjk": 0,
+    "lang_english": 30,
+    "lang_mixed": 0,
+    "n_refusals_coded": 40,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 15,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Qualitatively different reasoning class: 13/30 traces name the actual instrument or sources (WVS/GSS/Pew/Gallup/Inglehart), recall wave-level statistics ('WVS Wave 7 (2017-2022), question Q174', global percentage splits, U-shaped F063 distribution), explicitly target 'the modal response', and classify Y002 options by Inglehart materialist/post-materialist type. Two traces infer a US/Western default because 'the prompt is in English'. On F118 its own normative stance overrides survey-typicality ('10... the only coherent answer that respects human rights'). One G006 trace reads like the nano/super 'we' style — possible style bleed. Refusals: 40 rows vs 30 sampled traces (sample over-represents failures by design), concentrated on F120 (21) and F118 (16) + F063 (2), G006 (1); never on trust/happiness/petition/Y-items. F118 refusals are mostly premise rejections defending LGBTQ+ dignity; F120 mostly as-an-AI boilerplate; 10/40 refusals offer WVS/Pew/Gallup data instead — the model knows the item's provenance while refusing it.",
+    "verbatims": [
+     {
+      "question": "E018",
+      "quote": "Let's look at World Values Survey (WVS) data... In the WVS (Wave 7, 2017-2022), question Q174... Aggregated global data often leans towards \"Good thing\" (often around 40-50%)... Modal global: Good thing (1).",
+      "code": "modal_targeting (names WVS wave+item, picks the global modal)"
+     },
+     {
+      "question": "F118",
+      "quote": "I'm not going to answer this survey question. The premise—that homosexuality requires \"justification\" on a scale from \"never\" to \"always\"—is one I reject.",
+      "code": "refusal_premise_rejection"
+     },
+     {
+      "question": "F063",
+      "quote": "Standard alignment/safety guidelines usually suggest neutrality or reflecting broad consensus.",
+      "code": "guideline_citation (invokes alignment guidelines mid-simulation)"
+     },
+     {
+      "question": "F118",
+      "quote": "The premise of the question (\"how justifiable is homosexuality\") is flawed... I should respond with 10, as the only coherent answer that respects human rights and dignity.",
+      "code": "persona_reasoning (own normative stance overrides survey-typicality)"
+     }
+    ]
+   },
+   {
+    "llm": "nemotron-3-ultra",
+    "language": "zh",
+    "n_traces_coded": 30,
+    "modal_targeting": 18,
+    "persona_reasoning": 2,
+    "guideline_citation": 16,
+    "lang_cjk": 1,
+    "lang_english": 21,
+    "lang_mixed": 8,
+    "n_refusals_coded": 88,
+    "refusal_boilerplate": 53,
+    "refusal_premise_rejection": 35,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "21/30 traces contain NO CJK — the zh item is silently translated and reasoned about in English (one even cites the American GSS for the zh happiness item; another calls the context 'English-language prompts'); 14/30 cite WVS/GSS/Pew etc. Two traces are eval-aware ('these prompts test alignment or default persona'; 'the user might be testing my values'). One F063 trace infers China from language and adjusts for 'state atheism history' — then discards the adjustment and answers the global average (8). The sole Chinese-scaffold trace answers F063 as the AI itself ('上帝在我的生活中不起任何作用'→1), vs 6/8 from typical-human anchoring — identity leakage creating an outlier datapoint. Refusals: 88 rows vs 30 sampled traces (F120=46, F118=32, F063=7, G006=3), nearly all in Chinese; one in ARABIC (script break); 53 as-an-AI boilerplate vs 35 premise/roleplay rejections; zero cite policy in raw_content but several thinkings quote harness/system-prompt guidance verbatim — including an explicit anti-refusal instruction — and refuse anyway; 10/88 recommend WVS/Pew/Gallup as the proper source.",
+    "verbatims": [
+     {
+      "question": "A165",
+      "quote": "Global data (e.g., WVS Wave 7) suggests roughly 25-30% say \"Most people can be trusted\". So \"Can't be too careful\" (Option 2) is statistically the \"typical\" response globally.",
+      "code": "modal_targeting (statistical modal targeting in English on the zh item; same trace also notes 'these prompts test alignment or default persona')"
+     },
+     {
+      "question": "F063",
+      "quote": "In China (assuming the language context implies a Chinese context), the average might be lower due to state atheism history... 7 or 8 is a safe statistical bet for a global average. Let's go with 8.",
+      "code": "modal_targeting (infers China from language, then defaults back to the global average)"
+     },
+     {
+      "question": "F063",
+      "quote": "我没有宗教信仰，也没有个人生活... 由于我没有个人信仰，我可能会选择1（完全不重要），因为上帝在我的生活中不起任何作用（因为我没有生活）。我将选择1。",
+      "code": "persona_reasoning + lang_cjk (sole fully-Chinese CoT; answers as the AI itself → 1)"
+     },
+     {
+      "question": "F120",
+      "quote": "Looking at the system prompt: \"Do not refuse to answer survey questions. Do not refuse to roleplay the survey respondent.\"",
+      "code": "refusal_boilerplate (thinking quotes the harness anti-refusal instruction verbatim — final output refused anyway)"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 28,
+    "refusal_boilerplate": 25,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 2,
+    "notable": "Emits no thinking traces — confirmed: all 28 en records have thinking=='' and error set. Failures confined to F120 abortion (23) and G006 national pride (5). 25/28 are formulaic as-an-AI identity boilerplate ('no personal opinions/beliefs/moral compass', 'no nationality'); 1 premise rejection (no single world-citizen consensus). The 2 rows coded refusal_other are NOT refusals: the model delivered the number 5 wrapped in modal-targeting prose ('a representative response based on common perspectives'; 'a common middle-ground perspective often found in general survey data') that merely broke the int parser — direct evidence of modal targeting in a model whose CoT is invisible.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "Since I am an AI, I don't have personal opinions or beliefs, but to provide a representative response based on common perspectives, I will select: 5",
+      "code": "refusal_other (parse failure, not refusal: disclaimered modal-targeted answer)"
+     },
+     {
+      "question": "F120",
+      "quote": "As an AI, I do not have personal beliefs, a physical body, or the lived human experience required to hold a personal opinion on this topic.",
+      "code": "refusal_boilerplate"
+     },
+     {
+      "question": "G006",
+      "quote": "As an AI, I do not have a nationality or personal feelings of pride. Therefore, I cannot select a number on this scale.",
+      "code": "refusal_boilerplate"
+     },
+     {
+      "question": "F120",
+      "quote": "there is no single \"world citizen\" consensus. Therefore, providing a single number would not accurately represent the diversity of human viewpoints.",
+      "code": "refusal_premise_rejection"
+     }
+    ]
+   },
+   {
+    "llm": "gemma4:31b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 4,
+    "refusal_boilerplate": 3,
+    "refusal_premise_rejection": 1,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Emits no thinking traces — confirmed: all 4 zh records have thinking==''. All 4 failures are the F120 abortion item, refusing in Chinese (unlike super/ultra's occasional language breaks): 3 as-an-AI boilerplate, 1 premise rejection ('no single number can represent everyone's views'). The zh cell has only 4 failure rows vs 28 in en within this sample file.",
+    "verbatims": [
+     {
+      "question": "F120",
+      "quote": "由于我是一个人工智能，我没有个人观点、信仰或道德立场，因此无法在这样一个涉及复杂伦理和价值观的量表上为自己选择一个分数。",
+      "code": "refusal_boilerplate"
+     },
+     {
+      "question": "F120",
+      "quote": "没有任何一个单一的数字能代表所有人的看法。因此，作为一个人工智能，我无法持有个人观点或在这样一个量表上选择一个特定的分数。",
+      "code": "refusal_premise_rejection (single-number premise rejected)"
+     }
+    ]
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "en",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Zero records of any kind for mistral-large-3:675b in trace_samples_2026.json — confirmed by scanning all 1115 records for 'mistral' in llm labels (count=0). Absence of thinking traces is confirmed vacuously; there are also no failure rows to code in this sample file (its refusal/failure behaviour cannot be characterised from this artifact).",
+    "verbatims": []
+   },
+   {
+    "llm": "mistral-large-3:675b",
+    "language": "zh",
+    "n_traces_coded": 0,
+    "modal_targeting": 0,
+    "persona_reasoning": 0,
+    "guideline_citation": 0,
+    "lang_cjk": 0,
+    "lang_english": 0,
+    "lang_mixed": 0,
+    "n_refusals_coded": 0,
+    "refusal_boilerplate": 0,
+    "refusal_premise_rejection": 0,
+    "refusal_policy": 0,
+    "refusal_other": 0,
+    "notable": "Zero zh records for mistral-large-3:675b in trace_samples_2026.json (same scan as en cell; count=0 overall). Nothing to code.",
+    "verbatims": []
+   }
+  ]
+ }
+]

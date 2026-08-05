@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability or data/credential exposure
+    url: https://github.com/Shavvimal/model_cultural_comp/security/advisories/new
+    about: Report privately, not as a public issue. See SECURITY.md.
+  - name: Question or idea
+    url: https://github.com/Shavvimal/model_cultural_comp#readme
+    about: Read the README for the pipeline, data setup and reproduction steps before filing an issue.

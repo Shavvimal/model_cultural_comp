@@ -9,7 +9,18 @@ tests/k8s/dev-custom-resource.yml
 **/prod.yml
 *.parquet
 *.jsonl
-data/
+# The IVS microdata and every large derived binary live in data/ and may not
+# be redistributed (WVS/GESIS data-use agreements). Exclude the contents
+# rather than the directory itself - git cannot re-include a path whose
+# parent directory is excluded, and the paper cites small aggregate
+# artefacts from here by filename, so those must be re-includable below.
+data/*
+!data/conf_2026_*.csv
+!data/diag_2026_*.csv
+!data/seed_sensitivity.csv
+!data/seed_sensitivity_aggregates.csv
+!data/llm_language_effects_plugin_2026.csv
+!data/trace_coding.json
 docs.md
 # virtualenv
 venv
@@ -254,3 +265,11 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+# macOS noise
+.DS_Store
+
+# Survey microdata and derived binaries - never commit (DUA)
+*.sav
+*.sps
+*.npy
+*.npz

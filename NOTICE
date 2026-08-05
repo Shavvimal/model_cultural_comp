@@ -1,0 +1,51 @@
+model_cultural_comp
+Copyright (c) 2026 Shav Vimalendiran
+
+This product includes software developed by third parties, as set out below.
+The project as a whole is licensed under the MIT License (see LICENSE); the
+component below remains under the Apache License, Version 2.0, and this NOTICE
+is retained in accordance with section 4 of that licence.
+
+--------------------------------------------------------------------------------
+
+app/ppca.py
+
+  Derived from pca-magic (https://github.com/allentran/pca-magic)
+  Copyright Allen Tran
+  Licensed under the Apache License, Version 2.0.
+
+  A full copy of the Apache License, Version 2.0 is included in this
+  repository at LICENSES/Apache-2.0.txt (also available at
+  http://www.apache.org/licenses/LICENSE-2.0).
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+  License for the specific language governing permissions and limitations
+  under the License.
+
+  Statement of changes (Apache-2.0 §4(b)) — this file has been modified from
+  the original:
+
+    - Standardization parameters (per-feature means and standard deviations)
+      learned during `fit` are stored on the model and re-applied at
+      `transform` time, so new data lands in the same coordinate space as the
+      training scores. The original standardized only at fit.
+    - Fitting is seedable: the random initialisation of the loading matrix
+      takes an explicit seed, making a fit reproducible run to run.
+    - Model persistence round-trips the full parameter set (loadings, means,
+      standard deviations, eigenvalues) rather than the loadings alone.
+
+  The underlying method is unchanged: the EM algorithm for probabilistic PCA
+  of Tipping, M. E. and Bishop, C. M. (1999), "Probabilistic Principal
+  Component Analysis", Journal of the Royal Statistical Society, Series B,
+  61(3), 611-622.
+
+Survey instrument texts
+-----------------------
+The ten survey item prompts administered to models are adapted from the
+Integrated Values Surveys (WVS/EVS) master questionnaires, © World Values
+Survey Association and European Values Study. They are reproduced here for
+research and replication purposes only; the underlying survey microdata is
+governed by the WVS/GESIS data-use agreements and is not distributed with
+this repository.
