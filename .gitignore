@@ -20,6 +20,13 @@ data/*
 !data/seed_sensitivity.csv
 !data/seed_sensitivity_aggregates.csv
 !data/llm_language_effects_plugin_2026.csv
+!data/llm_language_effects_2026.csv
+!data/llm_parse_rates_2026.csv
+!data/llm_ellipses_2026.csv
+!data/llm_ellipses.csv
+!data/llm_regions.csv
+!data/llm_headline_stats.csv
+!data/llm_diagnostics.csv
 !data/trace_coding.json
 docs.md
 # virtualenv
