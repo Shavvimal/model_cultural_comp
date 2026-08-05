@@ -25,8 +25,11 @@ data/*
 !data/llm_ellipses_2026.csv
 !data/llm_ellipses.csv
 !data/llm_regions.csv
+!data/llm_regions_2026.csv
 !data/llm_headline_stats.csv
+!data/llm_headline_stats_2026.csv
 !data/llm_diagnostics.csv
+!data/llm_diagnostics_2026.csv
 !data/trace_coding.json
 docs.md
 # virtualenv
