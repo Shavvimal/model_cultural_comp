@@ -340,7 +340,7 @@ class CulturalMap:
             )
 
         ax.set_xlabel("Survival vs. Self-Expression Values")
-        ax.set_ylabel("Traditional vs. Secular Values")
+        ax.set_ylabel("Traditional vs. Secular-Rational Values")
         ax.set_title(title)
         ax.legend()
         ax.grid(True)
@@ -348,7 +348,8 @@ class CulturalMap:
 
 
 if __name__ == "__main__":
-    cultural_map = CulturalMap("../data/ivs_df.pkl", "../data/country_codes.pkl")
+    # Paths are relative to the repo root, like every script under scripts/.
+    cultural_map = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
     cultural_map.prepare_data()
     cultural_map.fit(seed=42, verbose=True)
     cultural_map.calculate_mean_scores()

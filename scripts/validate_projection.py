@@ -4,18 +4,22 @@ Run from the repo root with the data present:
 
     uv run python scripts/validate_projection.py
 
-Checks, per the statistical review (paper draft repo):
+The three gates the write-up releases (§3.2, "Validation"):
 
   A. Path-identity regression test (exact): raw complete-case survey rows
      pushed through the public ``project()`` API land exactly where the fit
      placed them. This is a regression test that the model and country
      projection paths are byte-identical — the defect present in the 2024
-     code — not a validation of the map itself.
+     code — not a validation of the map itself. Both paths could share a
+     wrong rotation and this check would still pass.
 
-  B. External agreement: per-axis affine calibration of the corrected
-     country coordinates against the published 2024 coordinates. The two
-     fits differ by design (Y003 sentinel recode, unit-variance rescaling),
-     so agreement is a fitted affine map with R², not a displacement.
+  B. Correction accounting: per-axis affine calibration of the corrected
+     country coordinates against the *previously published 2024* coordinates.
+     The two fits differ by design (Y003 sentinel recode, unit-variance
+     rescaling), so agreement is a fitted affine map with R², not a
+     displacement. This is an internal consistency check on the size of our
+     own correction — no regression against the published WVS country
+     coordinates is performed anywhere, so it is not external validation.
 
   C. Rotation diagnostics: the full sensitivity grid (scores / whitened
      scores / loadings x Kaiser on/off), the post-rotation axis
@@ -54,7 +58,7 @@ def check_a_path_identity(cm: CulturalMap) -> bool:
     return ok
 
 
-def check_b_external_agreement(cm: CulturalMap, published: pd.DataFrame):
+def check_b_correction_accounting(cm: CulturalMap, published: pd.DataFrame):
     pub = published[~published["llm"].astype(bool)]
     merged = cm.country_scores_pca.merge(
         pub[["country_code", "PC1_rescaled", "PC2_rescaled"]],
@@ -115,7 +119,7 @@ def main() -> int:
     published = pd.read_pickle("data/res_country_scores_pca.pkl")
 
     ok = check_a_path_identity(cm)
-    check_b_external_agreement(cm, published)
+    check_b_correction_accounting(cm, published)
     check_c_rotation_diagnostics(cm)
 
     cm.save_model("data/cultural_map_model.npz")

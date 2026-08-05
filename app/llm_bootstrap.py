@@ -1,13 +1,16 @@
 """Bootstrap inference for LLM positions on the cultural map.
 
-Two estimators, per the statistical review (paper draft repo) §2.4:
+Two estimators (write-up §3.4):
 
 * The **item bootstrap** resamples each item's stored responses
   independently. Because the projection is affine in the ten item values, a
   model's mean position depends only on per-item means, so the point
   estimate is pairing-invariant — but independent resampling forces all
-  cross-item covariances to zero, so its ellipses are a *lower bound* on
-  the true uncertainty.
+  cross-item covariances to zero. With mixed-sign item weights the neglected
+  term can take either sign, so this is not a *guaranteed* bound: on the
+  2026 corpus it understates the cluster bootstrap on 27 of 33 cells and
+  overstates it on at least one axis for the other six. Treat its ellipses
+  as lower bounds in practice, not by construction.
 * The **cluster bootstrap** resamples the ten system-prompt variants with
   replacement, carrying all items and repeats within a variant, which
   propagates prompt-level correlation into the position. It is the primary

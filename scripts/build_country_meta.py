@@ -1,3 +1,17 @@
+"""Build data/country_codes.pkl: the ISO country table plus the two label
+columns the map needs.
+
+Run from the repo root, once, before anything that constructs a CulturalMap:
+
+    uv run python scripts/build_country_meta.py
+
+Reads data/ivs_df.pkl (to keep only countries actually present in the merged
+IVS) and writes data/country_codes.pkl with a ``Cultural Region`` column - the
+eight Inglehart-Welzel regions that label the country cloud and define the
+region centroids - and an ``Islamic`` flag. Both mappings are hand-curated
+below and are the only place they are defined.
+"""
+
 import pandas as pd
 
 data = {
@@ -506,7 +520,7 @@ data = {
 }
 
 country_codes = pd.DataFrame(data)
-ivs_df = pd.read_pickle("../data/ivs_df.pkl")
+ivs_df = pd.read_pickle("data/ivs_df.pkl")
 # Filtering data
 # Metadata we need
 meta_col = ["S020", "S003"]
@@ -759,4 +773,4 @@ country_codes["Cultural Region"] = country_codes["Country"].map(cultural_regions
 country_codes["Islamic"] = country_codes["Country"].map(islamic_countries)
 
 # Save the DataFrame
-country_codes.to_pickle("../data/country_codes.pkl")
+country_codes.to_pickle("data/country_codes.pkl")
