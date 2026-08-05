@@ -32,9 +32,11 @@ body:
         - data preparation / IVS merge
         - PPCA fit
         - rotation and projection
-        - LLM collection harness
-        - response parsing (qn_classes)
-        - bootstrap CIs / SVM regions
+        - LLM collection harness (cloud_survey / collect_cloud_2026)
+        - response parsing (qn_classes) and refusal handling
+        - bootstrap CIs (item / cluster)
+        - region rules (SVM / nearest centroid) and headline statistics
+        - QC, diagnostics and confirmatory analysis
         - figures
         - packaging / CI / docs
         - other / not sure

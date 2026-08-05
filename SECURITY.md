@@ -39,9 +39,10 @@ enter it — including via an issue, a PR diff, or a notebook output cell.
   environment variables at run time and are never read from, or written to, tracked
   files. Do not paste a key into a bug report, a log excerpt, or a modelfile; rotate
   any key that has been shared, then report.
-- **Collected model responses.** Stored responses under `data/collection/` are
-  derived outputs, not survey microdata, but excerpts pasted into reports should
-  still be trimmed to the minimum needed to reproduce.
+- **Collected model responses.** Stored responses under `data/collection/` (2024
+  pickles) and `data/collection_2026/` (JSONL, including raw response text and
+  reasoning traces) are derived outputs, not survey microdata, but excerpts pasted
+  into reports should still be trimmed to the minimum needed to reproduce.
 
 When in doubt, describe the issue abstractly in the private advisory and we will
 follow up for the minimum detail needed to reproduce. Do not include working exploit

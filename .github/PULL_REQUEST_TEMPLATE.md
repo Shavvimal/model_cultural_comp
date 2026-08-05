@@ -14,5 +14,6 @@
 - [ ] Tests added or updated for the change
 - [ ] No survey data, `*.pkl`, or API keys added to the diff (or to notebook outputs)
 - [ ] Docs updated (`README.md`, `CHANGELOG.md`) if behaviour changed
+- [ ] Every number added to docs or comments is copied from a committed `data/` artefact, not recalled
 - [ ] If a published number could move: `make validate` run locally, result pasted above
 - [ ] Commit messages are short and imperative
