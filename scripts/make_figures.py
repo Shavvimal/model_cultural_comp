@@ -13,6 +13,7 @@ Writes vector PDFs (for LaTeX) and PNGs (for the blog) to figures/:
 import os
 import sys
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -21,6 +22,12 @@ from matplotlib.patches import Ellipse
 
 from app.culture_map import CULTURAL_REGION_COLORS
 from app.region_svm import RegionClassifier
+
+# Embed TrueType rather than matplotlib's default Type 3. ACL, IEEE and several
+# ACM tracks reject Type 3 outright, so the paper figures are unusable without
+# this. Set at module scope so scripts/make_figures_2026.py inherits it on import.
+mpl.rcParams["pdf.fonttype"] = 42
+mpl.rcParams["ps.fonttype"] = 42
 
 AI_COLOR = CULTURAL_REGION_COLORS["AI Model"]
 XLIM = (-2.1, 4.0)
