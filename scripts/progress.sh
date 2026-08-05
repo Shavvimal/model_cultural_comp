@@ -22,7 +22,9 @@ files=(data/collection_2026/*.jsonl)
 if [ ${#files[@]} -eq 0 ]; then echo "no data yet"; exit 0; fi
 
 total=$(cat "${files[@]}" | wc -l | tr -d ' ')
-target=18000
+# 34 cells (17 models x en/zh) x 500 calls. kimi-k3 was attempted but returned
+# a billing error on every call, so it is not in the design and not counted.
+target=17000
 pct=$((100 * total / target))
 filled=$((pct / 2)); empty=$((50 - filled))
 bar="$(printf '#%.0s' $(seq 1 $((filled > 0 ? filled : 1))))$(printf '.%.0s' $(seq 1 $((empty > 0 ? empty : 1))))"

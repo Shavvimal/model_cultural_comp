@@ -13,10 +13,20 @@ harness (kept in git history). Differences that matter for the paper:
 * results append to a JSONL per model, so an interrupted run resumes
   without repeating completed calls.
 
-The elicitation protocol itself is deliberately identical to 2024 (same ten
-item prompts, same ten system-prompt variants, five repeats, same trailing
-"Sure thing!" assistant primer) so 2024/2026 comparisons change one variable
-at a time.
+The elicitation protocol stays as close to 2024 as the corrections allow —
+same ten item prompts, ten system-prompt variants, five repeats per variant
+(500 calls per model-language cell), same trailing "Sure thing!" assistant
+primer. Three documented departures, all carried as confounds wherever the
+cohorts are shown together:
+
+* the retry budget is ``MAX_ATTEMPTS = 3``, against up to 15 re-asks in 2024;
+* the Chinese arm uses corrected translations (see the ``IV_QN_PROMPTS_ZH`` /
+  ``SYSTEM_PROMPTS_ZH`` note below): the 2024 Chinese F118 prompt labelled
+  both scale poles "always justifiable", several system-prompt variants had
+  collapsed to duplicates in translation, and format instructions were left
+  in English, so each arm is now monolingual;
+* every model is administered in *both* languages (34 cells), where 2024 had
+  a ragged eleven cells.
 """
 
 import asyncio

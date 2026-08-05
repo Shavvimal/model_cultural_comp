@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check validate
+.PHONY: install lint format typecheck test check validate progress watch
 
 install:
 	uv sync
@@ -20,15 +20,20 @@ test:
 
 check: lint test
 
-# Reproduction gate. Requires the ~5.8GB IVS download to be present locally (see
-# the README) - the WVS/GESIS data-use agreements forbid redistribution, so this
-# target can never run in CI.
+# Reproduction gate: refit the map, assert the projection path, then the
+# 2024-cohort bootstrap. Requires the ~5.8GB IVS download to be present locally
+# (see the README) - the WVS/GESIS data-use agreements forbid redistribution, so
+# this target can never run in CI. The 2026 cohort additionally needs the raw
+# corpus under data/collection_2026/ and is run script by script:
+# scripts/qc_2026.py (gate) -> analyze_2026.py -> confirmatory_2026.py,
+# diagnostics_2026.py, plugin_displacement_2026.py, make_figures_2026.py.
 validate:
 	uv run python scripts/validate_projection.py
 	uv run python scripts/bootstrap_llms.py
 
-progress: ## Show 2026 collection progress
+# Collection progress for a 2026 run in flight; needs data/collection_2026/.
+progress:
 	bash scripts/progress.sh
 
-watch: ## Live collection progress (Ctrl-C to exit)
+watch:
 	bash scripts/progress.sh --watch

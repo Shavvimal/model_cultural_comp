@@ -7,8 +7,9 @@ Run from the repo root after scripts/validate_projection.py:
 The 2024 corpus is split by elicitation language (``c-*`` pickles are
 Chinese administrations, labelled ``<llm> [zh]``) and never pooled. Only
 the item bootstrap is available here — the 2024 harness did not record the
-prompt-variant id — so every ellipse is a lower bound on the true
-uncertainty (see the statistical review (paper draft repo) §2.4).
+prompt-variant id — so every ellipse omits the cross-item covariance term
+and is reported as a lower bound, with the 2026 item-vs-cluster ratios as
+the empirical scale of the likely understatement (write-up §3.4).
 
 Writes:
     data/llm_bootstrap_replicates.csv

@@ -1,12 +1,17 @@
 """Cultural-region assignment for map positions.
 
-Two rules are reported side by side, per the statistical review (paper draft repo) §2.5:
-an RBF-SVM over the country coordinates (with its cross-validated accuracy
-attached — around 0.55 on 109 countries in 8 classes, so a single label is
-weak evidence), and the nearest region centroid. Their disagreement is a
-result, not a nuisance. "Positional stability" is the share of bootstrap
+Two rules are reported side by side (write-up §3.4): an RBF-SVM over the
+country coordinates (with its cross-validated accuracy attached — 0.57 on
+109 countries in 8 classes, against a 0.67 training accuracy, so a single
+label is weak evidence), and the nearest region centroid. Their disagreement
+is a result, not a nuisance. "Positional stability" is the share of bootstrap
 replicates falling in a fixed decision region: it reflects sampling
 uncertainty of the position only, never the classifier's own error rate.
+
+Neither rule carries a headline claim. The write-up's headline statistics
+route through no classifier at all (distance from the pooled human respondent
+mean, share of countries closer, minimum distance to any non-Western region
+centroid); see ``app.llm_bootstrap.centroid_statistics``.
 """
 
 import numpy as np
@@ -15,7 +20,8 @@ from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_sco
 from sklearn.svm import SVC
 
 # Includes the regularised regime: the 2024 grid started at C=500, which
-# never evaluates a smooth boundary at all.
+# never evaluates a smooth boundary at all. Grid search is wrapped in a
+# stratified 5-fold CV, and the same folds score the refitted estimator.
 PARAM_GRID = {
     "C": [0.1, 1, 10, 100, 500, 1000, 2000],
     "gamma": [0.01, 0.05, 0.1, 0.2, 0.5, 1.0],

@@ -11,15 +11,21 @@ Inglehart-Welzel cultural map. The map itself is refitted from scratch on the
 Integrated Values Surveys (IVS) 1981-2022 — a probabilistic PCA over the ten IVS items
 behind the two Inglehart-Welzel axes — and then LLMs are put through the same survey
 and projected onto that map through the *same* fitted transform the countries went
-through. Each model gets a position with a bootstrap confidence region and an SVM
-cultural-region assignment.
+through. Each model-language cell gets a position with a bootstrap confidence region
+and two region-assignment rules (an SVM reported with its own cross-validated
+accuracy, and the nearest region centroid), plus classifier-free headline statistics.
 
-The work started as a 2024 blog post, [Cultural Bias in
-LLMs](https://shav.dev/blog/cultural-bias). This repository is the corrected and
-reproducible version of that analysis: the original post projected model responses
-without the survey-fitted standardization and through a re-fitted rotation, so models
-and countries were not actually in the same coordinate space. See
-[CHANGELOG.md](CHANGELOG.md).
+Two cohorts are covered. The **2024 cohort** (eleven model-language cells, served
+locally at Q4 quantisation) is the corrected version of the 2024 blog post
+[Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias): the original projected
+model responses without the survey-fitted standardization and through a re-fitted
+rotation, so models and countries were not actually in the same coordinate space. The
+**2026 cohort** is a designed factorial experiment over the cloud-served frontier
+generation: 17 open-weight models × two administration languages (English and
+Chinese), 34 cells × 500 calls, with reasoning traces and refusals recorded as data.
+The full analysis is written up in
+[Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map);
+see also [CHANGELOG.md](CHANGELOG.md).
 
 ## Quickstart
 
@@ -81,12 +87,18 @@ prepare  ->  fit PPCA  ->  fix ONE varimax rotation  ->  project  ->  bootstrap 
    to hold; it is asserted by `scripts/validate_projection.py`.
 5. **Bootstrap CIs** (`app/llm_bootstrap.py`) — because the projection is affine in the
    ten item values, a model's position depends only on its per-question mean response.
-   Each replicate resamples that model's stored responses per question with
-   replacement, projects the resulting mean respondent, and the spread over replicates
-   gives a 95% confidence ellipse.
-6. **SVM regions** (`app/region_svm.py`) — an SVM fitted on the country coordinates
-   gives cultural-region decision boundaries; each model gets a region plus the
-   fraction of bootstrap replicates that land in it (its stability).
+   Two estimators are reported. The *item bootstrap* (B = 1,000) resamples each item's
+   stored responses independently — it omits cross-item covariance and is the only
+   estimator available for 2024, where the prompt-variant id was not recorded. The
+   *cluster bootstrap* (B = 10,000) resamples the ten system-prompt variants with
+   replacement, carrying all items and repeats within a variant, and is the primary
+   estimator for the 2026 cells (its regions are a median 2.9× larger by SD product).
+6. **Region rules** (`app/region_svm.py`) — an RBF-SVM fitted on the country
+   coordinates (reported with its 0.57 cross-validated accuracy) and the nearest
+   region centroid, side by side; where they disagree, the disagreement is a result.
+   The paper's headline statistics route through no classifier: distance to the
+   pooled human respondent mean, share of countries closer, and minimum distance to
+   any non-Western region centroid, computed per bootstrap replicate.
 
 ### Reproducibility of the seeded EM fit
 
@@ -123,22 +135,50 @@ per-seed extremes to match bit-for-bit.
 | `scripts/` | reproduction (`validate_projection.py`, `bootstrap_llms.py`), the 2026 analysis suite (`analyze_2026.py`, `confirmatory_2026.py`, `diagnostics_2026.py`, `qc_2026.py`, `plugin_displacement_2026.py`, `coverage_calibration_2026.py`, `seed_sensitivity.py`, `sample_traces_2026.py`), collection (`collect_cloud_2026.py`, `progress.sh`), and figures (`make_figures.py`, `make_figures_2026.py`) |
 | `notebooks/` | exploratory work; not the test suite |
 | `figures/` | generated PDFs and PNGs |
-| `data/` | the IVS inputs and every large derived binary live here and are **gitignored** — they may not be redistributed. The small aggregate artefacts the paper cites by filename (`conf_2026_*.csv`, `diag_2026_*.csv`, `seed_sensitivity*.csv`, `llm_language_effects_plugin_2026.csv`, `trace_coding.json`) are re-included by explicit negation and are committed |
+| `data/` | the IVS inputs and every large derived binary live here and are **gitignored** — they may not be redistributed. The small aggregate artefacts the paper cites by filename (`conf_2026_*.csv`, `diag_2026_*.csv`, `seed_sensitivity*.csv`, the `llm_*` parse-rate/ellipse/language-effect/region aggregates for both cohorts, `trace_coding.json`) are re-included by explicit negation and are committed |
 
 ## Models surveyed
 
-Models were run locally through [Ollama](https://ollama.com) at Q4 quantisation unless
-noted. The list lives in `app/llm_meta.py`; models that never produced parseable
-answers in the 2024 run are recorded there in `FAILED_LLMS_2024` rather than being
-silently dropped.
+The model lists live in `app/llm_meta.py` — the single source of truth. Models that
+never produced parseable answers in the 2024 run are recorded there in
+`FAILED_LLMS_2024` rather than being silently dropped.
 
-- **Chinese-origin / Chinese fine-tuned:** `qwen2:7b`, `llama2-chinese:13b`,
-  `wangshenzhi/gemma2-27b-chinese-chat`, `wangrongsheng/llama3-70b-chinese-chat`
-  (plus `yi:34b`, `aquilachat2:34b`, `glm4:9b`, `xuanyuan:70b`,
-  `kingzeus/llama-3-chinese-8b-instruct-v3` — all unparseable, excluded)
+### 2024 cohort — eleven model-language cells
+
+Served locally through [Ollama](https://ollama.com), Q4-quantised GGUF builds, on
+consumer hardware. Two models were administered *only* in Chinese and one in both
+languages (analysed as two cells, marked `[zh]`/`[en]`).
+
+- **Chinese-origin / Chinese fine-tuned:** `qwen2:7b` (both languages),
+  `llama2-chinese:13b` `[zh]`, `wangshenzhi/gemma2-27b-chinese-chat` `[zh]`,
+  `wangrongsheng/llama3-70b-chinese-chat`
 - **Western:** `llama3:70b`, `mistral:7b`, `gemma2:27b`
 - **Uncensored (Dolphin):** `dolphin-llama3:8b`, `dolphin-mistral:7b`,
   `dolphin-mixtral:8x7b`
+- **Attempted, excluded for producing nothing parseable:** `yi:34b`,
+  `aquilachat2:34b`, `glm4:9b`, `xuanyuan:70b`,
+  `kingzeus/llama-3-chinese-8b-instruct-v3` (five model names; the tracked
+  Modelfiles cannot confirm five distinct base artefacts — the `yi` and `glm`
+  Modelfiles point at the AquilaChat2 GGUF — which is disclosed wherever the
+  2024 coherence denominator is used)
+
+### 2026 cohort — 17 models × two administration languages
+
+Cloud-served (Ollama Cloud; serving precision undisclosed by the provider and
+carried as a confound), 34 cells of 500 calls each, English and Chinese arms.
+
+- **Chinese-origin (10):** `deepseek-v4-flash`, `deepseek-v4-flash:0731`,
+  `deepseek-v4-pro`, `glm-5.1`, `glm-5.2`, `kimi-k2.6`, `kimi-k2.7-code`,
+  `minimax-m2.7`, `minimax-m3`, `qwen3.5:397b`
+- **Western (7):** `gemma4:31b`, `gpt-oss:20b`, `gpt-oss:120b`,
+  `mistral-large-3:675b`, `nemotron-3-nano:30b`, `nemotron-3-super`,
+  `nemotron-3-ultra`
+
+An eighteenth model, `kimi-k3`, was excluded before any data was collected (every
+call returned a billing error; zero records, no part in any denominator). One cell,
+`nemotron-3-ultra [zh]`, is excluded from position estimates (F120 parsed 4/50,
+under the inclusion threshold) — its refusals are analysed as data and its
+worst-case Manski bound is still reported.
 
 Each model carries its own upstream licence; check it before reuse.
 
@@ -161,8 +201,15 @@ The IVS/WVS/EVS data is under its own terms and is **not** covered by this licen
 ## Citation
 
 A paper describing this work is forthcoming; this section will carry its BibTeX entry
-and DOI, along with the tagged release the paper cites. Until then, cite the
-repository and the origin post:
+and DOI. The release the paper's numbers were generated from is tagged
+[`v1.0.0`](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.0.0).
+Until then, cite the repository and the write-up:
+
+- Vimalendiran, S. (2026). [Cultural Alignment of Open-Weight LLMs on the
+  Inglehart-Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map)
+  — the full analysis this repository implements.
+- Vimalendiran, S. (2024). [Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias)
+  — the origin post, superseded and corrected by the above.
 
 ```bibtex
 @software{vimalendiran_model_cultural_comp,

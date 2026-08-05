@@ -1,7 +1,7 @@
 [project]
 name = "model-cultural-comp"
-version = "0.1.0"
-description = "Mapping the cultural alignment of LLMs onto the Inglehart-Welzel Cultural Map"
+version = "1.0.0"
+description = "Mapping the cultural alignment of open-weight LLMs onto the Inglehart-Welzel cultural map, refitted from the Integrated Values Surveys"
 readme = "README.md"
 authors = [{ name = "Shav Vimalendiran", email = "shavhugan@gmail.com" }]
 license = "MIT"
@@ -24,6 +24,13 @@ dependencies = [
     "seaborn>=0.13.2",
     "scipy>=1.14.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Shavvimal/model_cultural_comp"
+Repository = "https://github.com/Shavvimal/model_cultural_comp"
+Write-up = "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
+Changelog = "https://github.com/Shavvimal/model_cultural_comp/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Shavvimal/model_cultural_comp/issues"
 
 [dependency-groups]
 dev = [

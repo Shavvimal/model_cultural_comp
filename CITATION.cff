@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "model_cultural_comp: mapping LLM cultural alignment onto the Inglehart-Welzel map"
+abstract: >-
+  Refits the Inglehart-Welzel cultural map from the Integrated Values Surveys
+  with a probabilistic PCA over the ten IVS items, then administers the same ten
+  items to large language models and projects their responses through the same
+  frozen transform the countries go through. Each model-language cell gets a
+  bootstrap confidence region, two region-assignment rules, and classifier-free
+  headline statistics.
+type: software
+authors:
+  - family-names: Vimalendiran
+    given-names: Shav
+    email: shavhugan@gmail.com
+repository-code: "https://github.com/Shavvimal/model_cultural_comp"
+url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
+version: 1.0.0
+date-released: "2026-08-05"
+license: MIT
+keywords:
+  - nlp
+  - llm
+  - cultural-alignment
+  - world-values-survey
+  - inglehart-welzel
+  - pca
+  - reproducible-research
+  - evaluation
+references:
+  - type: article
+    title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
+    authors:
+      - family-names: Vimalendiran
+        given-names: Shav
+    year: 2026
+    url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
+    notes: "The full analysis this repository implements."
+  - type: data
+    title: "EVS Trend File 1981-2017"
+    authors:
+      - name: "EVS"
+    year: 2022
+    version: "3.0.0"
+    doi: "10.4232/1.14021"
+    publisher:
+      name: "GESIS Data Archive, Cologne"
+  - type: data
+    title: "World Values Survey Trend File (1981-2022) Cross-National Data-Set"
+    authors:
+      - name: "World Values Survey Association"
+    year: 2022
+    version: "4.0.0"
+    doi: "10.14281/18241.27"
+    publisher:
+      name: "JD Systems Institute & WVSA Secretariat"
