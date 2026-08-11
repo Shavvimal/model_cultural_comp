@@ -35,7 +35,7 @@ Issues = "https://github.com/Shavvimal/model_cultural_comp/issues"
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    "ruff>=0.5.0",
+    "ruff>=0.16.2",
 ]
 
 [tool.ruff]
