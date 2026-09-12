@@ -1,19 +1,16 @@
-<!-- Keep PRs focused: one logical change per pull request. -->
-
 ## Summary
 
-<!-- What does this change and why? -->
+<!-- Describe the problem and resulting behavior. -->
 
-## Linked issue
+## Validation
 
-<!-- e.g. Closes #123 -->
+<!-- Record checks run. For numerical changes, include source revision,
+input-manifest hash, reproduction commands and relevant reconciliation. -->
 
 ## Checklist
 
-- [ ] `make check` passes (ruff lint + pytest)
-- [ ] Tests added or updated for the change
-- [ ] No survey data, `*.pkl`, or API keys added to the diff (or to notebook outputs)
-- [ ] Docs updated (`README.md`, `CHANGELOG.md`) if behaviour changed
-- [ ] Every number added to docs or comments is copied from a committed `data/` artefact, not recalled
-- [ ] If a published number could move: `make validate` run locally, result pasted above
-- [ ] Commit messages are short and imperative
+- [ ] `make check` passes (indexed-file policy, Ruff and synthetic tests)
+- [ ] Appropriate regression coverage added for behavioral changes
+- [ ] No data, generated outputs, notebooks, credentials or private logs added
+- [ ] Current documentation and changelog reflect changed behavior
+- [ ] If reported results could change: full `make reproduce` run locally and relevant results recorded above

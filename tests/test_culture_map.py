@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.culture_map import IV_QNS, PC_RESCALE_PARAMS, CulturalMap
+from app.culture_map import HUMAN_MEAN, IV_QNS, PC_RESCALE_PARAMS, SURVEY_REFERENCE, CulturalMap
 
 
 class TestRotationIsFittedOnce:
@@ -37,8 +37,56 @@ class TestSelfConsistency:
             atol=1e-8,
         )
 
+    def test_saved_map_retains_fitting_evidence_without_respondents(self, fitted_map, tmp_path):
+        path = tmp_path / "map.npz"
+        fitted_map.save_model(path)
+        with np.load(path, allow_pickle=False) as archive:
+            assert "data" not in archive
+            assert archive["converged_"].item()
+            assert archive["gradient_norm_"].item() <= archive["tolerance_"].item()
+            np.testing.assert_array_equal(archive["loadings_"], fitted_map.ppca.loadings_)
+        loaded = CulturalMap(pd.DataFrame(), pd.DataFrame())
+        loaded.load_model(path)
+        assert loaded.ppca.noise_variance_ == fitted_map.ppca.noise_variance_
+        assert loaded.ppca.method_ == fitted_map.ppca.method_
+        assert loaded.ppca.data is None
+        complete = fitted_map.subset_ivs_df.dropna(subset=IV_QNS)
+        pd.testing.assert_frame_equal(loaded.project(complete), fitted_map.project(complete))
+
+    def test_legacy_map_does_not_claim_validated_likelihood(self, fitted_map, tmp_path):
+        path = tmp_path / "legacy.npz"
+        np.savez(
+            path,
+            C=fitted_map.ppca.C,
+            means=fitted_map.ppca.means,
+            stds=fitted_map.ppca.stds,
+            eig_vals=fitted_map.ppca.eig_vals,
+            rotation=fitted_map.rotation,
+            score_stds=fitted_map.score_stds,
+        )
+        loaded = CulturalMap(pd.DataFrame(), pd.DataFrame())
+        loaded.load_model(path)
+        assert not loaded.ppca.converged_
+        assert loaded.ppca.log_likelihood_ is None
+        assert loaded.ppca.loadings_ is None
+
 
 class TestRescaling:
+    def test_constants_match_wvs_syntax(self):
+        """Pin the affine constants to the WVS Association's published SPSS
+        syntax (SurvSAgg = 1.81*SurvSelf + .038; TradAgg = 1.61*TradRat5 - .1).
+        Guards against the decimal slip (0.38 / -0.01) inherited from Tao et
+        al. (2024) and carried until v1.1.0 (GitHub issue #12)."""
+        assert PC_RESCALE_PARAMS["PC1"] == (1.81, 0.038)
+        assert PC_RESCALE_PARAMS["PC2"] == (1.61, -0.10)
+        assert HUMAN_MEAN == (0.038, -0.10)
+        assert HUMAN_MEAN is SURVEY_REFERENCE
+
+    def test_reference_is_projected_observed_item_marginal_means(self, fitted_map):
+        means = pd.DataFrame([fitted_map.ppca.means], columns=IV_QNS)
+        point = fitted_map.project(means)[["PC1_rescaled", "PC2_rescaled"]].to_numpy()[0]
+        np.testing.assert_allclose(point, SURVEY_REFERENCE, atol=1e-14)
+
     def test_published_wvs_constants(self, fitted_map, rng):
         data = pd.DataFrame(5 + rng.standard_normal((10, len(IV_QNS))), columns=IV_QNS)
         out = fitted_map.project(data)

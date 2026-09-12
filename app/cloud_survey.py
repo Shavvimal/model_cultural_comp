@@ -1,4 +1,4 @@
-"""The 2026 survey harness: Ollama Cloud, full raw-response recording.
+"""The 2026 survey harness: Ollama Cloud, terminal records and attempt audits.
 
 Supersedes the 2024 ``llm_data_gen.py`` / ``chinese_llm_data_gen.py`` local
 harness (kept in git history). Differences that matter for the paper:
@@ -7,15 +7,20 @@ harness (kept in git history). Differences that matter for the paper:
   models), the system-prompt variant id and the repeat index — the 2024
   harness stored only ``(llm, question, parsed_value)``, which made
   prompt-level variance and refusals impossible to analyse retrospectively;
-* reasoning models are handled by asking the API to separate thinking
-  (``think`` capability) and by stripping any inline ``<think>`` blocks
-  before parsing;
+* a separate returned thinking field is retained when emitted, and inline
+  ``<think>`` blocks are stripped before parsing. Historical respondent
+  requests left the thinking setting unspecified;
 * results append to a JSONL per model, so an interrupted run resumes
-  without repeating completed calls.
+  without repeating completed calls;
+* schema-version 2 records retain exact request options and returned response
+  metadata. A separate attempt_audit/ log also retains failed/retried attempts.
+  These prospective fields do not reconstruct the historical 2026 defaults or
+  API-call total. Process termination between a request and its audit write can
+  still leave an unrecorded in-flight call.
 
 The elicitation protocol stays as close to 2024 as the corrections allow —
-same ten item prompts, ten system-prompt variants, five repeats per variant
-(500 calls per model-language cell), same trailing "Sure thing!" assistant
+same ten item prompts, ten user-message prefix variants, five repeats per variant
+(500 trials per model-language cell), same trailing "Sure thing!" system
 primer. Three documented departures, all carried as confounds wherever the
 cohorts are shown together:
 
@@ -36,7 +41,9 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import IntEnum
+from importlib.metadata import version
 from pathlib import Path
+from uuid import uuid4
 
 from ollama import AsyncClient
 
@@ -187,6 +194,19 @@ PRIMER = {
     "zh": "好的！这是我的数字答案：",
 }
 
+# Prompt-variant sets. ``persona`` is the 2024/2026 protocol: ten near-paraphrase
+# persona prefixes, five repeats each. ``nosys`` is the neutral baseline added
+# for the camera-ready at a reviewer's request: no persona prefix at all, fifty
+# repeats, so a cell keeps 500 calls and only the persona cue varies (item
+# wording, format instructions and the trailing primer are held fixed). The
+# baseline is written to its own directory (see collect_cloud_2026.py) because
+# every 2026 analysis script keys the arm on ``language`` alone.
+CALLS_PER_CELL = 500
+PROMPT_VARIANTS: dict[str, dict[str, list[str]]] = {
+    "en": {"persona": SYSTEM_PROMPTS, "nosys": [""]},
+    "zh": {"persona": SYSTEM_PROMPTS_ZH, "nosys": [""]},
+}
+
 PARSERS = {
     "A008": EnumOutputParser(A008),
     "A165": EnumOutputParser(A165),
@@ -202,6 +222,8 @@ PARSERS = {
 
 N_REPEATS = 5
 MAX_ATTEMPTS = 3
+assert len(SYSTEM_PROMPTS) == len(SYSTEM_PROMPTS_ZH)
+assert CALLS_PER_CELL == len(IV_QN_PROMPTS) * len(SYSTEM_PROMPTS) * N_REPEATS
 
 
 @dataclass
@@ -214,8 +236,19 @@ class CloudSurvey:
     concurrency: int = 6
     timeout_s: float = 300.0
     language: str = "en"  # "en" or "zh": selects prompts, instructions, primer
+    prompt_variant: str = "persona"  # "persona" (ten prefixes x 5) or "nosys" (none x 50)
+    # None deliberately preserves the historical request distribution: do not
+    # substitute assumed effective provider defaults for unspecified settings.
+    generation_options: dict | None = None
+    thinking: bool | str | None = None
 
     def __post_init__(self):
+        if self.language not in PROMPT_VARIANTS:
+            raise ValueError(f"language must be one of {sorted(PROMPT_VARIANTS)}")
+        if self.prompt_variant not in PROMPT_VARIANTS[self.language]:
+            raise ValueError(
+                f"prompt_variant must be one of {sorted(PROMPT_VARIANTS[self.language])}"
+            )
         self.out_dir = Path(self.out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self._client = AsyncClient(
@@ -224,13 +257,20 @@ class CloudSurvey:
         self._semaphore = asyncio.Semaphore(self.concurrency)
         self._write_lock = asyncio.Lock()
 
-    @staticmethod
-    def tasks_for_model() -> list[tuple[str, int, int]]:
+    @property
+    def persona_prefixes(self) -> list[str]:
+        """The persona prefixes of this arm; ``[""]`` for the neutral baseline."""
+        return PROMPT_VARIANTS[self.language][self.prompt_variant]
+
+    def tasks_for_model(self) -> list[tuple[str, int, int]]:
+        """Every (item, prefix id, repeat) triple of one cell: always 500."""
+        prefixes = self.persona_prefixes
+        repeats = CALLS_PER_CELL // (len(IV_QN_PROMPTS) * len(prefixes))
         return [
             (qn, sys_id, repeat)
-            for sys_id in range(len(SYSTEM_PROMPTS))
+            for sys_id in range(len(prefixes))
             for qn in IV_QN_PROMPTS
-            for repeat in range(N_REPEATS)
+            for repeat in range(repeats)
         ]
 
     def _jsonl_path(self, llm: str) -> Path:
@@ -240,6 +280,7 @@ class CloudSurvey:
         return self.out_dir / f"{stem}.jsonl"
 
     def _prompt_for(self, qn: str, sys_id: int) -> str:
+        prefix = self.persona_prefixes[sys_id]
         if self.language == "zh":
             parser = PARSERS[qn]
             if isinstance(parser, EnumOutputParser):
@@ -248,59 +289,94 @@ class CloudSurvey:
                 )
             else:
                 instructions = FORMAT_INSTRUCTIONS_ZH[qn]
-            return SYSTEM_PROMPTS_ZH[sys_id] + " " + IV_QN_PROMPTS_ZH[qn] + " " + instructions
-        return (
-            SYSTEM_PROMPTS[sys_id]
-            + " "
-            + IV_QN_PROMPTS[qn]
-            + " "
-            + PARSERS[qn].format_instructions()
-        )
+            parts = (prefix, IV_QN_PROMPTS_ZH[qn], instructions)
+        else:
+            parts = (prefix, IV_QN_PROMPTS[qn], PARSERS[qn].format_instructions())
+        # The empty prefix of the neutral baseline must not leave a leading space.
+        return " ".join(part for part in parts if part)
 
     def _completed(self, llm: str) -> set[tuple[str, int, int]]:
         path = self._jsonl_path(llm)
         if not path.exists():
             return set()
         done = set()
+        expected = set(self.tasks_for_model())
         with path.open() as f:
             for i, line in enumerate(f, 1):
                 try:
                     rec = json.loads(line)
-                except json.JSONDecodeError:
-                    # A kill mid-write can truncate the final line; skipping it
-                    # re-runs that one call, and the analysis loader dedups.
-                    print(f"[{llm}] skipping corrupt line {i} in {path.name}", flush=True)
-                    continue
-                done.add((rec["question"], rec["system_prompt_id"], rec["repeat"]))
+                    language = "en" if rec.get("language") is None else rec["language"]
+                    if rec["llm"] != llm or language != self.language:
+                        raise ValueError("record belongs to a different model/language")
+                    if rec.get("prompt_variant", "persona") != self.prompt_variant:
+                        raise ValueError("record belongs to a different prompt variant")
+                    indices = []
+                    for name in ("system_prompt_id", "repeat"):
+                        value = rec[name]
+                        if type(value) is not int and not (
+                            isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value)
+                        ):
+                            raise ValueError(f"invalid {name}")
+                        indices.append(int(value))
+                    key = (rec["question"], *indices)
+                    if key not in expected or key in done:
+                        raise ValueError("extra or duplicate trial key")
+                    if rec.get("transport_failure"):
+                        raise ValueError("transport-only attempt is not a completed trial")
+                except (ValueError, KeyError, TypeError) as exc:
+                    # Never append beyond a corrupt/truncated record or silently
+                    # normalize a duplicate into a supposedly complete corpus.
+                    raise ValueError(f"{path.name}:{i}: {exc}") from exc
+                done.add(key)
         return done
 
-    async def _call_once(self, llm: str, qn: str, sys_id: int):
-        messages = [
-            {"role": "user", "content": self._prompt_for(qn, sys_id)},
-            # 2024-protocol refusal mitigation, kept for comparability
-            {"role": "system", "content": PRIMER[self.language]},
-        ]
-        # Fresh client per call: repeated timeout-cancellations poison the
-        # shared connection pool (observed as per-model tail hangs that a
-        # process restart instantly cured). One TLS handshake per call is
-        # cheap; a wedged run is not.
+    def _request_for(self, llm: str, qn: str, sys_id: int) -> dict:
+        request = {
+            "model": llm,
+            "messages": [
+                {"role": "user", "content": self._prompt_for(qn, sys_id)},
+                # 2024-protocol refusal mitigation, kept for comparability.
+                {"role": "system", "content": PRIMER[self.language]},
+            ],
+        }
+        if self.generation_options is not None:
+            request["options"] = dict(self.generation_options)
+        if self.thinking is not None:
+            request["think"] = self.thinking
+        return request
+
+    async def _call_once(self, request: dict) -> dict:
+        # Fresh client per call: repeated timeout-cancellations poisoned the
+        # shared connection pool in the original collection.
         client = AsyncClient(
             host=self.host,
             headers={"Authorization": f"Bearer {self.api_key}"},
-            timeout=self.timeout_s,  # socket-level: dead connections error, never hang
+            timeout=self.timeout_s,
         )
-        response = await client.chat(model=llm, messages=messages)
-        content = response["message"]["content"] or ""
-        thinking = response["message"].get("thinking") or ""
-        return content, thinking
+        response = await client.chat(**request)
+        # Preserve all returned identity/timing/usage fields and uncapped text.
+        # Exclude SDK-populated defaults; explicitly returned nulls remain null.
+        if hasattr(response, "model_dump"):
+            return response.model_dump(mode="json", exclude_unset=True)
+        return dict(response)
+
+    async def _append_record(self, path: Path, record: dict):
+        async with self._write_lock:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
 
     async def _run_task(self, llm: str, qn: str, sys_id: int, repeat: int) -> dict:
+        request = self._request_for(llm, qn, sys_id)
         record = {
             "llm": llm,
             "question": qn,
             "system_prompt_id": sys_id,
             "repeat": repeat,
             "language": self.language,
+            "prompt_variant": self.prompt_variant,
             "raw_content": None,
             "thinking": None,
             "parsed": None,
@@ -308,39 +384,74 @@ class CloudSurvey:
             "attempts": 0,
             "duration_ms": None,
             "ts": None,
+            "schema_version": 2,
+            "task_run_id": str(uuid4()),
+            "request": request,
+            "request_provenance": {
+                "host": self.host,
+                "ollama_python_version": version("ollama"),
+                "timeout_s": self.timeout_s,
+                "generation_options": {
+                    "requested": request.get("options"),
+                    "unspecified_settings": "hosted defaults; effective values unknown",
+                },
+                "thinking": {
+                    "requested": self.thinking,
+                    "source": "hosted default; effective value unknown"
+                    if self.thinking is None
+                    else "explicit request",
+                },
+            },
+            "response": None,
         }
+        # Nested audit logs are deliberately outside the terminal-record glob.
+        # Every task invocation has a unique id, so re-sweep counters cannot be
+        # mistaken for a single all-time attempt count.
+        audit_path = self.out_dir / "attempt_audit" / self._jsonl_path(llm).name
         for attempt in range(1, MAX_ATTEMPTS + 1):
-            record["attempts"] = attempt
-            record.pop("transport_failure", None)  # each attempt reclassifies
+            record.update(
+                attempts=attempt,
+                raw_content=None,
+                thinking=None,
+                parsed=None,
+                response=None,
+                error=None,
+            )
+            record.pop("transport_failure", None)
             start = time.time()
             try:
                 async with self._semaphore:
-                    start = time.time()  # reset inside the semaphore: latency, not queue-wait
-                    content, thinking = await asyncio.wait_for(
-                        self._call_once(llm, qn, sys_id), timeout=self.timeout_s
+                    start = time.time()
+                    response = await asyncio.wait_for(
+                        self._call_once(request), timeout=self.timeout_s
                     )
-                record["raw_content"] = content
-                record["thinking"] = thinking[:2000]
-                record["duration_ms"] = int((time.time() - start) * 1000)
-                record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-                record["parsed"] = PARSERS[qn].parse(content)
-                record["error"] = None
-                return record
-            except (ValueError, KeyError) as exc:  # parse failure: keep raw, retry
-                record["error"] = f"parse: {exc}"
-                record["duration_ms"] = int((time.time() - start) * 1000)
-                record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-            # Broad catch is deliberate: any transport/API error (timeout,
-            # rate limit, 5xx) is expected at this volume, the record keeps
-            # the error string so nothing fails silently, and the degradation
-            # is a logged failed row that the analysis stage reports.
             except Exception as exc:
-                message = f"{type(exc).__name__}: {exc}"
-                record["error"] = message
-                record["duration_ms"] = int((time.time() - start) * 1000)
-                record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+                record["error"] = f"{type(exc).__name__}: {exc}"
                 record["transport_failure"] = True
-                # Rate limits back off long; other transport errors briefly
+                outcome = "transport_failure"
+            else:
+                record["response"] = response
+                try:
+                    content = response["message"]["content"] or ""
+                    thinking = response["message"].get("thinking") or ""
+                    record["raw_content"] = content
+                    # Legacy analysis field keeps its historical cap; the full
+                    # returned trace is available under response.message.thinking.
+                    record["thinking"] = thinking[:2000]
+                    record["parsed"] = PARSERS[qn].parse(content)
+                    outcome = "parsed"
+                except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                    record["error"] = f"parse: {exc}"
+                    outcome = "parse_failure"
+            record["duration_ms"] = int((time.time() - start) * 1000)
+            record["ts"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            # A write failure propagates: an unaudited request must not silently
+            # be treated as a recorded attempt. The API key is never serialized.
+            await self._append_record(audit_path, {**record, "outcome": outcome})
+            if outcome == "parsed":
+                return record
+            if outcome == "transport_failure":
+                message = record["error"]
                 throttled = "429" in message or "rate" in message.lower()
                 await asyncio.sleep(
                     min(60.0, 15.0 * attempt) if throttled else min(10.0, 2.0**attempt)
@@ -359,16 +470,13 @@ class CloudSurvey:
         async def one(task):
             qn, sys_id, repeat = task
             record = await self._run_task(llm, qn, sys_id, repeat)
-            # Exhausted transport failures are NOT persisted: a written record
-            # marks the call complete forever (resume skips it), and a rate
-            # limit is not an answer. Unwritten rows are retried on resume.
+            # Transport-only tasks remain absent from the terminal corpus so
+            # resume retries them; each attempt is retained in attempt_audit/.
             if record["error"] is not None and record.get("transport_failure"):
                 counts["deferred"] += 1
                 return
             record.pop("transport_failure", None)
-            async with self._write_lock:
-                with path.open("a") as f:
-                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            await self._append_record(path, record)
             counts["ok" if record["error"] is None else "failed"] += 1
             total = counts["ok"] + counts["failed"]
             if total % 50 == 0:

@@ -6,10 +6,14 @@ repo-root .env file. Run from the repo root:
     uv run python scripts/collect_cloud_2026.py [model ...]
 
 With no arguments, surveys every model the cloud account can see; pass
---language=zh as the first argument for the Chinese arm. Raw records append
-to data/collection_2026/<model>[__zh].jsonl (resumable — re-running skips
-completed calls). Analysis reads the JSONL directly via
-app.llm_bootstrap.load_responses_2026.
+--language=zh for the Chinese arm and --prompt-variant=nosys for the
+no-persona baseline (flags may come in either order, before the model
+list). Raw records append to data/collection_2026/<model>[__zh].jsonl for
+the persona protocol and to data/collection_2026_nosys/ for the baseline
+(resumable — re-running skips completed calls). The baseline gets its own
+directory because the 2026 analysis scripts key the arm on ``language``
+alone and would silently pool a third arm into ``en``. Analysis reads the
+JSONL directly via app.llm_bootstrap.load_responses_2026.
 """
 
 import asyncio
@@ -17,7 +21,11 @@ import os
 import sys
 from pathlib import Path
 
-RAW_DIR = Path("data/collection_2026")
+RAW_DIRS = {
+    "persona": Path("data/collection_2026"),
+    "nosys": Path("data/collection_2026_nosys"),
+}
+RAW_DIR = RAW_DIRS["persona"]
 
 
 def load_dotenv(path=".env"):
@@ -56,19 +64,30 @@ async def main() -> int:
 
     args = sys.argv[1:]
     language = "en"
-    if args and args[0] in ("--language=zh", "--language=en"):
-        language = args[0].split("=")[1]
-        args = args[1:]
+    prompt_variant = "persona"
+    while args and args[0].startswith("--"):
+        flag, _, value = args.pop(0).partition("=")
+        if flag == "--language" and value in ("en", "zh"):
+            language = value
+        elif flag == "--prompt-variant" and value in RAW_DIRS:
+            prompt_variant = value
+        else:
+            print(f"unknown flag {flag}={value}", file=sys.stderr)
+            return 2
 
     concurrency = int(os.environ.get("SURVEY_CONCURRENCY", "18"))
     model_parallelism = int(os.environ.get("SURVEY_MODEL_PARALLELISM", "3"))
     timeout_s = float(os.environ.get("SURVEY_TIMEOUT_S", "300"))
     survey = CloudSurvey(
-        out_dir=RAW_DIR, concurrency=concurrency, language=language, timeout_s=timeout_s
+        out_dir=RAW_DIRS[prompt_variant],
+        concurrency=concurrency,
+        language=language,
+        timeout_s=timeout_s,
+        prompt_variant=prompt_variant,
     )
     models = args or await list_cloud_models(survey)
     print(
-        f"Surveying {len(models)} models [{language}] "
+        f"Surveying {len(models)} models [{language}, {prompt_variant}] "
         f"(in-flight cap {concurrency}, {model_parallelism} models at a time): "
         + ", ".join(models),
         flush=True,

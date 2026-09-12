@@ -36,10 +36,18 @@ app/ppca.py
     - Model persistence round-trips the full parameter set (loadings, means,
       standard deviations, eigenvalues) rather than the loadings alone.
 
-  The underlying method is unchanged: the EM algorithm for probabilistic PCA
-  of Tipping, M. E. and Bishop, C. M. (1999), "Probabilistic Principal
-  Component Analysis", Journal of the Royal Statistical Society, Series B,
-  61(3), 611-622.
+    - The inherited approximate missing-data loop is replaced by direct
+      observed-data Gaussian likelihood optimisation using L-BFGS-B, with
+      multiple starts and explicit gradient-convergence checks. Missing
+      entries are completed with fitted Gaussian conditional means.
+    - Complete data use the analytic PPCA maximum-likelihood solution.
+      Saved state includes Gaussian loadings, residual variance and fit
+      diagnostics, separately from the orthonormal projection axes.
+
+  The Gaussian model follows Tipping, M. E. and Bishop, C. M. (1999),
+  "Probabilistic Principal Component Analysis", Journal of the Royal
+  Statistical Society, Series B, 61(3), 611-622. The current incomplete-data
+  optimiser is direct likelihood optimisation, not the inherited EM loop.
 
 Survey instrument texts
 -----------------------

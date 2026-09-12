@@ -1,25 +1,60 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [Unreleased] — planned 1.1.0 camera-ready revision
 
-## [Unreleased]
+The corrected instrument and analyses support the revised paper. This version
+is prepared locally; an immutable public response archive and release tag have
+not yet been published.
+
+### Fixed
+
+- Reconstruct missing Y003 from four valid constituent responses before the
+  completeness filter, preserving delivered scores. Report reconstruction and
+  concordance counts and the corrected fitting and mapped samples.
+- Replace the imputation fixed-point loop with observed-data Gaussian PPCA
+  likelihood optimisation, multiple starts, convergence diagnostics and exact
+  Gaussian conditional completion. Preserve the frozen score-side varimax path.
+- Correct affine offsets, item validity and empty-cluster count pooling; project
+  observed item means and use paired observed displacement estimates.
+- Correct permutation denominators, tie handling, simultaneous headline counts,
+  finite reference benchmarks and prompt-control completeness accounting.
+- Preserve all ten items in the item sign-test BH family, assigning p=1 when
+  every paired contrast is tied.
+- Describe user-message prefixes, the retained no-persona system primer,
+  terminal failure records and selected trace panels accurately.
 
 ### Added
-- `CITATION.cff`, so GitHub renders a "Cite this repository" entry. No DOI yet —
-  it carries the repository URL, the `v1.0.0` version and the write-up.
-- Project URLs in `pyproject.toml` (repository, write-up, changelog, issues).
+
+- Mathematical and synthetic regression checks for likelihood, completion,
+  scoring, resampling, inference and trace agreement.
+- Reference, language/design, family/wording, instrument rotation/completion,
+  prompt-control and item-profile sensitivities used by the corrected analysis.
+- Frozen-code trace-panel merging, agreement and selection diagnostics.
+- Prospective collection request metadata and per-attempt audit logging;
+  historical missing metadata remains unknown.
+- An explicit 69-file input manifest and tested data-only archive pack/install/
+  verify commands, with portable JSONL replacing distributed 2024 pickles.
+- A sequential offline `make reproduce` target and licensed-input provenance.
+- A separate aggregate/provenance supplement preserving all appendix-named CSVs
+  and the original, superseded trace-coding record without putting data in Git.
+- A Git-index policy gate in `make check` and CI to reject data, generated files,
+  notebooks, private state and symlinks, including forced additions.
 
 ### Changed
-- README rewritten around the released state: both cohorts, the two bootstrap
-  estimators, the two region rules, the committed artefacts, the `v1.0.0`
-  citation.
-- Documentation pass over the module and script docstrings, `CONTRIBUTING.md`,
-  `SECURITY.md`, the Makefile and the issue templates, so they describe the
-  released pipeline (both cohorts, both estimators, both region rules) rather
-  than the intermediate state they were written in.
+
+- Git contains source, tests and documentation only. Stop tracking existing
+  aggregates, figures and obsolete exploratory notebooks; local files remain
+  ignored. Retained inputs are distributed separately and outputs regenerated.
+- Move manuscript fact checks, LaTeX table exports and blog exports into the
+  paper project. Retire the combined source/corpus release-candidate builder.
+- Share family metadata in `app/llm_meta.py`; rename the scientific
+  `final_review_sensitivities.py` driver to `family_wording_sensitivity.py`.
+- Remove notebook-only and unused direct dependencies and update the lockfile
+  without upgrading retained numerical packages.
+- Retain historical plan entries and older changelog sections as dated records;
+  their old tracked-data policy and superseded results are not current guidance.
 
 ## [1.0.0] - 2026-08-05
 

@@ -3,7 +3,7 @@
 Eight diagnostic families feeding the paper's robustness appendix, each a
 typed function returning a DataFrame, written to data/diag_2026_<name>.csv:
 
-  1. variance components (model / language / variant / repeat), in map units
+  1. descriptive nested dispersion (model / language / variant / repeat)
   2. prompt-variant ICC(1) per model x language x item
   3. empirical item keying and an acquiescence/directional-bias table
   4. refusal rates, with an en-vs-zh comparison on the sensitive items
@@ -29,14 +29,13 @@ Sources and conventions
   (cm.ppca.means after load_model, the "means" array in
   data/cultural_map_model.npz): unweighted nanmeans over the post-2005,
   sentinel-recoded, >=6-items-answered IVS training rows, in IV_QNS order.
-  The vector of these means projects to exactly (0.38, -0.01) - the pooled
-  human respondent mean - so it doubles as the human-grand-mean base point.
-* The variance decomposition in (1) is a balanced nested approximation to
-  the full crossed model x language x variant x repeat G-study: each level
-  is estimated as the mean (over higher-level units) of the ddof=1 sample
-  variance of the next level's means, not by solving the crossed
-  expected-mean-square equations. With near-balanced cells (10 variants x
-  5 repeats) the approximation is close; it is labelled as such.
+  This vector projects to SURVEY_REFERENCE (the rescale offsets), not
+  necessarily to the mean of the conditionally completed respondent scores.
+* The primary dispersion summary is an orthogonal sums-of-squares partition
+  of synthetic ten-item profiles. Language-within-model includes the
+  model-by-language interaction. Legacy per-level variances are descriptive
+  variances of different levels' means, not additive variance components
+  or a fitted crossed generalisability study.
 * Nothing here is stochastic - every quantity is a deterministic function
   of the corpus and the frozen model.
 
@@ -51,33 +50,19 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from qc_2026 import classify_failure
 
-from app.culture_map import ITEM_VALID_RANGES, IV_QNS, CulturalMap
+from app.culture_map import HUMAN_MEAN, ITEM_VALID_RANGES, IV_QNS, CulturalMap
 from app.llm_bootstrap import _to_value
-from app.llm_meta import cohort_2026
+from app.llm_meta import FAMILIES, cohort_2026
+from scripts.qc_2026 import classify_failure
 
 RAW_DIR = Path("data/collection_2026")
 MODEL_PATH = "data/cultural_map_model.npz"
-HUMAN_MEAN = (0.38, -0.01)  # pooled human respondent mean, map units
 SENSITIVE_QNS = ["F118", "F120", "F063", "G006", "E025"]
 THRESHOLDS = (5, 10, 25)
 CELL = ["llm", "language"]
 PSEUDO_KEY = ["llm", "language", "system_prompt_id", "repeat"]
 AXES = ("PC1_rescaled", "PC2_rescaled")
-
-# Protocol-matched families for the within-family descriptives (6).
-FAMILIES = {
-    "deepseek": ["deepseek-v4-flash", "deepseek-v4-flash:0731", "deepseek-v4-pro"],
-    "gemma": ["gemma4:31b"],
-    "glm": ["glm-5.1", "glm-5.2"],
-    "gpt-oss": ["gpt-oss:20b", "gpt-oss:120b"],
-    "kimi": ["kimi-k2.6", "kimi-k2.7-code"],
-    "minimax": ["minimax-m2.7", "minimax-m3"],
-    "mistral": ["mistral-large-3:675b"],
-    "nemotron": ["nemotron-3-nano:30b", "nemotron-3-super", "nemotron-3-ultra"],
-    "qwen": ["qwen3.5:397b"],
-}
 
 
 def _cohort(llm: str) -> str:
@@ -230,13 +215,13 @@ def _orthogonal_ss(pseudo: pd.DataFrame, axis: str) -> dict[str, float]:
 def variance_components(pseudo: pd.DataFrame) -> pd.DataFrame:
     """Nested variance decomposition per axis, in map units.
 
-    Balanced nested approximation to the crossed G-study (module docstring):
+    Descriptive variances of nested means (module docstring):
     each component is the mean, over the units one level up, of the ddof=1
     variance of the next level's means. Language-within-model averages only
     models observed in both arms.
 
-    Reported under both conventions. ``pct_of_total`` is the mean-square
-    share (each level's per-unit variance as a share of the four summed);
+    ``pct_of_total`` is a legacy normalised-level-variance field, not a
+    share of total profile variance (each level's variance divided by their sum);
     ``pct_of_total_ss`` is the orthogonal sums-of-squares share, which
     partitions the total variance exactly and does not over-credit the
     two-level language factor. The two disagree materially for language, so
@@ -283,6 +268,8 @@ def variance_components(pseudo: pd.DataFrame) -> pd.DataFrame:
                     "sum_of_squares": ss[name],
                     "pct_of_total_ss": 100.0 * ss[name] / ss_total if ss_total > 0 else np.nan,
                     "n_units": n_units,
+                    "primary_definition": "orthogonal SS of synthetic ten-item profiles",
+                    "legacy_pct_definition": "normalised variances of nested means; not additive components",
                 }
             )
     return pd.DataFrame(rows)
@@ -722,7 +709,7 @@ def sensitivity_neutralised(cm: CulturalMap, parsed: pd.DataFrame) -> pd.DataFra
 
 
 def main() -> int:
-    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+    cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
     cm.load_model(MODEL_PATH)
 
     raw = load_raw()

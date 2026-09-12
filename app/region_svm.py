@@ -9,8 +9,8 @@ replicates falling in a fixed decision region: it reflects sampling
 uncertainty of the position only, never the classifier's own error rate.
 
 Neither rule carries a headline claim. The write-up's headline statistics
-route through no classifier at all (distance from the pooled human respondent
-mean, share of countries closer, minimum distance to any non-Western region
+route through no classifier at all (distance from the fixed survey
+reference, share of countries closer, minimum distance to any non-Western region
 centroid); see ``app.llm_bootstrap.centroid_statistics``.
 """
 
@@ -21,7 +21,8 @@ from sklearn.svm import SVC
 
 # Includes the regularised regime: the 2024 grid started at C=500, which
 # never evaluates a smooth boundary at all. Grid search is wrapped in a
-# stratified 5-fold CV, and the same folds score the refitted estimator.
+# stratified 5-fold CV. The reported score reuses the selection folds and is
+# therefore a tuning score, not an unbiased held-out accuracy estimate.
 PARAM_GRID = {
     "C": [0.1, 1, 10, 100, 500, 1000, 2000],
     "gamma": [0.01, 0.05, 0.1, 0.2, 0.5, 1.0],
@@ -36,7 +37,7 @@ class RegionClassifier:
         self.svm = None
         self.regions = None  # index -> region name
         self.centroids = None  # region -> (PC1', PC2')
-        self.cv_accuracy = None  # 5-fold stratified CV accuracy of the SVM
+        self.cv_accuracy = None  # selected-grid 5-fold CV score (optimistically selected)
 
     def fit(self, country_scores: pd.DataFrame) -> "RegionClassifier":
         data = country_scores.dropna(subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"])
@@ -66,7 +67,9 @@ class RegionClassifier:
         dists = np.linalg.norm(xy[:, None, :] - self.centroids.to_numpy()[None, :, :], axis=2)
         return [self.centroids.index[i] for i in dists.argmin(axis=1)]
 
-    def region_assignments(self, boot: pd.DataFrame) -> pd.DataFrame:
+    def region_assignments(
+        self, boot: pd.DataFrame, point_estimates: pd.DataFrame | None = None
+    ) -> pd.DataFrame:
         """Both rules per model, with the full SVM share vector.
 
         Returns modal SVM region + positional stability, the runner-up, the
@@ -75,10 +78,16 @@ class RegionClassifier:
         without it.
         """
         rows = []
+        points = None if point_estimates is None else point_estimates.set_index("llm")
         for llm, g in boot.groupby("llm"):
             xy = g[["PC1_rescaled", "PC2_rescaled"]].to_numpy()
             shares = pd.Series(self.predict_svm(xy)).value_counts(normalize=True)
-            centroid_region = self.predict_centroid(xy.mean(axis=0, keepdims=True))[0]
+            point = (
+                xy.mean(axis=0)
+                if points is None
+                else points.loc[llm, ["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
+            )
+            centroid_region = self.predict_centroid(point[None, :])[0]
             rows.append(
                 {
                     "llm": llm,

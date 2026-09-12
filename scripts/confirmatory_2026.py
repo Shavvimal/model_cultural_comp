@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import beta, binomtest, fisher_exact
 
-from app.culture_map import CulturalMap
+from app.culture_map import HUMAN_MEAN, CulturalMap
 from app.llm_bootstrap import WESTERN_REGIONS, load_responses_2026
 from app.llm_meta import cohort_2026
 
@@ -40,7 +40,6 @@ SEED = 42
 N_BOOT_MODELS = 10_000
 N_BOOT_ITEM_DELTA = 2_000
 N_PERM = 10_000
-HUMAN_MEAN = (0.38, -0.01)
 # Items predicted (from the 2024 qwen2:7b contrast) to move toward the
 # traditional pole under Chinese administration, with the direction that
 # "traditional" takes on each item's raw scale.
@@ -102,7 +101,7 @@ def origin_language_permutation(lang_fx: pd.DataFrame, seed: int = SEED) -> pd.D
         for b in range(N_PERM):
             lab = rng.permutation(is_cn)
             perm[b] = v[lab].mean() - v[~lab].mean()
-        p = float((np.abs(perm) >= abs(obs)).mean())
+        p = float((1 + (np.abs(perm) >= abs(obs)).sum()) / (N_PERM + 1))
         stats[col] = (obs, p)
     return pd.DataFrame(
         [
@@ -119,12 +118,15 @@ def origin_language_permutation(lang_fx: pd.DataFrame, seed: int = SEED) -> pd.D
 
 
 def confucian_distances(
-    boot: pd.DataFrame, country_scores: pd.DataFrame, cohort_fn=cohort_2026
+    boot: pd.DataFrame,
+    country_scores: pd.DataFrame,
+    cohort_fn=cohort_2026,
+    point_estimates: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Per cohort x arm: mean distance to the Confucian centroid, replicate CI.
 
     Cohort-mean distances are formed per replicate index (replicates are
-    aligned across models by construction — same seed, same B), giving a
+    independently drawn across cells and combined by replicate index), giving a
     bootstrap distribution of the cohort mean. Arms are never pooled.
     """
     conf = (
@@ -142,14 +144,19 @@ def confucian_distances(
         boot[["PC1_rescaled", "PC2_rescaled"]].to_numpy() - conf, axis=1
     )
     rows = []
+    points = None if point_estimates is None else point_estimates.set_index("llm")
     for (cohort, lang), g in boot.groupby(["cohort", "language"]):
         per_rep = g.groupby("replicate")["dist_confucian"].mean()
+        point = float(per_rep.mean())
+        if points is not None:
+            xy = points.loc[g["llm"].unique(), ["PC1_rescaled", "PC2_rescaled"]].to_numpy()
+            point = float(np.linalg.norm(xy - conf, axis=1).mean())
         rows.append(
             {
                 "cohort": cohort,
                 "language": lang,
                 "n_models": g["base"].nunique(),
-                "mean_dist_confucian": float(per_rep.mean()),
+                "mean_dist_confucian": point,
                 "ci_lo": float(per_rep.quantile(0.025)),
                 "ci_hi": float(per_rep.quantile(0.975)),
             }
@@ -157,14 +164,27 @@ def confucian_distances(
     return pd.DataFrame(rows)
 
 
-def _cluster_item_means(g: pd.DataFrame, rng: np.random.Generator, n_boot: int) -> np.ndarray:
-    """Cluster-bootstrap replicates of one (cell, item)'s mean value."""
-    by_variant = [grp["value"].to_numpy() for _, grp in g.groupby("system_prompt_id")]
-    k = len(by_variant)
-    sums = np.array([v.sum() for v in by_variant])
-    counts = np.array([len(v) for v in by_variant])
+def _cluster_item_means(
+    g: pd.DataFrame,
+    rng: np.random.Generator,
+    n_boot: int,
+    variants: np.ndarray | None = None,
+) -> np.ndarray:
+    """Pool observed answers across sampled full-cell prompt clusters.
+
+    Empty item groups contribute zero counts. Draws containing no answer
+    use the observed item mean, matching the primary map bootstrap.
+    """
+    grouped = g.groupby("system_prompt_id")["value"].agg(["sum", "count"])
+    if variants is not None:
+        grouped = grouped.reindex(variants, fill_value=0)
+    k = len(grouped)
+    sums = grouped["sum"].to_numpy()
+    counts = grouped["count"].to_numpy()
     draws = rng.integers(0, k, size=(n_boot, k))
-    return sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
+    numer = sums[draws].sum(axis=1)
+    denom = counts[draws].sum(axis=1)
+    return np.divide(numer, denom, out=np.full(n_boot, g["value"].mean()), where=denom > 0)
 
 
 def per_item_language_effects(responses: pd.DataFrame, seed: int = SEED) -> pd.DataFrame:
@@ -182,8 +202,10 @@ def per_item_language_effects(responses: pd.DataFrame, seed: int = SEED) -> pd.D
             zh = gq[gq["language"] == "zh"]
             if en.empty or zh.empty:
                 continue
-            en_reps = _cluster_item_means(en, rng, N_BOOT_ITEM_DELTA)
-            zh_reps = _cluster_item_means(zh, rng, N_BOOT_ITEM_DELTA)
+            en_variants = g.loc[g["language"] == "en", "system_prompt_id"].unique()
+            zh_variants = g.loc[g["language"] == "zh", "system_prompt_id"].unique()
+            en_reps = _cluster_item_means(en, rng, N_BOOT_ITEM_DELTA, en_variants)
+            zh_reps = _cluster_item_means(zh, rng, N_BOOT_ITEM_DELTA, zh_variants)
             delta = zh_reps - en_reps
             rows.append(
                 {
@@ -207,9 +229,9 @@ def per_item_sign_tests(item_fx: pd.DataFrame) -> pd.DataFrame:
         d = g["delta"].to_numpy()
         n_pos = int((d > 0).sum())
         n = int((d != 0).sum())
-        if n == 0:
-            continue
-        p = binomtest(n_pos, n, 0.5, alternative="two-sided").pvalue
+        # An all-tied item is uninformative, but remains in the declared BH
+        # family. Omitting it would make other items' adjusted p-values smaller.
+        p = binomtest(n_pos, n, 0.5, alternative="two-sided").pvalue if n else 1.0
         rows.append(
             {
                 "question": qn,
@@ -241,15 +263,16 @@ def coherence_rate(rates_2026: pd.DataFrame, min_per_question: int = 10) -> pd.D
 
     2024: 4 of 9 attempted Chinese-origin models produced parseable corpora
     (committed in the paper draft). 2026: computed from the parse-rate
-    artefact — a model counts as coherent if every item in its English cell
+    artefact — a model counts as usable if every item in both language cells
     has at least ``min_per_question`` parsed responses. kimi-k3 is excluded
     from the attempted set (billing wall: zero records collected — a
     provisioning failure, not a model behaviour; reported in Appendix A).
     """
-    en = rates_2026[(rates_2026["language"] == "en")]
-    cn = en[en["cohort"].str.lower() == "chinese"]
-    coherent = int((cn["min_per_question"] >= min_per_question).sum())
-    attempted = len(cn)
+    cn = rates_2026[rates_2026["cohort"].str.lower() == "chinese"]
+    by_arm = cn.pivot(index="llm", columns="language", values="min_per_question")
+    by_model = by_arm.reindex(columns=["en", "zh"]).fillna(0).min(axis=1)
+    coherent = int((by_model >= min_per_question).sum())
+    attempted = len(by_model)
     rows = []
     for year, k, n in [("2024", 4, 9), ("2026", coherent, attempted)]:
         lo = beta.ppf(0.025, k, n - k + 1) if k > 0 else 0.0
@@ -306,12 +329,12 @@ def coherence_fisher(coherence: pd.DataFrame) -> pd.DataFrame:
 
 
 def simultaneous_headline(boot: pd.DataFrame, country_scores: pd.DataFrame) -> pd.DataFrame:
-    """The bounds that hold in EVERY replicate of every cell, per arm.
+    """Descriptive extrema over the generated replicates of every cell.
 
     Reported per cell: the minimum (over replicates) share of countries
-    closer to the human mean, and the minimum distance to any non-Western
-    centroid — plus the across-cell floors, which are the numbers the
-    abstract's simultaneous statement is entitled to.
+    closer to the survey reference, and minimum distance to any non-Western
+    centroid. Across-cell floors describe Monte Carlo output, not calibrated
+    simultaneous confidence bounds or the full resampling support.
     """
     countries_xy = country_scores[["PC1_rescaled", "PC2_rescaled"]].to_numpy()
     country_dists = np.linalg.norm(countries_xy - np.array(HUMAN_MEAN), axis=1)
@@ -401,7 +424,7 @@ def main(selftest: bool = False) -> int:
         boot = pd.read_csv("data/llm_bootstrap_replicates_2026.csv")
         country_scores = pd.read_csv("data/corrected_country_scores.csv")
         rates = pd.read_csv("data/llm_parse_rates_2026.csv")
-        cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+        cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
         cm.load_model("data/cultural_map_model.npz")
         responses = load_responses_2026(cm, "data/collection_2026")
 
@@ -410,7 +433,10 @@ def main(selftest: bool = False) -> int:
         "conf_2026_mean_displacement": mean_displacement_ci(lang_fx),
         "conf_2026_origin_permutation": origin_language_permutation(lang_fx),
         "conf_2026_confucian_distances": confucian_distances(
-            boot, country_scores, cohort_fn=(lambda m: "Chinese") if selftest else cohort_2026
+            boot,
+            country_scores,
+            cohort_fn=(lambda m: "Chinese") if selftest else cohort_2026,
+            point_estimates=None if selftest else pd.read_csv("data/llm_ellipses_2026.csv"),
         ),
         "conf_2026_coherence_rate": coherence_rate(rates),
         "conf_2026_simultaneous_headline": simultaneous_headline(boot, country_scores),

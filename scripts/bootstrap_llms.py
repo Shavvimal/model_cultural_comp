@@ -4,12 +4,12 @@ Run from the repo root after scripts/validate_projection.py:
 
     uv run python scripts/bootstrap_llms.py
 
-The 2024 corpus is split by elicitation language (``c-*`` pickles are
+The 2024 corpus is split by elicitation language (``c-*`` JSONLs are
 Chinese administrations, labelled ``<llm> [zh]``) and never pooled. Only
 the item bootstrap is available here — the 2024 harness did not record the
 prompt-variant id — so every ellipse omits the cross-item covariance term
-and is reported as a lower bound, with the 2026 item-vs-cluster ratios as
-the empirical scale of the likely understatement (write-up §3.4).
+and is an independence-assumption sensitivity, not a guaranteed lower bound.
+The 2026 item-vs-cluster ratios quantify the difference in that cohort.
 
 Writes:
     data/llm_bootstrap_replicates.csv
@@ -30,6 +30,7 @@ from app.llm_bootstrap import (
     centroid_statistics,
     confidence_ellipses,
     load_transformed_responses,
+    project_cell_means,
 )
 from app.region_svm import RegionClassifier
 
@@ -38,7 +39,7 @@ SEED = 42
 
 
 def main() -> int:
-    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+    cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
     cm.load_model("data/cultural_map_model.npz")
     country_scores = pd.read_csv("data/corrected_country_scores.csv")
 
@@ -46,12 +47,13 @@ def main() -> int:
     print(f"{responses['llm'].nunique()} model-language cells, {len(responses)} stored responses")
 
     boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT, seed=SEED)
-    ellipses = confidence_ellipses(boot)
+    points = project_cell_means(cm, responses)
+    ellipses = confidence_ellipses(boot, point_estimates=points)
 
     clf = RegionClassifier().fit(country_scores)
     print(f"SVM 5-fold CV accuracy: {clf.cv_accuracy:.3f} (attach to every region claim)")
-    regions = clf.region_assignments(boot)
-    headline = centroid_statistics(boot, country_scores)
+    regions = clf.region_assignments(boot, point_estimates=points)
+    headline = centroid_statistics(boot, country_scores, point_estimates=points)
     diagnostics = central_tendency_diagnostics(cm, responses)
 
     summary = ellipses.merge(regions, on="llm").merge(headline, on="llm")

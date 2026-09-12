@@ -1,13 +1,13 @@
 """Data-integrity and QC gate for the 2026 collection — analysis-plan §0.
 
-No downstream statistic runs until every check here has been reported.
+No downstream statistic runs unless the full expected design and stored responses
+pass integrity checks. Low parse rates are reported, not fatal.
 Reads data/collection_2026/*.jsonl (both arms), normalises field types
 (resumed runs serialised repeat/system_prompt_id as both str and int, which
 would defeat a naive drop_duplicates), and reports:
 
   1. design completeness per model x language cell (500 = 10 x 10 x 5)
-  2. dedup audit (duplicates removed; mixed-type duplicates a naive key
-     would have missed)
+  2. duplicate audit (duplicates are fatal and are never silently removed)
   3. parse-rate table per model x language x item (flags <95% and <10)
   4. failure taxonomy from raw_content (refusal / format / out-of-range /
      empty), with counts per model x language x item
@@ -33,10 +33,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from app.cloud_survey import N_REPEATS, PARSERS, PROMPT_VARIANTS
 from app.culture_map import ITEM_VALID_RANGES, IV_QNS
+from app.llm_meta import CHINESE_LLMS_2026, WESTERN_LLMS_2026
 
 RAW_DIR = Path("data/collection_2026")
-DESIGN_CALLS = 500  # 10 items x 10 variants x 5 repeats
+# llm_meta records kimi-k3 as attempted but excluded before any responses:
+# its billing-only attempts are not one of the 17 collected model cells.
+EXPECTED_MODELS = (CHINESE_LLMS_2026 | WESTERN_LLMS_2026) - {"kimi-k3"}
+EXPECTED_LANGUAGES = tuple(PROMPT_VARIANTS)
+DESIGN_CALLS = len(IV_QNS) * len(PROMPT_VARIANTS["en"]["persona"]) * N_REPEATS
+KEY_COLUMNS = ["llm", "language", "question", "system_prompt_id", "repeat"]
 PARSE_TARGET = 0.95
 MIN_PER_QUESTION = 10
 
@@ -68,77 +75,173 @@ REFUSAL_MARKERS = [
 CJK_RE = re.compile(r"[一-鿿]")
 
 
+def _integer(value) -> int:
+    """Accept the historical integer/string encodings, never truncate floats."""
+    if isinstance(value, bool) or not isinstance(value, (int, str, np.integer)):
+        raise ValueError(f"expected integer or integer string, got {value!r}")
+    if isinstance(value, str) and not re.fullmatch(r"[+-]?\d+", value):
+        raise ValueError(f"invalid integer string: {value!r}")
+    return int(value)
+
+
 def load_raw() -> pd.DataFrame:
-    """Load every record with types normalised; keep error rows."""
+    """Load all terminal records; normalize historical types without deduping."""
     paths = sorted(RAW_DIR.glob("*.jsonl"))
     if not paths:
         raise FileNotFoundError(f"no JSONL files in {RAW_DIR}")
     records = []
+    required = {
+        "llm",
+        "question",
+        "system_prompt_id",
+        "repeat",
+        "attempts",
+        "duration_ms",
+        "raw_content",
+        "thinking",
+        "parsed",
+        "error",
+    }
     for path in paths:
         with path.open() as f:
-            for line in f:
-                rec = json.loads(line)
+            for lineno, line in enumerate(f, 1):
+                try:
+                    rec = json.loads(line)
+                    if not isinstance(rec, dict) or not required <= rec.keys():
+                        raise ValueError("record is not an object with all required fields")
+                    rec["_naive_key"] = repr(tuple(rec.get(k) for k in KEY_COLUMNS))
+                    rec["language"] = "en" if rec.get("language") is None else rec["language"]
+                    if any(
+                        not isinstance(rec[k], str) or not rec[k]
+                        for k in ("llm", "question", "language")
+                    ):
+                        raise ValueError("model, item and language must be nonempty strings")
+                    for name in ("system_prompt_id", "repeat", "attempts"):
+                        rec[name] = _integer(rec[name])
+                    rec["duration_ms"] = float(rec["duration_ms"])
+                except (ValueError, TypeError) as exc:
+                    raise ValueError(f"{path.name}:{lineno}: {exc}") from exc
                 rec["_file"] = path.name
+                rec["_line"] = lineno
                 records.append(rec)
+    if not records:
+        raise ValueError("no terminal records found")
     df = pd.DataFrame(records)
-    df["language"] = df.get("language", pd.Series([None] * len(df))).fillna("en")
-    # Resumed runs serialised these as str; originals as int. Normalise
-    # before any dedup or grouping, or duplicates survive the key.
-    df["system_prompt_id"] = df["system_prompt_id"].astype(int)
-    df["repeat"] = df["repeat"].astype(int)
-    df["attempts"] = pd.to_numeric(df["attempts"], errors="raise").astype(int)
-    df["duration_ms"] = pd.to_numeric(df["duration_ms"], errors="raise").astype(float)
+    # Preserve JSON nulls and integer/list shapes; pandas inference must not
+    # turn null errors into NaN or integer answers into floating-point values.
+    for name in ("parsed", "error", "prompt_variant"):
+        df[name] = pd.Series([rec.get(name) for rec in records], dtype=object)
+    # A terminal parse failure may store null content/thinking.
     df["raw_content"] = df["raw_content"].fillna("")
     df["thinking"] = df["thinking"].fillna("")
     return df
 
 
-def dedup_audit(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Keep-last dedup on the normalised key; report what was removed."""
-    key = ["llm", "language", "question", "system_prompt_id", "repeat"]
-    n_dupes = int(df.duplicated(subset=key, keep="last").sum())
-    # What a naive (un-normalised) key would have kept: recompute with the
-    # original mixed-type values to quantify the hazard.
-    naive = df.assign(
-        _sp=df["system_prompt_id"].astype(str),
-        _rp=df["repeat"].astype(str),
-    )
-    n_naive = int(
-        naive.duplicated(subset=["llm", "language", "question", "_sp", "_rp"], keep="last").sum()
-    )
-    deduped = df.drop_duplicates(subset=key, keep="last")
-    report = pd.DataFrame(
+def dedup_audit(df: pd.DataFrame) -> pd.DataFrame:
+    """Report normalized-key duplicates. None are removed from the corpus."""
+    n_dupes = int(df.duplicated(subset=KEY_COLUMNS, keep="last").sum())
+    n_naive = int(df["_naive_key"].duplicated(keep="last").sum())
+    return pd.DataFrame(
         [
             {
-                "duplicates_removed": n_dupes,
+                "duplicates_detected": n_dupes,
+                "duplicates_removed": 0,
                 "naive_key_would_remove": n_naive,
                 "mixed_type_hazard": n_dupes - n_naive,
                 "records_before": len(df),
-                "records_after": len(deduped),
+                "records_after": len(df),
             }
         ]
     )
-    return deduped, report
 
 
 def cell_completeness(df: pd.DataFrame) -> pd.DataFrame:
-    expected = {(q, s, r) for q in IV_QNS for s in range(10) for r in range(5)}
+    """Enumerate the full primary design, including entirely absent cells."""
+    groups = dict(tuple(df.groupby(["llm", "language"], dropna=False)))
+    cells = {(m, lang) for m in EXPECTED_MODELS for lang in EXPECTED_LANGUAGES}
     rows = []
-    for (llm, lang), g in df.groupby(["llm", "language"]):
+    for llm, lang in cells | set(groups):
+        g = groups.get((llm, lang), df.iloc[:0])
+        is_expected = (llm, lang) in cells
+        expected = (
+            {
+                (q, s, r)
+                for q in IV_QNS
+                for s in range(len(PROMPT_VARIANTS[lang]["persona"]))
+                for r in range(N_REPEATS)
+            }
+            if is_expected
+            else set()
+        )
         got = set(zip(g["question"], g["system_prompt_id"], g["repeat"], strict=True))
-        missing = expected - got
+        missing, extra = expected - got, got - expected
+        duplicates = len(g) - len(got)
         rows.append(
             {
                 "llm": llm,
                 "language": lang,
                 "records": len(g),
-                "design": DESIGN_CALLS,
-                "complete": not missing,
+                "design": len(expected),
+                "expected_cell": is_expected,
+                "complete": is_expected and not (missing or extra or duplicates),
                 "missing_keys": len(missing),
-                "extra_keys": len(got - expected),
+                "extra_keys": len(extra),
+                "duplicate_keys": duplicates,
             }
         )
     return pd.DataFrame(rows).sort_values(["language", "llm"])
+
+
+def record_integrity(df: pd.DataFrame) -> pd.DataFrame:
+    """Validate stored answer shape/range and agreement with retained raw text."""
+    rows = []
+    for rec in df.to_dict("records"):
+        problems = []
+        qn, parsed, error = rec["question"], rec["parsed"], rec["error"]
+        if rec["llm"] not in EXPECTED_MODELS:
+            problems.append("unknown/uncollected model")
+        if rec["language"] not in EXPECTED_LANGUAGES:
+            problems.append("unknown language")
+        if rec["prompt_variant"] not in (None, "persona"):
+            problems.append("non-persona trial in primary corpus")
+        if rec["attempts"] < 1 or not np.isfinite(rec["duration_ms"]) or rec["duration_ms"] < 0:
+            problems.append("invalid attempts or duration")
+        if not isinstance(rec["raw_content"], str) or not isinstance(rec["thinking"], str):
+            problems.append("content/thinking must be text")
+        if rec.get("transport_failure", False) is True:
+            problems.append("transport-only task is not a terminal answer")
+        if error is None:
+            try:
+                if qn not in PARSERS:
+                    raise ValueError("unknown item")
+                if qn in ("Y002", "Y003"):
+                    if (
+                        not isinstance(parsed, list)
+                        or not parsed
+                        or any(type(v) is not int for v in parsed)
+                    ):
+                        raise ValueError("stored choices must be a nonempty integer list")
+                elif type(parsed) is not int:
+                    raise ValueError("stored scalar must be an integer")
+                reparsed = PARSERS[qn].parse(rec["raw_content"])
+                if isinstance(reparsed, tuple):
+                    reparsed = list(reparsed)
+                if reparsed != parsed:
+                    raise ValueError("stored answer disagrees with reparsed raw content")
+            except (ValueError, TypeError, KeyError, AttributeError) as exc:
+                problems.append(f"invalid parsed response: {exc}")
+        elif not isinstance(error, str) or not error or parsed is not None:
+            problems.append("failed terminal record needs a nonempty error and null parsed value")
+        if problems:
+            rows.append(
+                {
+                    "file": rec["_file"],
+                    "line": rec["_line"],
+                    **{k: rec[k] for k in KEY_COLUMNS},
+                    "problems": "; ".join(problems),
+                }
+            )
+    return pd.DataFrame(rows, columns=["file", "line", *KEY_COLUMNS, "problems"])
 
 
 def parse_rate_table(df: pd.DataFrame) -> pd.DataFrame:
@@ -246,7 +349,9 @@ def determinism_census(df: pd.DataFrame) -> pd.DataFrame:
                 "mean_item_entropy_bits": round(mean_h, 3),
             }
         )
-    return pd.DataFrame(rows).sort_values(["language", "llm"])
+    return pd.DataFrame(
+        rows, columns=["llm", "language", "items_constant_all_calls", "mean_item_entropy_bits"]
+    ).sort_values(["language", "llm"])
 
 
 def thinking_inventory(df: pd.DataFrame) -> pd.DataFrame:
@@ -305,23 +410,44 @@ def index_validity(df: pd.DataFrame) -> pd.DataFrame:
                 "max": float(arr.max()),
             }
         )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["question", "n_parsed", "out_of_range", "min", "max"])
 
 
 def main() -> int:
-    df = load_raw()
-    deduped, dedup_report = dedup_audit(df)
+    try:
+        df = load_raw()
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"QC FAILED: {exc}", file=sys.stderr)
+        return 1
+    dedup_report = dedup_audit(df)
+    cells = cell_completeness(df)
+    integrity = record_integrity(df)
+    preliminary = {
+        "qc_2026_dedup": dedup_report,
+        "qc_2026_cells": cells,
+        "qc_2026_integrity_errors": integrity,
+    }
+    for name, frame in preliminary.items():
+        frame.to_csv(f"data/{name}.csv", index=False)
+    if not cells["complete"].all() or not integrity.empty:
+        print(
+            "QC FAILED: incomplete/extra/duplicate design keys or invalid responses.",
+            file=sys.stderr,
+        )
+        print(cells.loc[~cells["complete"]].to_string(index=False))
+        if not integrity.empty:
+            print(integrity.head(30).to_string(index=False))
+        return 1
 
     artefacts = {
-        "qc_2026_dedup": dedup_report,
-        "qc_2026_cells": cell_completeness(deduped),
-        "qc_2026_parse_rates": parse_rate_table(deduped),
-        "qc_2026_failures": failure_taxonomy(deduped),
-        "qc_2026_attempts": retry_intensity(deduped),
-        "qc_2026_latency": latency_sanity(deduped),
-        "qc_2026_determinism": determinism_census(deduped),
-        "qc_2026_thinking": thinking_inventory(deduped),
-        "qc_2026_index_validity": index_validity(deduped),
+        **preliminary,
+        "qc_2026_parse_rates": parse_rate_table(df),
+        "qc_2026_failures": failure_taxonomy(df),
+        "qc_2026_attempts": retry_intensity(df),
+        "qc_2026_latency": latency_sanity(df),
+        "qc_2026_determinism": determinism_census(df),
+        "qc_2026_thinking": thinking_inventory(df),
+        "qc_2026_index_validity": index_validity(df),
     }
 
     with pd.option_context("display.width", 220, "display.max_rows", 400):
@@ -350,6 +476,7 @@ def main() -> int:
     for name, frame in artefacts.items():
         frame.to_csv(f"data/{name}.csv", index=False)
     print(f"\nWrote {len(artefacts)} data/qc_2026_*.csv artefacts.")
+    print("QC PASSED: the full primary design and stored responses are valid.")
     return 0
 
 
