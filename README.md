@@ -98,6 +98,8 @@ prefixes, exclusions, known translation issues and missing historical metadata.
    fixed before fitting. Missing entries are integrated out in the observed-data
    likelihood. L-BFGS-B uses three starts; each must satisfy a maximum absolute
    gradient of at most `1e-7` for negative log likelihood per informative row.
+   If an objective-change stop occurs above that bound, the same likelihood
+   is centered numerically and resumed within the original iteration budget.
    The highest-likelihood converged start is retained. This is direct likelihood
    optimisation, not EM, and multiple starts do not prove a global optimum.
    Missing entries are then completed with exact Gaussian conditional means.

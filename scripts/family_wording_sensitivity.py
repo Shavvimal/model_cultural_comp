@@ -12,10 +12,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import binomtest, false_discovery_control
 
-from app.appendix_contrasts import origin_profile_permutation
+from app.appendix_contrasts import origin_profile_permutation, standardise_profiles
 from app.culture_map import IV_QNS
 from app.llm_meta import FAMILY_OF, cohort_2026
-from scripts.appendix_contrasts_2026 import standardise_profiles
 
 KNOWN_Y003_WORDING_MODELS = {"glm-5.1", "glm-5.2", "kimi-k2.6", "qwen3.5:397b"}
 

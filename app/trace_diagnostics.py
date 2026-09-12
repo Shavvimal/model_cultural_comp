@@ -23,6 +23,26 @@ PREFIX_FAMILY = {
 }
 
 
+def validate_trace_labels(labels: pd.DataFrame) -> pd.DataFrame:
+    """Accept binary codes and genuine missing values without hiding corruption.
+
+    Missing labels are part of the agreement analysis. A nonnumeric or out-of-
+    range stored code is a different condition and must stop that analysis.
+    The same boundary applies to optional human and LLM annotation rows.
+    """
+    validated = labels.copy()
+    for code in CODES:
+        values = validated[code]
+        try:
+            numeric = pd.to_numeric(values, errors="raise")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"{code}: labels must be binary or missing") from exc
+        if (values.notna() & numeric.isna()).any() or not numeric.dropna().isin([0, 1]).all():
+            raise ValueError(f"{code}: labels must be binary or missing")
+        validated[code] = numeric
+    return validated
+
+
 def vote_counts(votes: pd.DataFrame) -> tuple[pd.Series, dict]:
     """Strict majority with explicit ties, missing labels and denominator bounds."""
     n = votes.notna().sum(axis=1)
@@ -49,9 +69,11 @@ def vote_counts(votes: pd.DataFrame) -> tuple[pd.Series, dict]:
     }
 
 
-def trace_diagnostics(long: pd.DataFrame, sample: pd.DataFrame):
+def trace_diagnostics(
+    long: pd.DataFrame, sample: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Self-rater sensitivity, selected-trace coverage and prefix-code rates."""
-    long, sample = long.copy(), sample.copy()
+    long, sample = validate_trace_labels(long), sample.copy()
     for frame in [long, sample]:
         for col in ["system_prompt_id", "repeat"]:
             frame[col] = pd.to_numeric(frame[col]).astype(int)
@@ -66,9 +88,6 @@ def trace_diagnostics(long: pd.DataFrame, sample: pd.DataFrame):
     majority_codes, sensitivity, prefix_rows = {}, [], []
     for code in CODES:
         good = long[long["error"].isna() & long["annotator"].isin(raters)].copy()
-        good[code] = pd.to_numeric(good[code], errors="coerce")
-        if not good[code].dropna().isin([0, 1]).all():
-            raise ValueError(f"{code}: labels must be binary")
         matrix = good.pivot(index=KEY, columns="annotator", values=code).reindex(
             index=index, columns=raters
         )

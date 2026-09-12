@@ -17,7 +17,12 @@ not yet been published.
   likelihood optimisation, multiple starts, convergence diagnostics and exact
   Gaussian conditional completion. Preserve the frozen score-side varimax path.
 - Resume premature optimizer objective-change stops within the original
-  iteration budget, retaining the strict gradient tolerance on every start.
+  iteration budget using a numerically centered evaluation of the same
+  likelihood, retaining the strict gradient tolerance on every start.
+- Reject undefined profile correlations, malformed annotation codes and invalid
+  collection execution limits before they can produce misleading results.
+- Require matching recorded request/host provenance when resuming collection;
+  historical records with unknown settings require a new output directory.
 - Correct affine offsets, item validity and empty-cluster count pooling; project
   observed item means and use paired observed displacement estimates.
 - Correct permutation denominators, tie handling, simultaneous headline counts,
@@ -53,6 +58,8 @@ not yet been published.
   paper project. Retire the combined source/corpus release-candidate builder.
 - Share family metadata in `app/llm_meta.py`; rename the scientific
   `final_review_sensitivities.py` driver to `family_wording_sensitivity.py`.
+- Keep shared profile standardization in `app/appendix_contrasts.py`; scripts
+  consume this application helper instead of importing it from another CLI.
 - Remove notebook-only and unused direct dependencies and update the lockfile
   without upgrading retained numerical packages.
 - Retain historical plan entries and older changelog sections as dated records;

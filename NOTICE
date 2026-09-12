@@ -40,6 +40,8 @@ app/ppca.py
       observed-data Gaussian likelihood optimisation using L-BFGS-B, with
       multiple starts and explicit gradient-convergence checks. Missing
       entries are completed with fitted Gaussian conditional means.
+    - Premature objective-change stops can resume with a numerically centered
+      evaluation of that likelihood, preserving tolerance and iteration limits.
     - Complete data use the analytic PPCA maximum-likelihood solution.
       Saved state includes Gaussian loadings, residual variance and fit
       diagnostics, separately from the orthonormal projection axes.

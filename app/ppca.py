@@ -12,16 +12,21 @@ orthonormal score axes; ``loadings_`` and ``noise_variance_`` retain the distinc
 Gaussian model parameters.
 """
 
+from pathlib import Path
+from typing import Self
+
 import numpy as np
-from scipy.linalg import cho_factor, cho_solve, orth
+from numpy.typing import ArrayLike
+from scipy.linalg import cho_factor, cho_solve, orth, solve_triangular
 from scipy.optimize import minimize
 
 _NOISE_FLOOR = 1e-10
 # Bound attempts even when floating-point objective stagnation consumes no iterations.
 _MAX_OPTIMIZER_RESTARTS = 3
+PatternStatistics = list[tuple[np.ndarray, int, np.ndarray]]
 
 
-def _pattern_statistics(data):
+def _pattern_statistics(data: np.ndarray) -> PatternStatistics:
     """Return observed-index/count/scatter triples, without imputing anything."""
     patterns, membership = np.unique(np.isfinite(data), axis=0, return_inverse=True)
     groups = []
@@ -33,7 +38,13 @@ def _pattern_statistics(data):
     return groups
 
 
-def _negative_log_likelihood(parameters, groups, width, dimensions, n_rows):
+def _negative_log_likelihood(
+    parameters: np.ndarray,
+    groups: PatternStatistics,
+    width: int,
+    dimensions: int,
+    n_rows: int,
+) -> tuple[float, np.ndarray]:
     """Mean observed-row NLL and analytic gradient for fixed standardization."""
     loadings = parameters[:-1].reshape(width, dimensions)
     noise = np.exp(parameters[-1])
@@ -53,6 +64,48 @@ def _negative_log_likelihood(parameters, groups, width, dimensions, n_rows):
     return loss / n_rows, np.r_[gradient.ravel(), noise * noise_gradient] / n_rows
 
 
+def _whiten(matrix: np.ndarray, factor: np.ndarray) -> np.ndarray:
+    """Apply a Cholesky factor's inverse to both sides of a symmetric matrix."""
+    left = solve_triangular(factor, matrix, lower=True)
+    return solve_triangular(factor, left.T, lower=True).T
+
+
+def _likelihood_change(
+    parameters: np.ndarray,
+    reference: np.ndarray,
+    groups: PatternStatistics,
+    width: int,
+    dimensions: int,
+    n_rows: int,
+) -> float:
+    """NLL(parameters) - NLL(reference), without subtracting nearly equal losses.
+
+    For C = C0 + delta and C0 = L0 L0.T, diagonalize D = L0^-1 delta L0^-T.
+    The log-determinant change is sum(log1p(eigenvalues(D))); the inverse
+    change in that basis is -D / (I + D). This resolves improvements below
+    the rounding error of the full likelihood when a line search stalls.
+    """
+    loadings = reference[:-1].reshape(width, dimensions)
+    difference = (parameters[:-1] - reference[:-1]).reshape(width, dimensions)
+    noise = np.exp(reference[-1])
+    noise_difference = noise * np.expm1(parameters[-1] - reference[-1])
+    change = 0.0
+    for observed, count, scatter in groups:
+        w, dw = loadings[observed], difference[observed]
+        identity = np.eye(len(w))
+        factor = np.linalg.cholesky(w @ w.T + noise * identity)
+        delta = w @ dw.T + dw @ w.T + dw @ dw.T + noise_difference * identity
+
+        eigenvalues, axes = np.linalg.eigh(_whiten(delta, factor))
+        if np.any(eigenvalues <= -1):
+            raise ValueError("likelihood continuation covariance is not positive definite")
+        rotated_scatter = np.diag(axes.T @ _whiten(scatter, factor) @ axes)
+        change += 0.5 * np.sum(
+            count * np.log1p(eigenvalues) - eigenvalues / (1 + eigenvalues) * rotated_scatter
+        )
+    return float(change / n_rows)
+
+
 class PPCA:
     """Fit Gaussian PPCA, then expose the existing completed-data score axes.
 
@@ -61,7 +114,7 @@ class PPCA:
     ``transform()`` projects the conditionally completed training observations.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.C = None
         self.means = None
         self.stds = None
@@ -85,15 +138,15 @@ class PPCA:
 
     def fit(
         self,
-        data,
-        d=None,
-        tol=1e-7,
-        min_obs=10,
-        seed=None,
-        verbose=False,
-        max_iter=1000,
-        n_init=3,
-    ):
+        data: ArrayLike,
+        d: int | None = None,
+        tol: float = 1e-7,
+        min_obs: int = 10,
+        seed: int | None = None,
+        verbose: bool = False,
+        max_iter: int = 1000,
+        n_init: int = 3,
+    ) -> Self:
         """Fit an unweighted, fixed-standardization Gaussian PPCA model.
 
         ``d`` must be between 1 and retained width minus 1 (default: width minus
@@ -106,7 +159,8 @@ class PPCA:
         of the negative log likelihood *per informative row*, including log noise
         variance. An objective-change message alone is not convergence. Every
         start must satisfy that gradient bound within ``max_iter`` iterations;
-        objective-change stops may resume within that same iteration budget.
+        objective-change stops may resume with a numerically centered likelihood
+        within that same iteration budget.
         Otherwise fitting raises. The converged start with greatest likelihood
         is retained. Multiple starts reduce, but do not rule out, local optima.
 
@@ -190,10 +244,12 @@ class PPCA:
                     x0[-1] += rng.normal(scale=0.2)
                 history = []
 
-                def objective(x):
+                def objective(x: np.ndarray) -> tuple[float, np.ndarray]:
                     return _negative_log_likelihood(x, groups, width, d, informative_rows)
 
-                def record(x, history=history, start=start):
+                def record(
+                    x: np.ndarray, history: list[float] = history, start: int = start
+                ) -> None:
                     value, grad = objective(x)
                     history.append(-value * informative_rows)
                     if verbose:
@@ -204,9 +260,10 @@ class PPCA:
 
                 history.append(-objective(x0)[0] * informative_rows)
                 iterations = 0
+                search_objective = objective
                 for _ in range(_MAX_OPTIMIZER_RESTARTS + 1):
                     result = minimize(
-                        objective,
+                        search_objective,
                         x0,
                         jac=True,
                         method="L-BFGS-B",
@@ -231,9 +288,19 @@ class PPCA:
                     ):
                         break
                     # L-BFGS-B may report an unchanged objective before the gradient
-                    # converges. Reset its curvature history, retaining the same
-                    # parameters, likelihood, bounds and strict acceptance criterion.
+                    # converges. Centering the same likelihood resolves changes
+                    # smaller than the rounding error of its absolute value.
                     x0 = result.x
+                    reference = x0.copy()
+
+                    def search_objective(
+                        x: np.ndarray, reference: np.ndarray = reference
+                    ) -> tuple[float, np.ndarray]:
+                        change = _likelihood_change(
+                            x, reference, groups, width, d, informative_rows
+                        )
+                        return change, objective(x)[1]
+
                 if not np.isfinite(loss) or not np.isfinite(norm) or norm > tol:
                     raise RuntimeError(
                         f"PPCA likelihood start {start + 1}/{n_init} did not converge within "
@@ -289,7 +356,7 @@ class PPCA:
         self.likelihood_history_ = np.array(histories[best])
         return self
 
-    def transform(self, data=None):
+    def transform(self, data: ArrayLike | None = None) -> np.ndarray:
         """Project complete raw rows, or the completed training rows if omitted."""
         if self.C is None:
             raise RuntimeError("Fit the model first.")
@@ -313,7 +380,7 @@ class PPCA:
             raise ValueError("transform() requires complete finite observations")
         return ((data - self.means) / self.stds) @ self.C
 
-    def state_dict(self):
+    def state_dict(self) -> dict[str, np.ndarray | float | int | bool | str]:
         """Return only pickle-free fitted parameters/diagnostics, never microdata."""
         if self.C is None:
             raise RuntimeError("Fit the model first.")
@@ -343,11 +410,11 @@ class PPCA:
             if getattr(self, name) is not None
         }
 
-    def save(self, fpath):
+    def save(self, fpath: str | Path) -> None:
         """Save projection/Gaussian parameters and convergence evidence, not data."""
         np.savez(fpath, **self.state_dict())
 
-    def load(self, fpath):
+    def load(self, fpath: str | Path) -> Self:
         """Load a new model or a legacy projection-only archive without pickle."""
         loaded = PPCA()
         with np.load(fpath, allow_pickle=False) as archive:

@@ -119,3 +119,24 @@ def test_manifest_cannot_include_survey_pickle(corpus, tmp_path):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="unsafe"):
         load_manifest(path)
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        [],
+        {"schema_version": True, "files": [{}]},
+        {"schema_version": 1, "files": {"unexpected": "mapping"}},
+        {"schema_version": 1, "files": [None]},
+        {"schema_version": 1, "files": [{"path": "data/trace_samples_2026.json"}]},
+        {
+            "schema_version": 1,
+            "files": [{"path": "data/trace_samples_2026.json", "bytes": 3, "sha256": None}],
+        },
+    ],
+)
+def test_malformed_manifest_fails_at_boundary(tmp_path, manifest):
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        load_manifest(path)

@@ -5,7 +5,7 @@ import pytest
 from scipy.optimize import OptimizeResult, minimize
 from scipy.stats import multivariate_normal
 
-from app.ppca import PPCA
+from app.ppca import PPCA, _likelihood_change, _negative_log_likelihood, _pattern_statistics
 
 
 @pytest.fixture(scope="module")
@@ -173,6 +173,32 @@ def test_iteration_exhaustion_fails_without_replacing_fit(incomplete_data, fitte
     with pytest.raises(RuntimeError, match="did not converge"):
         model.fit(incomplete_data, d=2, min_obs=1, seed=42, max_iter=1)
     np.testing.assert_array_equal(model.C, prior)
+
+
+def test_centered_likelihood_matches_independent_density_difference(incomplete_data, fitted):
+    data = (incomplete_data - fitted.means) / fitted.stds
+    reference = np.r_[fitted.loadings_.ravel(), np.log(fitted.noise_variance_)]
+    parameters = reference + np.random.default_rng(87).normal(scale=0.01, size=len(reference))
+    expected = (
+        row_log_likelihood(data, fitted.loadings_, fitted.noise_variance_)
+        - row_log_likelihood(data, parameters[:-1].reshape(6, 2), np.exp(parameters[-1]))
+    ) / len(data)
+    groups = _pattern_statistics(data)
+    actual = _likelihood_change(parameters, reference, groups, 6, 2, len(data))
+    assert actual == pytest.approx(expected, abs=3e-14)
+    assert _likelihood_change(reference, reference, groups, 6, 2, len(data)) == 0
+
+
+def test_centered_likelihood_resolves_tiny_descent_steps(incomplete_data, fitted):
+    data = (incomplete_data - fitted.means) / fitted.stds
+    groups = _pattern_statistics(data)
+    reference = np.r_[fitted.loadings_.ravel() + 0.01, np.log(fitted.noise_variance_)]
+    _, gradient = _negative_log_likelihood(reference, groups, 6, 2, len(data))
+    parameters = reference - 1e-12 * gradient
+    first_order = gradient @ (parameters - reference)
+    actual = _likelihood_change(parameters, reference, groups, 6, 2, len(data))
+    assert actual < 0
+    assert actual == pytest.approx(first_order, rel=1e-6, abs=0)
 
 
 def test_premature_objective_stop_resumes_within_iteration_budget(monkeypatch, incomplete_data):

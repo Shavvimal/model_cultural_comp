@@ -43,7 +43,12 @@ from app.agreement import (
     percent_agreement,
 )
 from app.trace_codebook import CODES
-from app.trace_diagnostics import CODE_LABELS, trace_diagnostics, vote_counts
+from app.trace_diagnostics import (
+    CODE_LABELS,
+    trace_diagnostics,
+    validate_trace_labels,
+    vote_counts,
+)
 
 LABELS = Path("data/trace_labels_2026.csv")
 OUT_AGREEMENT = Path("data/trace_agreement_2026.csv")
@@ -71,9 +76,7 @@ def wide(long: pd.DataFrame, code: str, trace_index: pd.MultiIndex | None = None
 def main(output_dir: str = "data") -> int:
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
-    long = pd.read_csv(LABELS)
-    for code in CODES:
-        long[code] = pd.to_numeric(long[code], errors="coerce")
+    long = validate_trace_labels(pd.read_csv(LABELS))
     annotators = sorted(long["annotator"].unique())
     llm_annotators = [a for a in annotators if a != "human"]
     print(f"annotators: {annotators}  (adjudicating over {llm_annotators})")

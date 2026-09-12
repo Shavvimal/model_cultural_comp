@@ -21,6 +21,36 @@ def make(tmp_path, **kw) -> CloudSurvey:
     return CloudSurvey(out_dir=tmp_path, api_key="test-key", **kw)
 
 
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"concurrency": 0},
+        {"concurrency": -1},
+        {"concurrency": True},
+        {"concurrency": 1.5},
+        {"concurrency": "2"},
+        {"timeout_s": 0},
+        {"timeout_s": -1},
+        {"timeout_s": float("inf")},
+        {"timeout_s": float("nan")},
+        {"timeout_s": True},
+        {"timeout_s": "300"},
+    ],
+)
+def test_invalid_execution_limits_fail_before_creating_resources(tmp_path, monkeypatch, invalid):
+    from unittest.mock import Mock
+
+    from app import cloud_survey
+
+    client = Mock()
+    monkeypatch.setattr(cloud_survey, "AsyncClient", client)
+    output = tmp_path / "collection"
+    with pytest.raises(ValueError, match=next(iter(invalid))):
+        make(output, **invalid)
+    client.assert_not_called()
+    assert not output.exists()
+
+
 class TestPersonaProtocol:
     def test_cell_is_500_calls_over_ten_prefixes(self, tmp_path):
         tasks = make(tmp_path).tasks_for_model()
@@ -182,12 +212,20 @@ class TestProvenanceAndAttempts:
         assert audit[0]["raw_content"] == "I cannot answer"
         assert audit[1]["raw_content"] == "1"
 
-    def test_resume_normalizes_old_indices_and_rejects_corrupt_or_duplicate_log(self, tmp_path):
+    def test_resume_normalizes_indices_and_rejects_corrupt_or_duplicate_log(self, tmp_path):
         import json
 
         survey = make(tmp_path)
         path = survey._jsonl_path("model")
-        record = {"llm": "model", "question": "A008", "system_prompt_id": "0", "repeat": "0"}
+        record = {
+            "llm": "model",
+            "question": "A008",
+            "system_prompt_id": "0",
+            "repeat": "0",
+            "schema_version": 2,
+            "request": survey._request_for("model", "A008", 0),
+            "request_provenance": {"host": survey.host},
+        }
         line = json.dumps(record) + "\n"
         path.write_text(line)
         assert survey._completed("model") == {("A008", 0, 0)}
@@ -196,6 +234,55 @@ class TestProvenanceAndAttempts:
             survey._completed("model")
         path.write_text(line + '{"llm":')
         with pytest.raises(ValueError, match=r"model\.jsonl:2"):
+            survey._completed("model")
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            {"generation_options": {"temperature": 0.0}},
+            {"generation_options": None},
+            {"thinking": False},
+            {"host": "https://other-provider.invalid"},
+        ],
+    )
+    def test_resume_rejects_changed_request_before_making_any_call(
+        self, tmp_path, monkeypatch, changed
+    ):
+        import asyncio
+        import json
+        from unittest.mock import AsyncMock
+
+        original_options = {"generation_options": {"temperature": 0.7}, "thinking": "low"}
+        original = make(tmp_path, **original_options)
+        monkeypatch.setattr(
+            original, "_call_once", AsyncMock(return_value={"message": {"content": "1"}})
+        )
+        record = asyncio.run(original._run_task("model", "A008", 0, 0))
+        original._jsonl_path("model").write_text(json.dumps(record) + "\n")
+        resumed = make(tmp_path, **(original_options | changed))
+        call = AsyncMock()
+        monkeypatch.setattr(resumed, "_call_once", call)
+        with pytest.raises(ValueError, match="different request configuration"):
+            asyncio.run(resumed.run_model("model"))
+        call.assert_not_awaited()
+
+    @pytest.mark.parametrize("missing", ["schema_version", "request", "request_provenance"])
+    def test_resume_requires_recorded_provenance_even_with_default_options(self, tmp_path, missing):
+        import json
+
+        survey = make(tmp_path)
+        record = {
+            "llm": "model",
+            "question": "A008",
+            "system_prompt_id": 0,
+            "repeat": 0,
+            "schema_version": 2,
+            "request": survey._request_for("model", "A008", 0),
+            "request_provenance": {"host": survey.host},
+        }
+        record.pop(missing)
+        survey._jsonl_path("model").write_text(json.dumps(record) + "\n")
+        with pytest.raises(ValueError, match="new output directory"):
             survey._completed("model")
 
     def test_exhausted_parse_failure_is_a_completed_trial(self, tmp_path, monkeypatch):

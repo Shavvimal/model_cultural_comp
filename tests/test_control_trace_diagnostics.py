@@ -143,3 +143,38 @@ def test_trace_labels_outside_frozen_sample_are_rejected():
     labels.loc[0, "repeat"] = 99
     with pytest.raises(ValueError, match="outside"):
         trace_diagnostics(labels, sample)
+
+
+@pytest.mark.parametrize("invalid", ["corrupt", "", 2, -1, np.inf])
+@pytest.mark.parametrize("annotator", ["model-a", "human"])
+def test_invalid_trace_labels_cannot_silently_shrink_the_panel(invalid, annotator):
+    sample, labels = traces_and_labels()
+    labels[CODES[0]] = labels[CODES[0]].astype(object)
+    labels.loc[0, ["annotator", CODES[0]]] = [annotator, invalid]
+    with pytest.raises(ValueError, match="labels must be binary or missing"):
+        trace_diagnostics(labels, sample)
+
+
+def test_actual_missing_labels_keep_explicit_panel_denominators():
+    sample, labels = traces_and_labels()
+    labels.loc[0, CODES[0]] = np.nan
+    sensitivity, coverage, _ = trace_diagnostics(labels, sample)
+    row = sensitivity.query("code == @CODES[0] and analysis == 'all_llm_raters'").iloc[0]
+    assert row["n_traces"] == 2
+    assert row["n_ties"] == 1
+    assert row["min_available_raters"] == 2
+    assert coverage["n_complete_llm_panel"].sum() == 1
+
+
+def test_trace_agreement_cli_rejects_corruption_before_coercing_it_away(tmp_path, monkeypatch):
+    from scripts import trace_agreement_2026
+
+    _, labels = traces_and_labels()
+    labels[CODES[0]] = labels[CODES[0]].astype(object)
+    labels.loc[0, CODES[0]] = "corrupt"
+    path = tmp_path / "labels.csv"
+    labels.to_csv(path, index=False)
+    monkeypatch.setattr(trace_agreement_2026, "LABELS", path)
+    with pytest.raises(ValueError, match="labels must be binary or missing"):
+        trace_agreement_2026.main(str(tmp_path / "output"))
+    assert not list((tmp_path / "output").iterdir())

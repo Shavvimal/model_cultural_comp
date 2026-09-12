@@ -51,8 +51,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-from app.appendix_contrasts import origin_profile_permutation, petition_contrast
-from app.culture_map import IV_QNS
+from app.appendix_contrasts import (
+    origin_profile_permutation,
+    petition_contrast,
+    standardise_profiles,
+)
 from app.llm_meta import cohort_2026
 
 SEED = 42  # no randomness is consumed; kept for the repo-wide convention
@@ -83,31 +86,6 @@ ORIGIN_DEFINITION = (
     "C(17,10) origin labellings; p_exact_ge = share of labellings with "
     "statistic >= observed"
 )
-
-
-def standardise_profiles(profiles: pd.DataFrame, item_baselines: pd.DataFrame) -> pd.DataFrame:
-    """Apply the released frozen fit moments, aligned by item identifier.
-
-    These are observed-item standardisation parameters from the fitted
-    instrument, not moments recalculated from model profiles or completed
-    human scores. Reject partial or invalid aggregates instead of silently
-    producing a different transform.
-    """
-    required = {"question", "fit_standardisation_mean", "fit_standardisation_sd"}
-    if not required.issubset(item_baselines.columns):
-        raise ValueError(f"item baselines require columns {sorted(required)}")
-    if item_baselines["question"].duplicated().any():
-        raise ValueError("item baselines must contain one row per question")
-    if set(item_baselines["question"]) != set(IV_QNS):
-        raise ValueError("item baselines must contain exactly the ten instrument items")
-    if profiles.columns.duplicated().any() or set(profiles.columns) != set(IV_QNS):
-        raise ValueError("profiles must contain exactly the ten instrument items")
-    fitted = item_baselines.set_index("question").reindex(profiles.columns)
-    means = fitted["fit_standardisation_mean"].astype(float)
-    stds = fitted["fit_standardisation_sd"].astype(float)
-    if not np.isfinite(means).all() or not np.isfinite(stds).all() or (stds <= 0).any():
-        raise ValueError("fitted standardisation means must be finite and SDs positive")
-    return (profiles - means) / stds
 
 
 def main() -> int:

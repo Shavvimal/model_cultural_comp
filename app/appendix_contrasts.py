@@ -37,9 +37,36 @@ import numpy as np
 import pandas as pd
 from scipy.stats import binomtest
 
+from app.culture_map import IV_QNS
+
 log = logging.getLogger(__name__)
 
 MAX_EXACT_LABELLINGS = 5_000_000
+
+
+def standardise_profiles(profiles: pd.DataFrame, item_baselines: pd.DataFrame) -> pd.DataFrame:
+    """Apply the released frozen fit moments, aligned by item identifier.
+
+    These are observed-item standardisation parameters from the fitted
+    instrument, not moments recalculated from model profiles or completed
+    human scores. Reject partial or invalid aggregates instead of silently
+    producing a different transform.
+    """
+    required = {"question", "fit_standardisation_mean", "fit_standardisation_sd"}
+    if not required.issubset(item_baselines.columns):
+        raise ValueError(f"item baselines require columns {sorted(required)}")
+    if item_baselines["question"].duplicated().any():
+        raise ValueError("item baselines must contain one row per question")
+    if set(item_baselines["question"]) != set(IV_QNS):
+        raise ValueError("item baselines must contain exactly the ten instrument items")
+    if profiles.columns.duplicated().any() or set(profiles.columns) != set(IV_QNS):
+        raise ValueError("profiles must contain exactly the ten instrument items")
+    fitted = item_baselines.set_index("question").reindex(profiles.columns)
+    means = fitted["fit_standardisation_mean"].astype(float)
+    stds = fitted["fit_standardisation_sd"].astype(float)
+    if not np.isfinite(means).all() or not np.isfinite(stds).all() or (stds <= 0).any():
+        raise ValueError("fitted standardisation means must be finite and SDs positive")
+    return (profiles - means) / stds
 
 
 def keyed_pc1_shift(item_fx: pd.DataFrame, keying: pd.DataFrame) -> pd.DataFrame:
@@ -144,18 +171,24 @@ def origin_profile_permutation(
     labellings, so n and k must be small (17 choose 10 = 19,448).
     """
     x = profiles.to_numpy(dtype=float)
-    is_cn = np.asarray(is_chinese, dtype=bool)
+    is_cn = np.asarray(is_chinese)
     n = len(x)
-    if is_cn.shape != (n,):
-        raise ValueError("is_chinese must have one entry per profile row")
+    if is_cn.shape != (n,) or is_cn.dtype.kind != "b":
+        raise ValueError("is_chinese must have one boolean entry per profile row")
     k = int(is_cn.sum())
-    if k == 0 or k == n:
-        raise ValueError("both cohorts must be non-empty")
+    if k < 2 or n - k < 2:
+        raise ValueError("both cohorts need at least two models for within-cohort correlations")
+    if x.shape[1] < 2 or not np.isfinite(x).all():
+        raise ValueError("profiles must contain at least two finite item values per model")
+    if not np.any(x != x[:, :1], axis=1).all():
+        raise ValueError("each model profile must vary across items for Pearson correlation")
     n_lab = comb(n, k)
     if n_lab > MAX_EXACT_LABELLINGS:
         raise ValueError(f"C({n}, {k}) = {n_lab:,} labellings is too many to enumerate")
 
     corr = np.corrcoef(x)
+    if not np.isfinite(corr).all():
+        raise ValueError("profiles must produce finite Pearson correlations")
     iu = np.triu_indices(n, 1)
     n_within = comb(k, 2) + comb(n - k, 2)
     n_cross = k * (n - k)

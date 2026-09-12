@@ -42,6 +42,7 @@ import time
 from dataclasses import dataclass, field
 from enum import IntEnum
 from importlib.metadata import version
+from math import isfinite
 from pathlib import Path
 from uuid import uuid4
 
@@ -249,6 +250,15 @@ class CloudSurvey:
             raise ValueError(
                 f"prompt_variant must be one of {sorted(PROMPT_VARIANTS[self.language])}"
             )
+        if type(self.concurrency) is not int or self.concurrency < 1:
+            raise ValueError("concurrency must be a positive integer")
+        if (
+            isinstance(self.timeout_s, bool)
+            or not isinstance(self.timeout_s, (int, float))
+            or not isfinite(self.timeout_s)
+            or self.timeout_s <= 0
+        ):
+            raise ValueError("timeout_s must be a finite positive number")
         self.out_dir = Path(self.out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self._client = AsyncClient(
@@ -305,6 +315,8 @@ class CloudSurvey:
             for i, line in enumerate(f, 1):
                 try:
                     rec = json.loads(line)
+                    if not isinstance(rec, dict):
+                        raise ValueError("expected a terminal record object")
                     language = "en" if rec.get("language") is None else rec["language"]
                     if rec["llm"] != llm or language != self.language:
                         raise ValueError("record belongs to a different model/language")
@@ -321,6 +333,25 @@ class CloudSurvey:
                     key = (rec["question"], *indices)
                     if key not in expected or key in done:
                         raise ValueError("extra or duplicate trial key")
+                    provenance = rec.get("request_provenance")
+                    if (
+                        rec.get("schema_version") != 2
+                        or not isinstance(rec.get("request"), dict)
+                        or not isinstance(provenance, dict)
+                        or "host" not in provenance
+                    ):
+                        raise ValueError(
+                            "record lacks exact request provenance; collect into a new "
+                            "output directory instead of resuming historical records"
+                        )
+                    if (
+                        rec["request"] != self._request_for(llm, rec["question"], indices[0])
+                        or provenance["host"] != self.host
+                    ):
+                        raise ValueError(
+                            "record belongs to a different request configuration; "
+                            "use a new output directory for changed prompts, options or host"
+                        )
                     if rec.get("transport_failure"):
                         raise ValueError("transport-only attempt is not a completed trial")
                 except (ValueError, KeyError, TypeError) as exc:

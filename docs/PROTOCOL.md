@@ -75,6 +75,12 @@ response archive described in [REPRODUCING.md](REPRODUCING.md).
 
 ## New collection
 
+Resuming requires schema-version 2 terminal records whose exact request and
+host match the current configuration. Changed prompts, generation options,
+thinking settings or host require a new output directory. Historical records
+without those fields remain valid offline analysis inputs, but cannot establish
+compatibility for appending new responses and therefore cannot be resumed.
+
 The collector reads `OLLAMA_API_KEY` and optionally `OLLAMA_HOST` from the
 environment or a local `.env`. Run explicitly, from a separate checkout or
 with the frozen response directories moved safely aside:

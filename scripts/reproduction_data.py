@@ -13,6 +13,7 @@ import re
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
+from typing import Literal, NotRequired, TypedDict
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "docs/reproduction-data.json"
@@ -20,7 +21,23 @@ MANIFEST_NAME = "REPRODUCTION_DATA_MANIFEST.json"
 COLLECTIONS = ("collection", "collection_2026", "collection_2026_nosys")
 
 
-def permitted_path(name):
+class ManifestFile(TypedDict):
+    """Required integrity fields; conversion provenance is retained when present."""
+
+    path: str
+    bytes: int
+    sha256: str
+    source_sha256: NotRequired[str]
+
+
+class ReproductionManifest(TypedDict):
+    """Integrity contract; descriptive metadata passes through unchanged."""
+
+    schema_version: Literal[1]
+    files: list[ManifestFile]
+
+
+def permitted_path(name: object) -> bool:
     """Only the retained model records and the historical comparison input."""
     if not isinstance(name, str):
         return False
@@ -35,36 +52,47 @@ def permitted_path(name):
     )
 
 
-def load_manifest(path=MANIFEST):
-    manifest = json.loads(Path(path).read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != 1 or not manifest.get("files"):
+def load_manifest(path: str | Path = MANIFEST) -> ReproductionManifest:
+    manifest: ReproductionManifest = json.loads(Path(path).read_text(encoding="utf-8"))
+    if (
+        not isinstance(manifest, dict)
+        or type(manifest.get("schema_version")) is not int
+        or manifest["schema_version"] != 1
+        or not isinstance(manifest.get("files"), list)
+        or not manifest["files"]
+    ):
         raise ValueError("expected a nonempty version-1 reproduction manifest")
     seen = set()
     for entry in manifest["files"]:
+        if not isinstance(entry, dict) or not {"path", "bytes", "sha256"} <= entry.keys():
+            raise ValueError("manifest files require path, bytes and sha256 fields")
         name = entry["path"]
         if not permitted_path(name) or name in seen:
             raise ValueError(f"unsafe or duplicate manifest path: {name}")
         if type(entry["bytes"]) is not int or entry["bytes"] <= 0:
             raise ValueError(f"invalid file size: {name}")
-        if not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]):
-            raise ValueError(f"invalid SHA-256: {name}")
+        for field in ("sha256", "source_sha256"):
+            if field not in entry:
+                continue  # source_sha256 exists only for converted historical files.
+            if not isinstance(entry[field], str) or not re.fullmatch(r"[0-9a-f]{64}", entry[field]):
+                raise ValueError(f"invalid {field}: {name}")
         seen.add(name)
     return manifest
 
 
-def local_path(root, name):
+def local_path(root: Path, name: str) -> Path:
     path = root / name
     if any(p.is_symlink() for p in [path, *path.parents] if p != root.parent):
         raise ValueError(f"response paths must not follow symlinks: {name}")
     return path
 
 
-def check_content(content, entry):
+def check_content(content: bytes, entry: ManifestFile) -> None:
     if len(content) != entry["bytes"] or hashlib.sha256(content).hexdigest() != entry["sha256"]:
         raise ValueError(f"response file differs from frozen manifest: {entry['path']}")
 
 
-def verify(root, manifest):
+def verify(root: str | Path, manifest: ReproductionManifest) -> None:
     """Fail on missing, changed or additional files consumed by frozen replay."""
     root = Path(root).resolve()
     expected = {entry["path"] for entry in manifest["files"]}
@@ -92,11 +120,11 @@ def verify(root, manifest):
         check_content(path.read_bytes(), entry)
 
 
-def manifest_bytes(manifest):
+def manifest_bytes(manifest: ReproductionManifest) -> bytes:
     return (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def pack(root, manifest, output):
+def pack(root: str | Path, manifest: ReproductionManifest, output: str | Path) -> str:
     """Build a deterministic data-only archive from the explicit manifest."""
     root, output = Path(root).resolve(), Path(output).resolve()
     if output == root or root in output.parents:
@@ -125,7 +153,7 @@ def pack(root, manifest, output):
     return digest
 
 
-def install(root, manifest, source):
+def install(root: str | Path, manifest: ReproductionManifest, source: str | Path) -> None:
     """Validate every archive member before installing any input.
 
     Extraction is by exact filename into regular files, never extractall().
@@ -174,7 +202,7 @@ def install(root, manifest, source):
     verify(root, manifest)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--manifest", type=Path, default=MANIFEST)

@@ -12,10 +12,10 @@ from app.appendix_contrasts import (
     keyed_pc1_shift,
     origin_profile_permutation,
     petition_contrast,
+    standardise_profiles,
 )
 from app.culture_map import IV_QNS
 from app.survey_reference import survey_reference_tables
-from scripts.appendix_contrasts_2026 import standardise_profiles
 
 ITEMS = ["E025", "F063", "F118", "F120", "G006", "A008"]
 
@@ -175,6 +175,31 @@ class TestOriginProfilePermutation:
             origin_profile_permutation(profiles, np.array([True] * 4))
         with pytest.raises(ValueError):
             origin_profile_permutation(profiles, np.array([True, False]))
+
+    @pytest.mark.parametrize("invalid", ["constant", "nan", "infinity", "one_item"])
+    def test_undefined_correlations_raise_instead_of_reporting_zero_p(self, invalid):
+        profiles = pd.DataFrame(
+            [[1.0, 2.0, 3.0], [3.0, 2.0, 1.0], [1.0, 3.0, 2.0], [3.0, 1.0, 2.0]]
+        )
+        if invalid == "constant":
+            profiles.iloc[0] = 1.0
+        elif invalid == "one_item":
+            profiles = profiles.iloc[:, :1]
+        else:
+            profiles.iloc[0, 0] = np.nan if invalid == "nan" else np.inf
+        with pytest.raises(ValueError, match="profile"):
+            origin_profile_permutation(profiles, np.array([True, True, False, False]))
+
+    @pytest.mark.parametrize("labels", [[True, False, False, False], [True, True, True, False]])
+    def test_singleton_cohorts_cannot_supply_within_cohort_correlations(self, labels):
+        with pytest.raises(ValueError, match="at least two models"):
+            origin_profile_permutation(pd.DataFrame(np.eye(4)), np.array(labels))
+
+    def test_origin_labels_must_be_boolean(self):
+        with pytest.raises(ValueError, match="boolean"):
+            origin_profile_permutation(
+                pd.DataFrame(np.eye(4)), np.array(["True", "True", "False", "False"])
+            )
 
 
 class TestReleasedStandardisation:
