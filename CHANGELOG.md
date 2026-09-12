@@ -2,11 +2,11 @@
 
 All notable changes to this project are documented here.
 
-## [1.1.0] — unreleased camera-ready revision
+## [1.1.0] — 2026-09-12
 
-The corrected instrument and analyses support the revised paper. This version
-is prepared locally; an immutable public response archive and release tag have
-not yet been published.
+The corrected instrument and analyses support the revised paper. The
+[v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0)
+provides the source revision and separate response and results archives.
 
 ### Fixed
 
@@ -67,11 +67,10 @@ not yet been published.
 
 ## [1.0.0] - 2026-08-05
 
-The release the paper's numbers were generated from, tagged `v1.0.0`. Everything
-below is described in full in [Cultural Alignment of Open-Weight LLMs on the
-Inglehart-Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map),
-which supersedes and corrects the 2024 post
-[Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias).
+The initial paper artifact, tagged `v1.0.0`. The entries below describe that
+historical release and its corrections to the 2024 post
+[Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias). Version 1.1.0 above
+supplies the corrected results for the revised paper.
 
 ### Fixed
 - **Projection correction.** LLM responses were previously projected without the
@@ -164,5 +163,5 @@ which supersedes and corrects the 2024 post
   `app/cloud_survey.py`, the single-path `CulturalMap.project` and
   `app/region_svm.py`. They remain in git history.
 
-[Unreleased]: https://github.com/Shavvimal/model_cultural_comp/compare/v1.0.0...HEAD
+[1.1.0]: https://github.com/Shavvimal/model_cultural_comp/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.0.0

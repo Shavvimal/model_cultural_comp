@@ -1,17 +1,19 @@
 # Reproducing the corrected analysis
 
-Run commands from the repository root with Python 3.11 and `uv sync --frozen`.
+Use the `v1.1.0` source tag (`git checkout v1.1.0`). Run commands from the
+repository root with Python 3.11 and `uv sync --frozen`.
 `make check` uses synthetic fixtures only. The full analysis needs the licensed
 survey inputs below and a separate archive of retained model responses.
 
 ## Frozen response archive
 
-**Delivery status: prepared locally; no immutable public download has been
-published yet.** The source tree alone is not a complete reproduction deposit.
-A public release must attach this archive (or link a durable research deposit)
-and publish its SHA-256 alongside the source revision. Do not add its contents
-to Git. The expected filename is
-`model-cultural-comp-responses-2026-09-12.tar.gz`.
+Download [model-cultural-comp-responses-2026-09-12.tar.gz](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz)
+(5,787,471 bytes) and its [SHA-256 sidecar](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz.sha256)
+from the [v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0).
+The archive SHA-256 is
+`10fd2e8d83ce4ce091551790ef0007cbafb866f48f436efa5d19d6f1fd8cd311`.
+The source checkout and separate archive together identify the frozen replay;
+keep the archive and its contents out of Git.
 
 [reproduction-data.json](reproduction-data.json) fixes the exact 69 inputs by
 relative filename, size and SHA-256:
@@ -30,9 +32,10 @@ The 2024 pickle-to-JSONL conversion preserves fields and row order; tuples becom
 arrays. The frozen trace sample uses JSON null for absent error fields. Original
 hashes for those converted inputs remain in the manifest.
 
-Install and verify an obtained archive:
+Verify the downloaded checksum, then install and verify the inputs:
 
 ```bash
+(cd /path/to/downloads && shasum -a 256 -c model-cultural-comp-responses-2026-09-12.tar.gz.sha256)
 uv run python scripts/reproduction_data.py install /path/to/model-cultural-comp-responses-2026-09-12.tar.gz
 make verify-data
 ```
@@ -58,14 +61,14 @@ applicable provenance and terms when distributing the separate archive.
 
 ## Results and historical provenance supplement
 
-The corrected appendix promises bundled aggregate artifacts. These are supplied
-separately from Git and the frozen input archive as
-`model-cultural-comp-paper-results-2026-09-12.tar.gz` (207,783 bytes).
+The corrected appendix's aggregate artifacts are supplied separately from Git
+and the frozen input archive. Download
+[model-cultural-comp-paper-results-2026-09-12.tar.gz](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz)
+(207,780 bytes) and its [SHA-256 sidecar](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz.sha256)
+from the same [v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0).
 Its SHA-256 is
-`744e8a7b0fb52add617d74b4e0d23a5016fe8e31ab1f449f2d394b503c32c1e4`.
-**The public download remains pending.** Publish this supplement alongside the
-source and response archives; source-code publication alone does not fulfil the
-paper's artifact-availability statement.
+`7ea1be9d9f07380e53ad3e9fdf653287da9d516ad94b3939a35bb75a8a49809f`.
+Verify its sidecar with `shasum -a 256 -c` before extracting the supplement.
 
 The supplement contains 91 regenerated aggregate CSVs, the seed-angle log used
 by the optional `seed_sensitivity.py --from-stored` summary, and the original
@@ -183,3 +186,23 @@ The former combined release-candidate builder has been retired in favour of the
 explicit data-only archive above. Older notebooks are not part of the supported pipeline. A public source
 deposit must also exclude historical commits containing data or notebook outputs;
 ignoring or deleting those paths in a new commit does not remove old copies.
+
+## Publishing the archives (maintainers)
+
+1. Run `make check` and `make verify-data`. If the analysis changes, run
+   `make reproduce` and reconcile the aggregates before packaging.
+2. Build the response archive with the `reproduction_data.py pack` command
+   above. Package the results supplement using its explicit `RESULTS_MANIFEST.json`
+   file list and verify every member's size and hash. Preserve the original
+   historical `trace_coding.json`; the current pipeline cannot regenerate it.
+   Keep both archives outside Git and create a SHA-256 sidecar for each.
+3. Record the final archive sizes and SHA-256 values in this guide. Set the
+   changelog date to the release date and its comparison link to the release tag.
+4. Squash-merge the source/documentation PR. Tag **that merged commit** `v1.1.0`
+   and create its GitHub release. Attach both named `.tar.gz` files and both
+   `.tar.gz.sha256` sidecars. GitHub supplies the tagged source downloads.
+5. Download the four assets from the release and verify both checksums. Install
+   the response archive into a clean `v1.1.0` checkout and run `make verify-data`.
+   Confirm the results supplement contains every manifest member. The paper's
+   release-availability statement requires these published downloads as well as
+   the source tag.

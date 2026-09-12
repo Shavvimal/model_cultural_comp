@@ -361,7 +361,7 @@
       "source_sha256": "15a07817502417dc5541fffa49a473b9febce596130f4f612985e2bd16446975"
     }
   ],
-  "publication_status": "Prepared locally; the separate response archive is not yet published.",
+  "release_url": "https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0",
   "schema_version": 1,
   "source_candidate_manifest_sha256": "95eacf7e56443e4254b16b0f67725e8eb1d1a9dd95b639709830337ce6d1dddf"
 }

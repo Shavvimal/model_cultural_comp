@@ -76,7 +76,7 @@ def test_observed_likelihood_matches_independent_scipy_density(incomplete_data, 
     standardized = (incomplete_data - fitted.means) / fitted.stds
     independent = row_log_likelihood(standardized, fitted.loadings_, fitted.noise_variance_)
     assert fitted.log_likelihood_ == pytest.approx(independent, abs=2e-9)
-    # The released missing-data loop misses this fixture's optimum by about 60.
+    # The v1.0.0 missing-data loop misses this fixture's optimum by about 60.
     assert independent == pytest.approx(-5183.419019391, abs=2e-7)
     assert np.min(np.diff(fitted.likelihood_history_)) >= -2e-9
 

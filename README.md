@@ -18,14 +18,16 @@ positions. All eligible means occupy the primary reference-relative quadrant;
 Chinese administration increases projected self-expression in 15/16 paired
 models. The rotation, benchmark and prompt sensitivities limit interpretation.
 
-The 1.1.0 corrections are prepared for release. The source checkout contains
+Version [1.1.0](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0)
+contains these corrections. The source checkout contains
 code, tests, documentation and input checksums. **No datasets, generated
 results, fitted binaries or figures belong in Git.** The required retained
 model responses are packaged separately. A second, small results/provenance
 archive supplies the aggregates named in the paper and the historical trace-coding
-record. Neither archive belongs in Git; their immutable public downloads are
-still pending. See [reproduction instructions](docs/REPRODUCING.md) for the
-exact inputs, result assets and delivery status, and [CHANGELOG.md](CHANGELOG.md)
+record. Download the [response archive](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz)
+and [results supplement](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz)
+from the v1.1.0 release. See [reproduction instructions](docs/REPRODUCING.md) for
+the exact inputs, result assets and checksums, and [CHANGELOG.md](CHANGELOG.md)
 for repairs.
 
 ## Quickstart
@@ -33,6 +35,7 @@ for repairs.
 ```bash
 git clone https://github.com/Shavvimal/model_cultural_comp
 cd model_cultural_comp
+git checkout v1.1.0
 uv sync --frozen
 make check
 ```
