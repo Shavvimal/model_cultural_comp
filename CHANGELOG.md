@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] — planned 1.1.0 camera-ready revision
+## [1.1.0] — unreleased camera-ready revision
 
 The corrected instrument and analyses support the revised paper. This version
 is prepared locally; an immutable public response archive and release tag have
@@ -16,6 +16,8 @@ not yet been published.
 - Replace the imputation fixed-point loop with observed-data Gaussian PPCA
   likelihood optimisation, multiple starts, convergence diagnostics and exact
   Gaussian conditional completion. Preserve the frozen score-side varimax path.
+- Resume premature optimizer objective-change stops within the original
+  iteration budget, retaining the strict gradient tolerance on every start.
 - Correct affine offsets, item validity and empty-cluster count pooling; project
   observed item means and use paired observed displacement estimates.
 - Correct permutation denominators, tie handling, simultaneous headline counts,

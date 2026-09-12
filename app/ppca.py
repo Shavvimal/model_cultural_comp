@@ -17,6 +17,8 @@ from scipy.linalg import cho_factor, cho_solve, orth
 from scipy.optimize import minimize
 
 _NOISE_FLOOR = 1e-10
+# Bound attempts even when floating-point objective stagnation consumes no iterations.
+_MAX_OPTIMIZER_RESTARTS = 3
 
 
 def _pattern_statistics(data):
@@ -104,7 +106,8 @@ class PPCA:
         of the negative log likelihood *per informative row*, including log noise
         variance. An objective-change message alone is not convergence. Every
         start must satisfy that gradient bound within ``max_iter`` iterations;
-        otherwise fitting raises. The converged start with greatest likelihood
+        objective-change stops may resume within that same iteration budget.
+        Otherwise fitting raises. The converged start with greatest likelihood
         is retained. Multiple starts reduce, but do not rule out, local optima.
 
         Complete data use the analytic maximum-likelihood PPCA solution. Fits
@@ -200,17 +203,37 @@ class PPCA:
                         )
 
                 history.append(-objective(x0)[0] * informative_rows)
-                result = minimize(
-                    objective,
-                    x0,
-                    jac=True,
-                    method="L-BFGS-B",
-                    callback=record,
-                    bounds=[(None, None)] * (width * d) + [(np.log(_NOISE_FLOOR), 20.0)],
-                    options={"ftol": 0.0, "gtol": tol, "maxiter": max_iter, "maxls": 50},
-                )
-                loss, gradient = objective(result.x)
-                norm = float(abs(gradient).max())
+                iterations = 0
+                for _ in range(_MAX_OPTIMIZER_RESTARTS + 1):
+                    result = minimize(
+                        objective,
+                        x0,
+                        jac=True,
+                        method="L-BFGS-B",
+                        callback=record,
+                        bounds=[(None, None)] * (width * d) + [(np.log(_NOISE_FLOOR), 20.0)],
+                        options={
+                            "ftol": 0.0,
+                            "gtol": tol,
+                            "maxiter": max_iter - iterations,
+                            "maxls": 50,
+                        },
+                    )
+                    iterations += int(result.nit)
+                    loss, gradient = objective(result.x)
+                    norm = float(abs(gradient).max())
+                    if (
+                        not np.isfinite(loss)
+                        or not np.isfinite(norm)
+                        or norm <= tol
+                        or not result.success
+                        or iterations >= max_iter
+                    ):
+                        break
+                    # L-BFGS-B may report an unchanged objective before the gradient
+                    # converges. Reset its curvature history, retaining the same
+                    # parameters, likelihood, bounds and strict acceptance criterion.
+                    x0 = result.x
                 if not np.isfinite(loss) or not np.isfinite(norm) or norm > tol:
                     raise RuntimeError(
                         f"PPCA likelihood start {start + 1}/{n_init} did not converge within "
@@ -222,7 +245,7 @@ class PPCA:
                         "PPCA fit reached the residual-noise floor; no accepted interior fit"
                     )
                 histories.append(history)
-                results.append((result.x, loss, norm, int(result.nit)))
+                results.append((result.x, loss, norm, iterations))
             method = "observed-data Gaussian PPCA likelihood (L-BFGS-B)"
         best = min(range(len(results)), key=lambda index: results[index][1])
         parameters, loss, gradient_norm, iterations = results[best]

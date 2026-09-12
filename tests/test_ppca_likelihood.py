@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from scipy.optimize import OptimizeResult, minimize
 from scipy.stats import multivariate_normal
 
 from app.ppca import PPCA
@@ -172,6 +173,48 @@ def test_iteration_exhaustion_fails_without_replacing_fit(incomplete_data, fitte
     with pytest.raises(RuntimeError, match="did not converge"):
         model.fit(incomplete_data, d=2, min_obs=1, seed=42, max_iter=1)
     np.testing.assert_array_equal(model.C, prior)
+
+
+def test_premature_objective_stop_resumes_within_iteration_budget(monkeypatch, incomplete_data):
+    calls = []
+
+    def premature_once(objective, x0, **kwargs):
+        calls.append(kwargs["options"].copy())
+        if len(calls) == 1:
+            kwargs["options"] = {**kwargs["options"], "maxiter": 1}
+        result = minimize(objective, x0, **kwargs)
+        if len(calls) == 1:
+            assert np.max(np.abs(objective(result.x)[1])) > 1e-7
+            result.success = True
+            result.message = "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH"
+        return result
+
+    monkeypatch.setattr("app.ppca.minimize", premature_once)
+    model = PPCA().fit(incomplete_data, d=2, min_obs=1, seed=42, max_iter=1000)
+    assert len(calls) >= 4  # All three starts plus the resumed first start.
+    assert calls[1]["maxiter"] == 999
+    assert all(options["gtol"] == 1e-7 and options["ftol"] == 0 for options in calls)
+    assert np.all(model.start_gradient_norms_ <= 1e-7)
+    assert len(model.start_converged_) == 3
+    assert model.n_iter_ <= 1000
+
+
+def test_persistent_objective_stagnation_fails_without_accepting_fit(monkeypatch, incomplete_data):
+    calls = 0
+
+    def stalled(objective, x0, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls > 10:
+            pytest.fail("zero-iteration optimizer stops must not retry indefinitely")
+        return OptimizeResult(x=x0, nit=0, success=True, message="objective stagnation")
+
+    monkeypatch.setattr("app.ppca.minimize", stalled)
+    model = PPCA()
+    with pytest.raises(RuntimeError, match="did not converge"):
+        model.fit(incomplete_data, d=2, min_obs=1, seed=42)
+    assert model.C is None
+    assert calls > 1
 
 
 def test_gaussian_and_convergence_parameters_roundtrip(fitted, tmp_path):

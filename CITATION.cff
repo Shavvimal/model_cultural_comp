@@ -18,7 +18,7 @@ authors:
     affiliation: "Sammy Labs"
 repository-code: "https://github.com/Shavvimal/model_cultural_comp"
 url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
-version: "1.1.0-rc"
+version: "1.1.0"
 license: MIT
 keywords:
   - nlp
