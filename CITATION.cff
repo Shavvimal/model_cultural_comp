@@ -2,21 +2,24 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "model_cultural_comp: mapping LLM cultural alignment onto the Inglehart-Welzel map"
 abstract: >-
-  Refits the Inglehart-Welzel cultural map from the Integrated Values Surveys
-  with a probabilistic PCA over the ten IVS items, then administers the same ten
+  Fits a custom two-dimensional instrument inspired by the Inglehart-Welzel
+  map using Gaussian probabilistic PCA over ten Integrated Values Surveys items,
+  then administers the same ten
   items to large language models and projects their responses through the same
   frozen transform the countries go through. Each model-language cell gets a
-  bootstrap confidence region, two region-assignment rules, and classifier-free
+  nominal bootstrap ellipse, two region-assignment rules, and classifier-free
   headline statistics.
 type: software
 authors:
   - family-names: Vimalendiran
     given-names: Shav
     email: shavhugan@gmail.com
+    orcid: "https://orcid.org/0000-0003-3236-248X"
+    affiliation: "Sammy Labs"
 repository-code: "https://github.com/Shavvimal/model_cultural_comp"
 url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
-version: 1.0.0
-date-released: "2026-08-05"
+version: "1.1.0"
+date-released: "2026-09-14"
 license: MIT
 keywords:
   - nlp
@@ -27,15 +30,30 @@ keywords:
   - pca
   - reproducible-research
   - evaluation
+preferred-citation:
+  type: conference-paper
+  title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
+  authors:
+    - family-names: Vimalendiran
+      given-names: Shav
+      orcid: "https://orcid.org/0000-0003-3236-248X"
+  year: 2026
+  conference:
+    name: "Workshop on Open Reasoning Across Cultures and Languages (ORACLE) at EMNLP 2026"
+  publisher:
+    name: "Association for Computational Linguistics"
+  url: "https://openreview.net/forum?id=xJHa9ts0mt"
+  notes: "The paper this repository implements; accepted 4 September 2026. ACL Anthology DOI to be added on publication."
 references:
-  - type: article
+  - type: blog
     title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
     authors:
       - family-names: Vimalendiran
         given-names: Shav
+        orcid: "https://orcid.org/0000-0003-3236-248X"
     year: 2026
     url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
-    notes: "The full analysis this repository implements."
+    notes: "Expanded write-up of the paper."
   - type: data
     title: "EVS Trend File 1981-2017"
     authors:
@@ -46,11 +64,31 @@ references:
     publisher:
       name: "GESIS Data Archive, Cologne"
   - type: data
-    title: "World Values Survey Trend File (1981-2022) Cross-National Data-Set"
+    title: "World Values Survey (1981-2022). Trend File"
     authors:
-      - name: "World Values Survey Association"
-    year: 2022
-    version: "4.0.0"
+      - family-names: Haerpfer
+        given-names: Christian
+      - family-names: Inglehart
+        given-names: Ronald
+      - family-names: Moreno
+        given-names: Alejandro
+      - family-names: Welzel
+        given-names: Christian
+      - family-names: Kizilova
+        given-names: Kseniya
+      - family-names: Diez-Medrano
+        given-names: Jaime
+      - family-names: Lagos
+        given-names: Marta
+      - family-names: Norris
+        given-names: Pippa
+      - family-names: Ponarin
+        given-names: Eduard
+      - family-names: Puranen
+        given-names: Bi
+    year: 2024
+    version: "4.0"
     doi: "10.14281/18241.27"
     publisher:
-      name: "JD Systems Institute & WVSA Secretariat"
+      name: "World Values Survey Association"
+    notes: "DOI metadata for version 4.0; the WVS download page also presents an older 2022 recommended citation. Local source version is 4-0-0 (2024-06-30); retrieval date is unverified."

@@ -1,6 +1,0 @@
-quantity,value,n_seeds,n_countries
-rotation_angle_mean_deg,-39.6865,20,109
-rotation_angle_spread_deg,5.210000000000001,20,109
-coord_across_seed_sd_mean,0.022034401401736212,20,109
-coord_across_seed_sd_max,0.0767046217434029,20,109
-coord_across_seed_range_max,0.2619560900682687,20,109

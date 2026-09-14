@@ -1,189 +1,511 @@
-"""Probabilistic PCA with support for missing data.
+"""Gaussian probabilistic PCA with observed-data likelihood fitting.
 
-Derived from ``pca-magic`` (https://github.com/allentran/pca-magic),
-Copyright Allen Tran, licensed under the Apache License, Version 2.0.
-Changes from the original: standardization parameters are stored and applied
-symmetrically at transform time, fitting is seedable, and model persistence
-round-trips all parameters (loadings, means, stds, eigenvalues) rather than
-the loadings alone.
+This module retains the projection/persistence interface of the former
+``pca-magic`` adaptation (Copyright Allen Tran, Apache License 2.0), but replaces
+its missing-data fitting loop. Observed entries are standardized once, then the
+Gaussian PPCA likelihood is optimized directly, integrating out missing entries.
+Missing values are completed with conditional means only *after* fitting.
 
-The underlying method is the EM algorithm for PPCA of Tipping & Bishop (1999),
-"Probabilistic Principal Component Analysis", J. R. Statist. Soc. B 61(3).
+The Gaussian model is Tipping & Bishop (1999), "Probabilistic Principal Component
+Analysis", JRSS B 61(3). Fitting here uses L-BFGS-B, not EM. ``C`` contains
+orthonormal score axes; ``loadings_`` and ``noise_variance_`` retain the distinct
+Gaussian model parameters.
 """
 
+from pathlib import Path
+from typing import Any, Self, cast
+
 import numpy as np
-from scipy.linalg import orth
+from numpy.typing import ArrayLike
+from scipy.linalg import cho_factor, cho_solve, orth, solve_triangular
+from scipy.optimize import minimize
+
+# Smallest accepted residual noise variance in standardized units; lower is singular.
+_NOISE_FLOOR = 1e-10
+# Bound attempts even when floating-point objective stagnation consumes no iterations.
+_MAX_OPTIMIZER_RESTARTS = 3
+# Spectral start: noise lower bound, so the first start is never near-singular.
+_INITIAL_NOISE_MIN = 0.05
+# Spectral start: minimum loading variance, so no latent direction starts at zero.
+_INITIAL_LOADING_VARIANCE_MIN = 0.01
+# SD of the seeded perturbation of later starts, in standardized loading and log-noise units.
+_START_PERTURBATION_SCALE = 0.2
+# Upper bound on log noise variance; exp(20) is far above any standardized variance.
+_LOG_NOISE_UPPER_BOUND = 20.0
+# L-BFGS-B line-search steps per iteration (SciPy default 20) for flat likelihood regions.
+_LINE_SEARCH_MAX_STEPS = 50
+# A fit within 1% of the noise floor is treated as having reached the bound.
+_NOISE_FLOOR_MARGIN = 1.01
+PatternStatistics = list[tuple[np.ndarray, int, np.ndarray]]
+
+
+def _pattern_statistics(data: np.ndarray) -> PatternStatistics:
+    """Return observed-index/count/scatter triples, without imputing anything."""
+    patterns, membership = np.unique(np.isfinite(data), axis=0, return_inverse=True)
+    groups = []
+    for index, observed in enumerate(patterns):
+        if not observed.any():
+            continue  # an entirely missing row has observed likelihood one
+        rows = data[membership == index][:, observed]
+        groups.append((observed, len(rows), rows.T @ rows))
+    return groups
+
+
+def _negative_log_likelihood(
+    parameters: np.ndarray,
+    groups: PatternStatistics,
+    width: int,
+    dimensions: int,
+    n_rows: int,
+) -> tuple[float, np.ndarray]:
+    """Mean observed-row NLL and analytic gradient for fixed standardization."""
+    loadings = parameters[:-1].reshape(width, dimensions)
+    noise = np.exp(parameters[-1])
+    loss = 0.0
+    gradient = np.zeros_like(loadings)
+    noise_gradient = 0.0
+    for observed, count, scatter in groups:
+        w = loadings[observed]
+        covariance = w @ w.T + noise * np.eye(len(w))
+        cholesky = cho_factor(covariance, lower=True)
+        precision = cho_solve(cholesky, np.eye(len(w)))
+        logdet = 2 * np.log(np.diag(cholesky[0])).sum()
+        loss += 0.5 * (count * (len(w) * np.log(2 * np.pi) + logdet) + np.sum(precision * scatter))
+        covariance_gradient = 0.5 * (count * precision - precision @ scatter @ precision)
+        gradient[observed] += 2 * covariance_gradient @ w
+        noise_gradient += np.trace(covariance_gradient)
+    return loss / n_rows, np.r_[gradient.ravel(), noise * noise_gradient] / n_rows
+
+
+def conditional_complete(standardized: ArrayLike, loadings: np.ndarray, noise: float) -> np.ndarray:
+    """Complete missing standardized entries with fitted Gaussian conditional means.
+
+    For each missingness pattern, missing entries receive
+    E[y_missing | y_observed] under the covariance ``loadings @ loadings.T +
+    noise * I``. Observed entries are never replaced. An entirely unobserved
+    row predicts the zero mean; ``PPCA.fit`` rejects such rows before this
+    point. The same function completes the training data inside
+    :meth:`PPCA.fit` and serves frozen-fit diagnostics, so both paths share
+    one arithmetic.
+    """
+    # order="K" keeps the caller's memory layout, which frozen diagnostics rely on.
+    values = np.array(standardized, dtype=float, copy=True, order="K")
+    loadings = np.asarray(loadings, dtype=float)
+    if np.isinf(values).any() or not np.isfinite(noise) or noise <= 0:
+        raise ValueError(
+            f"finite values or NaN and positive Gaussian noise are required; got noise {noise!r}"
+        )
+    if values.ndim != 2 or loadings.ndim != 2 or loadings.shape[0] != values.shape[1]:
+        raise ValueError(
+            f"expected a two-dimensional array with one loading row per column; got data "
+            f"shape {values.shape} and loadings shape {loadings.shape}"
+        )
+    patterns, membership = np.unique(np.isfinite(values), axis=0, return_inverse=True)
+    for index, observed in enumerate(patterns):
+        if observed.all():
+            continue
+        rows = np.flatnonzero(membership == index)
+        if not observed.any():
+            values[rows] = 0.0
+            continue
+        w = loadings[observed]
+        # E[y_missing | y_observed] under the *fitted* Gaussian covariance.
+        gain = np.linalg.solve(w @ w.T + noise * np.eye(len(w)), w @ loadings[~observed].T)
+        values[np.ix_(rows, ~observed)] = values[np.ix_(rows, observed)] @ gain
+    return values
+
+
+def _whiten(matrix: np.ndarray, factor: np.ndarray) -> np.ndarray:
+    """Apply a Cholesky factor's inverse to both sides of a symmetric matrix."""
+    left = solve_triangular(factor, matrix, lower=True)
+    return solve_triangular(factor, left.T, lower=True).T
+
+
+def _likelihood_change(
+    parameters: np.ndarray,
+    reference: np.ndarray,
+    groups: PatternStatistics,
+    width: int,
+    dimensions: int,
+    n_rows: int,
+) -> float:
+    """NLL(parameters) - NLL(reference), without subtracting nearly equal losses.
+
+    For C = C0 + delta and C0 = L0 L0.T, diagonalize D = L0^-1 delta L0^-T.
+    The log-determinant change is sum(log1p(eigenvalues(D))); the inverse
+    change in that basis is -D / (I + D). This resolves improvements below
+    the rounding error of the full likelihood when a line search stalls.
+
+    Both C0 and C = W W.T + noise * I are positive definite for any finite
+    parameters, because noise = exp(log noise) > 0. So I + D is positive
+    definite and every eigenvalue of D exceeds -1 exactly. An eigenvalue at
+    or below -1 can therefore only come from floating-point rounding in the
+    whitening or eigendecomposition. The guard raises rather than returning
+    a value, because log1p would then be undefined or infinite and a line
+    search would silently accept a meaningless objective.
+    """
+    loadings = reference[:-1].reshape(width, dimensions)
+    difference = (parameters[:-1] - reference[:-1]).reshape(width, dimensions)
+    noise = np.exp(reference[-1])
+    noise_difference = noise * np.expm1(parameters[-1] - reference[-1])
+    change = 0.0
+    for observed, count, scatter in groups:
+        w, dw = loadings[observed], difference[observed]
+        identity = np.eye(len(w))
+        factor = np.linalg.cholesky(w @ w.T + noise * identity)
+        delta = w @ dw.T + dw @ w.T + dw @ dw.T + noise_difference * identity
+
+        eigenvalues, axes = np.linalg.eigh(_whiten(delta, factor))
+        if np.any(eigenvalues <= -1):
+            raise ValueError(
+                "centered likelihood change: whitened covariance eigenvalue "
+                f"{eigenvalues.min():.6e} is at or below -1, which a positive-definite "
+                "candidate covariance cannot produce; this is floating-point rounding "
+                "(for example a noise variance near the floor), not a valid step"
+            )
+        rotated_scatter = np.diag(axes.T @ _whiten(scatter, factor) @ axes)
+        change += 0.5 * np.sum(
+            count * np.log1p(eigenvalues) - eigenvalues / (1 + eigenvalues) * rotated_scatter
+        )
+    return float(change / n_rows)
 
 
 class PPCA:
-    """Probabilistic PCA fitted with EM, tolerant of missing values.
+    """Fit Gaussian PPCA, then expose the existing completed-data score axes.
 
-    After fitting, ``transform(X)`` standardizes ``X`` with the means and
-    standard deviations learned during ``fit`` before projecting onto the
-    principal axes, so new data lands in the same coordinate space as the
-    training scores.
+    ``transform(X)`` standardizes complete raw observations and projects onto
+    ``C``. These scores are orthogonal projections, not posterior latent means.
+    ``transform()`` projects the conditionally completed training observations.
     """
 
-    def __init__(self):
-        self.C = None  # (D, d) principal axes
-        self.means = None  # (D,) feature means learned in fit
-        self.stds = None  # (D,) feature stds learned in fit
-        self.eig_vals = None  # (d,) score variances, descending
-        self.var_exp = None  # (d,) cumulative explained variance ratio
-        self.data = None  # (N, D) standardized training data, EM-imputed
-        self.valid_series = None  # (D_in,) column mask applied during fit
+    def __init__(self) -> None:
+        self.C: np.ndarray | None = None
+        self.means: np.ndarray | None = None
+        self.stds: np.ndarray | None = None
+        self.eig_vals: np.ndarray | None = None
+        self.var_exp: np.ndarray | None = None
+        self.data: np.ndarray | None = None
+        self.valid_series: np.ndarray | None = None
+        self.loadings_: np.ndarray | None = None
+        self.noise_variance_: float | None = None
+        self.log_likelihood_: float | None = None
+        self.gradient_norm_: float | None = None
+        self.n_iter_: int | None = None
+        self.converged_: bool = False
+        self.start_log_likelihoods_: np.ndarray | None = None
+        self.start_gradient_norms_: np.ndarray | None = None
+        self.start_converged_: np.ndarray | None = None
+        self.likelihood_history_: np.ndarray | None = None
+        self.method_: str | None = None
+        self.tolerance_: float | None = None
+        self.n_informative_rows_: int | None = None
+        # Diagnostic only: deliberately absent from state_dict() and saved archives.
+        self.n_optimizer_restarts_: int | None = None
 
-    def fit(self, data, d=None, tol=1e-4, min_obs=10, seed=None, verbose=False, max_iter=1000):
-        """Fit the model to ``data`` (shape N x D, NaNs allowed).
+    def fit(
+        self,
+        data: ArrayLike,
+        d: int | None = None,
+        tol: float = 1e-7,
+        min_obs: int = 10,
+        seed: int | None = None,
+        verbose: bool = False,
+        max_iter: int = 1000,
+        n_init: int = 3,
+    ) -> Self:
+        """Fit an unweighted, fixed-standardization Gaussian PPCA model.
 
-        :param d: number of latent dimensions (defaults to D)
-        :param tol: relative tolerance on the EM objective for convergence
-        :param min_obs: drop columns with fewer than this many observed values
-        :param seed: seed for the random initialization of the loading matrix;
-            set for reproducible fits
-        :param verbose: print the convergence criterion each iteration
-        :param max_iter: hard cap on EM iterations; raises RuntimeError rather
-            than silently returning an unconverged fit
+        ``d`` must be between 1 and retained width minus 1 (default: width minus
+        1). Columns with fewer than ``min_obs`` finite observations are dropped;
+        retained constant columns and infinities are rejected. A row with no
+        observed value in any retained column is rejected: it carries no
+        likelihood information, yet its zero completion would still enter the
+        score covariance, eigenvalues and exported axes.
+
+        For incomplete data, ``n_init`` starts use a spectral initialization and
+        seeded random perturbations. ``tol`` bounds the maximum absolute gradient
+        of the negative log likelihood *per informative row*, including log noise
+        variance. An objective-change message alone is not convergence. Every
+        start must satisfy that gradient bound within ``max_iter`` iterations;
+        objective-change stops may resume with a numerically centered likelihood
+        within that same iteration budget.
+        A resume happens only when L-BFGS-B reports success while the gradient
+        still exceeds ``tol``, the loss and gradient are finite and iterations
+        remain; at most ``_MAX_OPTIMIZER_RESTARTS`` resumes run per start. The
+        total across starts is ``n_optimizer_restarts_`` (a log diagnostic, not
+        saved). No resume fired for the released cultural-map fit.
+        Otherwise fitting raises. The converged start with greatest likelihood
+        is retained. Multiple starts reduce, but do not rule out, local optima.
+
+        Complete data use the analytic maximum-likelihood PPCA solution. Fits
+        requiring noise variance at or below 1e-10 in standardized units, or a
+        rank-deficient requested latent space, are rejected rather than silently
+        returning a singular model. No fitted state is replaced on failure.
         """
         raw = np.array(data, dtype=float, copy=True)
-        raw[np.isinf(raw)] = np.max(raw[np.isfinite(raw)])
-
-        # Columns dropped here are remembered so transform() can apply the
-        # same selection — otherwise fitted means/stds/C would silently
-        # misalign with full-width input.
-        self.valid_series = np.sum(~np.isnan(raw), axis=0) >= min_obs
-        data = raw[:, self.valid_series].copy()
-        N, D = data.shape
-
-        self.means = np.nanmean(data, axis=0)
-        self.stds = np.nanstd(data, axis=0)
-        data = (data - self.means) / self.stds
-
-        observed = ~np.isnan(data)
-        missing = np.sum(~observed)
-        # NaNs are replaced with zeros so matrix operations can proceed; the
-        # E-step below overwrites them with model reconstructions each pass.
-        data[~observed] = 0
-
+        if raw.ndim != 2 or raw.shape[0] < 2 or raw.shape[1] < 2:
+            raise ValueError("data must be a two-dimensional array with at least two rows/columns")
+        if np.isinf(raw).any():
+            raise ValueError("data must contain finite observations or NaN, not infinity")
+        for name, value in (("min_obs", min_obs), ("max_iter", max_iter), ("n_init", n_init)):
+            if (
+                isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, np.integer))
+                or value < 1
+            ):
+                raise ValueError(f"{name} must be a positive integer")
+        if not np.isfinite(tol) or tol <= 0:
+            raise ValueError("tol must be finite and positive")
+        valid = np.sum(np.isfinite(raw), axis=0) >= min_obs
+        retained = raw[:, valid]
+        width = retained.shape[1]
+        if width < 2:
+            raise ValueError("at least two columns must meet min_obs")
         if d is None:
-            d = D
-
-        rng = np.random.default_rng(seed)
-        C = rng.standard_normal((D, d))
-
-        CC = C.T @ C
-        X = data @ C @ np.linalg.inv(CC)
-        recon = X @ C.T
-        recon[~observed] = 0
-        ss = np.sum((recon - data) ** 2) / (N * D - missing)
-
-        v0 = np.inf
-        counter = 0
-
-        while True:
-            Sx = np.linalg.inv(np.eye(d) + CC / ss)
-
-            # E-step: estimate latent variables and impute missing entries
-            ss0 = ss
-            if missing > 0:
-                proj = X @ C.T
-                data[~observed] = proj[~observed]
-            X = data @ C @ Sx / ss
-
-            # M-step: update the loading matrix
-            XX = X.T @ X
-            C = data.T @ X @ np.linalg.pinv(XX + N * Sx)
-            CC = C.T @ C
-            recon = X @ C.T
-            recon[~observed] = 0
-
-            ss = (np.sum((recon - data) ** 2) + N * np.sum(CC * Sx) + missing * ss0) / (N * D)
-
-            det = np.log(np.linalg.det(Sx))
-            if np.isinf(det):
-                det = abs(np.linalg.slogdet(Sx)[1])
-            v1 = N * (D * np.log(ss) + np.trace(Sx) - det) + np.trace(XX) - missing * np.log(ss0)
-            diff = abs(v1 / v0 - 1)
-            if verbose:
-                print(diff)
-            if (diff < tol) and (counter > 5):
-                break
-            if counter >= max_iter:
+            d = width - 1
+        if (
+            isinstance(d, (bool, np.bool_))
+            or not isinstance(d, (int, np.integer))
+            or not 1 <= d < width
+        ):
+            raise ValueError("d must be an integer between 1 and retained columns minus 1")
+        means = np.nanmean(retained, axis=0)
+        stds = np.nanstd(retained, axis=0)
+        if not np.isfinite(stds).all() or np.any(stds <= 0):
+            raise ValueError("retained columns must have nonzero finite variance")
+        standardized = (retained - means) / stds
+        observed_rows = np.isfinite(standardized).any(axis=1)
+        if not observed_rows.all():
+            empty = np.flatnonzero(~observed_rows)
+            raise ValueError(
+                f"every row must observe at least one retained column; {len(empty)} rows "
+                f"observe none (first row indices {empty[:5].tolist()})"
+            )
+        informative_rows = int(observed_rows.sum())
+        if informative_rows < 2:
+            raise ValueError("at least two rows must contain observed values")
+        groups = _pattern_statistics(standardized)
+        zero_filled = np.nan_to_num(standardized, nan=0.0)
+        covariance = zero_filled.T @ zero_filled / informative_rows
+        values, axes = np.linalg.eigh(covariance)
+        order = np.argsort(values)[::-1]
+        values, axes = values[order], axes[:, order]
+        noise = float(values[d:].mean())
+        complete = np.isfinite(standardized).all()
+        if complete and noise <= _NOISE_FLOOR:
+            raise ValueError(
+                "no nonsingular PPCA maximum: residual noise variance is zero or too small"
+            )
+        initial_noise = max(noise, _INITIAL_NOISE_MIN)
+        initial_loadings = axes[:, :d] * np.sqrt(
+            np.maximum(values[:d] - initial_noise, _INITIAL_LOADING_VARIANCE_MIN)
+        )
+        if complete:
+            if np.any(values[:d] <= noise):
+                raise ValueError("requested latent space has zero-variance dimensions")
+            loadings = axes[:, :d] * np.sqrt(values[:d] - noise)
+            parameters = np.r_[loadings.ravel(), np.log(noise)]
+            loss, gradient = _negative_log_likelihood(
+                parameters, groups, width, d, informative_rows
+            )
+            if not np.isfinite(loss) or np.max(np.abs(gradient)) > tol:
                 raise RuntimeError(
-                    f"EM did not converge within {max_iter} iterations "
-                    f"(last relative change {diff:.2e}, tol {tol})."
+                    "analytic PPCA solution exceeds the requested numerical gradient tolerance"
                 )
+            histories: list[list[float]] = [[-loss * informative_rows]]
+            results = [(parameters, loss, float(abs(gradient).max()), 0)]
+            method = "closed-form complete-data PPCA"
+            optimizer_restarts = 0
+        else:
+            rng = np.random.default_rng(seed)
+            histories, results = [], []
+            optimizer_restarts = 0
+            initial = np.r_[initial_loadings.ravel(), np.log(initial_noise)]
+            for start in range(n_init):
+                x0 = initial.copy()
+                if start:
+                    x0[:-1] += rng.normal(scale=_START_PERTURBATION_SCALE, size=width * d)
+                    x0[-1] += rng.normal(scale=_START_PERTURBATION_SCALE)
+                history: list[float] = []
 
-            counter += 1
-            v0 = v1
+                def objective(x: np.ndarray) -> tuple[float, np.ndarray]:
+                    return _negative_log_likelihood(x, groups, width, d, informative_rows)
 
-        # Orthogonalize C and align it with the principal axes of the scores
-        C = orth(C)
-        vals, vecs = np.linalg.eig(np.cov((data @ C).T))
-        order = np.flipud(np.argsort(vals))
-        vecs = vecs[:, order]
-        vals = vals[order]
-        C = C @ vecs
+                def record(
+                    x: np.ndarray, history: list[float] = history, start: int = start
+                ) -> None:
+                    value, grad = objective(x)
+                    history.append(-value * informative_rows)
+                    if verbose:
+                        print(
+                            f"start {start + 1}: log likelihood {history[-1]:.8f}, "
+                            f"gradient {abs(grad).max():.3e}"
+                        )
 
-        # Fix an arbitrary sign ambiguity: make the largest-magnitude loading
-        # in each column positive so fits are reproducible across seeds.
-        signs = np.sign(C[np.argmax(np.abs(C), axis=0), np.arange(C.shape[1])])
-        C = C * signs
+                history.append(-objective(x0)[0] * informative_rows)
+                iterations = 0
+                search_objective = objective
+                for _ in range(_MAX_OPTIMIZER_RESTARTS + 1):
+                    result = minimize(
+                        search_objective,
+                        x0,
+                        jac=True,
+                        method="L-BFGS-B",
+                        callback=record,
+                        bounds=[(None, None)] * (width * d)
+                        + [(np.log(_NOISE_FLOOR), _LOG_NOISE_UPPER_BOUND)],
+                        options={
+                            "ftol": 0.0,
+                            "gtol": tol,
+                            "maxiter": max_iter - iterations,
+                            "maxls": _LINE_SEARCH_MAX_STEPS,
+                        },
+                    )
+                    iterations += int(result.nit)
+                    loss, gradient = objective(result.x)
+                    norm = float(abs(gradient).max())
+                    if (
+                        not np.isfinite(loss)
+                        or not np.isfinite(norm)
+                        or norm <= tol
+                        or not result.success
+                        or iterations >= max_iter
+                    ):
+                        break
+                    # L-BFGS-B may report an unchanged objective before the gradient
+                    # converges. Centering the same likelihood resolves changes
+                    # smaller than the rounding error of its absolute value.
+                    x0 = result.x
+                    reference = x0.copy()
+                    # Counted when scheduled. An exhausted loop leaves the gradient
+                    # above tol and raises below, so an accepted fit ran every count.
+                    optimizer_restarts += 1
 
-        self.C = C
-        self.data = data
-        self.eig_vals = vals
-        self._calc_var()
+                    def search_objective(
+                        x: np.ndarray, reference: np.ndarray = reference
+                    ) -> tuple[float, np.ndarray]:
+                        change = _likelihood_change(
+                            x, reference, groups, width, d, informative_rows
+                        )
+                        return change, objective(x)[1]
 
-    def transform(self, data=None):
-        """Project data onto the principal axes.
+                if not np.isfinite(loss) or not np.isfinite(norm) or norm > tol:
+                    raise RuntimeError(
+                        f"PPCA likelihood start {start + 1}/{n_init} did not converge within "
+                        f"{max_iter} iterations: gradient {norm:.3e} exceeds tol {tol:.3e} "
+                        f"({result.message})."
+                    )
+                if np.exp(result.x[-1]) <= _NOISE_FLOOR * _NOISE_FLOOR_MARGIN:
+                    raise ValueError(
+                        "PPCA fit reached the residual-noise floor; no accepted interior fit"
+                    )
+                histories.append(history)
+                results.append((result.x, loss, norm, iterations))
+            method = "observed-data Gaussian PPCA likelihood (L-BFGS-B)"
+        best = min(range(len(results)), key=lambda index: results[index][1])
+        parameters, loss, gradient_norm, iterations = results[best]
+        loadings = parameters[:-1].reshape(width, d)
+        noise = float(np.exp(parameters[-1]))
+        # C order, as the released fit's standardized.copy(): the same values in
+        # another memory layout change summation rounding in var_exp and
+        # correlations of the completed data (about 1e-13), so keep it pinned.
+        completed = conditional_complete(np.ascontiguousarray(standardized), loadings, noise)
+        C = orth(loadings)
+        if C.shape[1] != d:
+            raise ValueError("fitted Gaussian loadings have a rank-deficient latent space")
+        score_covariance = np.atleast_2d(np.cov((completed @ C).T))
+        score_variances, score_axes = np.linalg.eigh(score_covariance)
+        order = np.argsort(score_variances)[::-1]
+        score_variances = score_variances[order]
+        if np.any(score_variances <= 0):
+            raise ValueError("fitted projection has zero-variance scores")
+        C = C @ score_axes[:, order]
+        C *= np.sign(C[np.argmax(np.abs(C), axis=0), np.arange(d)])
+        self.C, self.means, self.stds = C, means, stds
+        self.data, self.valid_series = completed, valid
+        self.eig_vals = score_variances
+        self.var_exp = score_variances.cumsum() / np.var(completed, axis=0, ddof=1).sum()
+        self.loadings_, self.noise_variance_ = loadings, noise
+        self.log_likelihood_, self.gradient_norm_ = -loss * informative_rows, gradient_norm
+        self.n_iter_, self.converged_, self.method_ = iterations, True, method
+        self.tolerance_, self.n_informative_rows_ = tol, informative_rows
+        self.start_log_likelihoods_ = np.array([-item[1] * informative_rows for item in results])
+        self.start_gradient_norms_ = np.array([item[2] for item in results])
+        self.start_converged_ = np.ones(len(results), dtype=bool)
+        self.likelihood_history_ = np.array(histories[best])
+        self.n_optimizer_restarts_ = optimizer_restarts
+        return self
 
-        With no argument, returns the scores of the (standardized, EM-imputed)
-        training data. Otherwise ``data`` must be raw (unstandardized) complete
-        observations with the same columns, in the same order, as the data
-        passed to ``fit``; it is standardized with the fitted means and stds
-        before projection.
-        """
-        if self.C is None:
+    def transform(self, data: ArrayLike | None = None) -> np.ndarray:
+        """Project complete raw rows, or the completed training rows if omitted."""
+        if self.C is None or self.means is None or self.stds is None:
             raise RuntimeError("Fit the model first.")
         if data is None:
+            if self.data is None:
+                raise RuntimeError(
+                    "training data are not retained by save/load; supply complete data"
+                )
             return self.data @ self.C
         data = np.asarray(data, dtype=float)
+        if data.ndim != 2:
+            raise ValueError("transform() requires a two-dimensional array")
         if self.valid_series is not None and data.shape[1] == len(self.valid_series):
             data = data[:, self.valid_series]
         if data.shape[1] != len(self.means):
             raise ValueError(
-                f"expected {len(self.valid_series) if self.valid_series is not None else len(self.means)} "
-                f"columns (as passed to fit), got {data.shape[1]}"
+                f"expected {len(self.means)} retained columns or the original fit width, "
+                f"got {data.shape[1]}"
             )
-        if np.isnan(data).any():
-            raise ValueError(
-                "transform() requires complete observations; "
-                "drop or impute rows with missing values first."
-            )
+        if not np.isfinite(data).all():
+            raise ValueError("transform() requires complete finite observations")
         return ((data - self.means) / self.stds) @ self.C
 
-    def _calc_var(self):
-        var = np.nanvar(self.data.T, axis=1)
-        self.var_exp = self.eig_vals.cumsum() / var.sum()
+    def state_dict(self) -> dict[str, np.ndarray | float | int | bool | str]:
+        # n_optimizer_restarts_ is intentionally excluded: the released archive
+        # schema is frozen, and the count is reported in the validation log.
+        """Return only pickle-free fitted parameters/diagnostics, never microdata."""
+        if self.C is None:
+            raise RuntimeError("Fit the model first.")
+        return {
+            name: getattr(self, name)
+            for name in (
+                "C",
+                "means",
+                "stds",
+                "eig_vals",
+                "var_exp",
+                "valid_series",
+                "loadings_",
+                "noise_variance_",
+                "log_likelihood_",
+                "gradient_norm_",
+                "n_iter_",
+                "converged_",
+                "start_log_likelihoods_",
+                "start_gradient_norms_",
+                "start_converged_",
+                "likelihood_history_",
+                "method_",
+                "tolerance_",
+                "n_informative_rows_",
+            )
+            if getattr(self, name) is not None
+        }
 
-    def save(self, fpath):
-        """Save all model parameters (npz)."""
-        np.savez(
-            fpath,
-            C=self.C,
-            means=self.means,
-            stds=self.stds,
-            eig_vals=self.eig_vals,
-            valid_series=self.valid_series,
-        )
+    def save(self, fpath: str | Path) -> None:
+        """Save projection/Gaussian parameters and convergence evidence, not data."""
+        # np.savez's stub confuses **kwds with its allow_pickle flag; values are arrays or scalars.
+        np.savez(fpath, **cast(dict[str, Any], self.state_dict()))
 
-    def load(self, fpath):
-        """Load model parameters saved by :meth:`save`."""
-        with np.load(fpath) as npz:
-            self.C = npz["C"]
-            self.means = npz["means"]
-            self.stds = npz["stds"]
-            self.eig_vals = npz["eig_vals"]
-            if "valid_series" in npz:
-                self.valid_series = npz["valid_series"]
+    def load(self, fpath: str | Path) -> Self:
+        """Load a new model or a legacy projection-only archive without pickle."""
+        loaded = PPCA()
+        with np.load(fpath, allow_pickle=False) as archive:
+            for name in ("C", "means", "stds", "eig_vals"):
+                setattr(loaded, name, archive[name])
+            for name in vars(loaded).keys() - {"C", "means", "stds", "eig_vals", "data"}:
+                if name in archive:
+                    value = archive[name]
+                    setattr(loaded, name, value.item() if value.ndim == 0 else value)
+        self.__dict__.update(loaded.__dict__)
+        return self

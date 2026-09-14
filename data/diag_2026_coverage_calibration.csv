@@ -1,7 +1,0 @@
-quantity,value,note,K_clusters
-chi2_radius_nominal_95,5.99146454710798,the radius the published ellipses use,10
-hotelling_radius,10.032682741930149,"2(K-1)/(K-2) F(0.95; 2, K-2) at K=10; conservative alternative",10
-analytic_coverage_unbiased_cov,0.8701045946312145,"idealisation: covariance of K cluster means, divisor K-1",10
-analytic_coverage_bootstrap_plugin_cov,0.8470860729797612,"divisor K, the nonparametric cluster bootstrap's limit",10
-simulated_coverage_identity_cov,0.8489,"full estimator, 20000 cells x 2000 replicates",10
-simulated_coverage_correlated_cov,0.8489,affine-invariance check; must match the identity run,10

@@ -90,9 +90,31 @@ WESTERN_LLMS_2026 = frozenset(
 )
 
 
+# Attempted but excluded before any responses were collected (billing errors).
+EXCLUDED_LLMS_2026 = frozenset({"kimi-k3"})
+
+# The 17 collected models: every cohort member except the excluded attempts.
+COLLECTED_LLMS_2026 = (CHINESE_LLMS_2026 | WESTERN_LLMS_2026) - EXCLUDED_LLMS_2026
+
+
 def cohort_2026(llm: str) -> str:
     if llm in CHINESE_LLMS_2026:
         return "Chinese"
     if llm in WESTERN_LLMS_2026:
         return "Western"
     raise ValueError(f"unknown 2026 model: {llm}")
+
+
+# Developer-family units for the declared sensitivity analyses.
+FAMILIES = {
+    "deepseek": ["deepseek-v4-flash", "deepseek-v4-flash:0731", "deepseek-v4-pro"],
+    "gemma": ["gemma4:31b"],
+    "glm": ["glm-5.1", "glm-5.2"],
+    "gpt-oss": ["gpt-oss:20b", "gpt-oss:120b"],
+    "kimi": ["kimi-k2.6", "kimi-k2.7-code"],
+    "minimax": ["minimax-m2.7", "minimax-m3"],
+    "mistral": ["mistral-large-3:675b"],
+    "nemotron": ["nemotron-3-nano:30b", "nemotron-3-super", "nemotron-3-ultra"],
+    "qwen": ["qwen3.5:397b"],
+}
+FAMILY_OF = {m: f for f, ms in FAMILIES.items() for m in ms}

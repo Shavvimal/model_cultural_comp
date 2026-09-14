@@ -1,0 +1,312 @@
+# Reproducing the corrected analysis
+
+Use the `v1.1.0` source tag (`git checkout v1.1.0`). Run commands from the
+repository root with Python 3.11 and `uv sync --frozen`.
+`make check` uses synthetic fixtures only. The full analysis needs the licensed
+survey inputs below and a separate archive of retained model responses.
+
+## Frozen response archive
+
+Download [model-cultural-comp-responses-2026-09-12.tar.gz](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz)
+(5,787,471 bytes) and its [SHA-256 sidecar](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz.sha256)
+from the [v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0).
+The archive SHA-256 is
+`10fd2e8d83ce4ce091551790ef0007cbafb866f48f436efa5d19d6f1fd8cd311`.
+The source checkout and separate archive together identify the frozen replay;
+keep the archive and its contents out of Git.
+
+[reproduction-data.json](reproduction-data.json) fixes the exact 69 inputs by
+relative filename, size and SHA-256:
+
+- 11 portable 2024 response files (5,500 records);
+- 34 primary 2026 files and 17 English no-persona files;
+- the frozen trace sample and five annotation panels;
+- the historical published 2024 country-coordinate CSV used only for correction
+  accounting, not an external Inglehart–Welzel benchmark.
+
+The archive contains these files and a copy of the manifest. It excludes survey
+microdata, local caches, model binaries, bootstrap draws, generated summaries,
+figures, private collection logs and the regenerable blank coding worksheet.
+The [protocol](PROTOCOL.md) documents schemas and retained-information limits.
+The 2024 pickle-to-JSONL conversion preserves fields and row order; tuples become
+arrays. The frozen trace sample uses JSON null for absent error fields. Original
+hashes for those converted inputs remain in the manifest.
+
+Verify the downloaded checksum, then install and verify the inputs:
+
+```bash
+(cd /path/to/downloads && shasum -a 256 -c model-cultural-comp-responses-2026-09-12.tar.gz.sha256)
+uv run python scripts/reproduction_data.py install /path/to/model-cultural-comp-responses-2026-09-12.tar.gz
+make verify-data
+```
+
+Installation validates all archive members against the checkout's manifest before
+writing inputs. It rejects missing, additional, duplicate, nonregular or altered
+members, and refuses to overwrite different existing inputs. Verification also
+rejects additional response files or human labels that would change the frozen
+analysis. Keep new experiments in another checkout.
+
+A maintainer who already holds all verified inputs can build the deterministic
+archive outside the repository:
+
+```bash
+uv run python scripts/reproduction_data.py pack --output ../releases/model-cultural-comp-responses-2026-09-12.tar.gz
+```
+
+This emits the archive and its `.sha256` sidecar. The explicit manifest allowlist
+prevents inclusion of other local files. Packaging neither collects new responses
+nor reconstructs missing historical metadata. The software's MIT licence does
+not assign a licence to model outputs or third-party survey materials; retain
+applicable provenance and terms when distributing the separate archive.
+
+## Results and historical provenance supplement
+
+The corrected appendix's aggregate artifacts are supplied separately from Git
+and the frozen input archive. Download
+[model-cultural-comp-paper-results-2026-09-12.tar.gz](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz)
+(207,780 bytes) and its [SHA-256 sidecar](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz.sha256)
+from the same [v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0).
+Its SHA-256 is
+`7ea1be9d9f07380e53ad3e9fdf653287da9d516ad94b3939a35bb75a8a49809f`.
+Verify its sidecar, then check every member against the tracked results manifest
+before extracting the supplement:
+
+```bash
+(cd /path/to/downloads && shasum -a 256 -c model-cultural-comp-paper-results-2026-09-12.tar.gz.sha256)
+uv run python scripts/reproduction_data.py verify-results /path/to/model-cultural-comp-paper-results-2026-09-12.tar.gz
+```
+
+[results-manifest.json](results-manifest.json) is a byte-identical copy of the
+supplement's embedded `RESULTS_MANIFEST.json`. `verify-results` reads the archive
+without extracting it. It applies the same member checks as `install`: exact
+names, no duplicates, regular files only and expected sizes before any content is
+read. It then requires every listed file's SHA-256, an embedded manifest equal to
+the tracked copy, and the input-manifest hash of this checkout's
+`reproduction-data.json`.
+
+The supplement contains 91 regenerated aggregate CSVs, the seed-angle log used
+by the optional `seed_sensitivity.py --from-stored` summary, and the original
+`data/trace_coding.json`. `RESULTS_MANIFEST.json` records per-file hashes, sizes,
+roles, the analysis source tree and the frozen input-manifest hash. The supplement
+also carries a short `README.md`, which the manifest does not list; its exact text
+is tracked as [results-supplement-README.md](results-supplement-README.md), which
+`pack-results` packs byte for byte. `verify-results` checks only that README's
+name and a 64,000-byte size limit, not its content. All seventeen
+CSV filenames cited in the current appendix are included, in particular:
+
+- `data/llm_parse_rates_2026.csv`;
+- `data/llm_ellipses_2026.csv`;
+- `data/llm_language_effects_plugin_2026.csv`;
+- `data/diag_2026_keying_balance.csv`.
+
+The historical `trace_coding.json` contains the original eight-coder counts and
+model-output excerpts described in the appendix. It is retained verbatim for
+provenance and is superseded by the five-panel analysis. The corrected pipeline
+does not read it, and it cannot be recreated by rerunning the current annotators.
+Current trace results are in the `trace_coding_2026.csv`,
+`trace_coding_headline_2026.csv`, `trace_agreement_2026.csv` and related summaries.
+
+Extract the supplement into a separate directory to inspect the reported outputs.
+A fresh reproduction should regenerate outputs with `make reproduce` rather than
+preload them. The supplement excludes licensed respondent records, fitted models,
+bootstrap draws, per-trace label exports and the blank human worksheet. The frozen
+response archive preserves the underlying primary records and five label panels.
+No result file needs to be committed to Git to accompany the public release.
+
+## What the archives alone can and cannot reproduce
+
+The fitted instrument, `data/cultural_map_model.npz`, is not distributed in Git
+or in either archive. It is regenerated by `validate_projection.py` from the
+licensed survey cache. **Without the licensed survey inputs, no coordinate can be
+recomputed:** neither country positions nor any model position, bootstrap region,
+displacement or statistic derived from them.
+
+| Needs the licensed survey inputs | Runs from the release archives alone |
+|---|---|
+| `build_country_meta.py` and `validate_projection.py`, which read `data/ivs_df.pkl` | `make verify-data` and `reproduction_data.py verify-results` |
+| Stages that load the fitted instrument: `bootstrap_llms.py`, `analyze_2026.py`, `confirmatory_2026.py`, `diagnostics_2026.py`, `language_design_sensitivity.py`, `prompt_sensitivity_2026.py` | `qc_2026.py`, which re-parses the retained 2026 responses |
+| `seed_sensitivity.py`, which refits from the cache, and `instrument_sensitivity.py`, which re-prepares it and loads the fitted instrument | `make validate-traces` (`code_traces_2026.py --merge` and `trace_agreement_2026.py`), which read the frozen trace sample and five label panels |
+| Later stages that read those outputs, including `reference_sensitivity.py` (which also reads the undistributed 2024 bootstrap draws) and both figure scripts | Inspecting the reported aggregates in the results supplement |
+
+A reader without a licence can therefore check the response and supplement
+hashes, rerun 2026 quality control and the trace-agreement analysis, and compare
+reported aggregates, but cannot regenerate any coordinate-based result.
+
+## Licensed survey input provenance
+
+Obtain these versions from their original providers under the applicable terms:
+
+| Input | Version and provider | Bytes | SHA-256 |
+|---|---|---:|---|
+| `Trends_VS_1981_2022_sav_v4_0.sav` | WVS Time Series 1981–2022, v4-0-0 (2024-06-30), [WVS download](https://www.worldvaluessurvey.org/WVSEVStrend.jsp), DOI [10.14281/18241.27](https://doi.org/10.14281/18241.27) | 534274112 | `7ad3bb018c8cbfe07ac2d0fca3b914bf444053cd3e7a7eb7493cbd727258562d` |
+| `ZA7503_v3-0-0.sav` | EVS Trend File 1981–2017, v3.0.0 (2022-12-14), [GESIS ZA7503](https://search.gesis.org/research_data/ZA7503), DOI [10.4232/1.14021](https://doi.org/10.4232/1.14021) | 227393114 | `6e3cab793a87a21c00cc2ca5570e244fd4a6e152dc1394cb005b15a1b3843025` |
+
+Apply the provider's `EVS_WVS_Merge Syntax_Spss_June2024.sps` using SPSS, adjusting
+local paths as its instructions require. The retained unedited syntax SHA-256 is
+`fa1e3f4314404c39308c18270ec9ee8c1df1dc9b118a71e148009a3f3bac1914`.
+The source files contain 442,473 WVS and 224,434 EVS rows; the merged input contains
+666,907 rows. The retained `Integrated_values_surveys_1981-2022.sav` has 858,671,834
+bytes and SHA-256
+`9da7dbe3921f88e4835dfe6fec00328b02773df4d945f5523f1e83c9a2906ce8`.
+SAV writer metadata may differ after a fresh merge. These checksums identify the
+retained source files; the repository does not distribute them or automate SPSS.
+
+Place the merged file in ignored `data/`, then create a trusted local cache:
+
+```bash
+uv run python - <<'PYTHON'
+from pathlib import Path
+import pyreadstat
+
+Path("data").mkdir(exist_ok=True)
+df, _ = pyreadstat.read_sav(
+    "data/Integrated_values_surveys_1981-2022.sav", encoding="latin1"
+)
+assert len(df) == 666907, f"Unexpected merged row count: {len(df)}"
+assert {"A029", "A039", "A040", "A042"}.issubset(df.columns)
+df.to_pickle("data/ivs_df.pkl")
+PYTHON
+```
+
+Retain all columns. The four Y003 constituents are essential to the corrected
+sample; a previously reduced cache can silently prevent reconstruction. The
+pipeline reads only locally prepared pickle caches, not downloaded executable
+pickle data. Allow several gigabytes of disk and memory for the full DataFrame.
+No access credentials or survey files belong in Git or in the response archive.
+
+### Alternative without SPSS
+
+Readers without SPSS can build the cache from the two source files with
+`pyreadstat` alone. Read the columns the instrument uses from each file, add any
+absent column as missing, and concatenate WVS then EVS:
+
+```bash
+uv run python - <<'PYTHON'
+import numpy as np
+import pandas as pd
+import pyreadstat
+
+COLUMNS = ["S020", "S003", "S017", "A008", "A165", "E018", "E025", "F063", "F118",
+           "F120", "G006", "Y002", "Y003", "A029", "A039", "A040", "A042"]
+
+def load(name):
+    _, meta = pyreadstat.read_sav(f"data/{name}", metadataonly=True, encoding="latin1")
+    present = [c for c in COLUMNS if c in meta.column_names]
+    df, _ = pyreadstat.read_sav(f"data/{name}", usecols=present, encoding="latin1")
+    for column in COLUMNS:
+        if column not in df:
+            df[column] = np.nan  # the EVS trend file has no Y003 column
+    return df[COLUMNS]
+
+df = pd.concat([load("Trends_VS_1981_2022_sav_v4_0.sav"), load("ZA7503_v3-0-0.sav")],
+               ignore_index=True)
+assert len(df) == 666907, f"Unexpected merged row count: {len(df)}"
+df.to_pickle("data/ivs_df.pkl")
+PYTHON
+```
+
+This route was checked during the independent review on 12 September 2026. The
+code under review was the release candidate that preceded the final PPCA
+convergence commits, and the check has not been repeated on v1.1.0 itself. In
+that check:
+
+- after aligning rows on the respondent key `S007_01`, every column above except
+  `Y003` matched the SPSS-merged cache cell for cell over 666,907 rows;
+- `Y003` differed only in the 224,434 EVS rows, which are missing here and carry
+  the merge's `-3` code in the SPSS route;
+- `build_country_meta.py` wrote a byte-identical `country_codes.pkl`;
+- `validate_projection.py` reproduced the 392,382 fitting rows. The fitted
+  instrument agreed to 9.3e-10, country scores to 4.2e-13 and rotation angles to
+  1.3e-11. The preparation and unmapped-entity CSVs were byte-identical.
+
+One quantity cannot be recomputed this way: `sentinel_recodes_Y003` in
+`data/validation_summary_2024.csv` reads 0 instead of 125,718, because the EVS
+`-3` codes it counts never enter this cache. The check covered the instrument
+stage only; later stages that read the cache (`seed_sensitivity.py` and
+`instrument_sensitivity.py`) were not compared on this route.
+
+## Offline command chain
+
+```bash
+make reproduce
+```
+
+This sequential target prepares country metadata, refits the instrument and runs:
+
+| Stage | Outputs under ignored `data/` and `figures/` |
+|---|---|
+| `build_country_meta.py`, `validate_projection.py` | Country metadata, fitted Gaussian parameters and score transform, country coordinates, preparation and validation summaries |
+| `bootstrap_llms.py`, `qc_2026.py`, `analyze_2026.py` | Both cohorts' observed positions, bootstrap draws, regional labels, completeness and parse diagnostics |
+| Confirmatory, diagnostic, language, prompt and family/wording scripts | Paired effects, permutation/sign tests, multiplicity corrections, missingness bounds, profile and control sensitivities |
+| `seed_sensitivity.py`, `reference_sensitivity.py`, `instrument_sensitivity.py` | Twenty fitting seeds, reference definitions, rotation/completion alternatives and dated country-neighbour comparisons |
+| `make_figures.py`, `make_figures_2026.py` | Six static study figures as PDF and PNG |
+| `code_traces_2026.py --merge`, `trace_agreement_2026.py` | Frozen-panel majority coding, agreement and selection/self-annotation diagnostics |
+
+The targets use seed 42 where applicable, one OpenMP thread and the Agg plotting
+backend. Floating-point differences can occur across BLAS/platform versions;
+PDF creation timestamps also vary. The lockfile pins dependency versions, not
+hardware. Reproduction should start with empty generated-output directories so
+stale results cannot satisfy a missing stage.
+
+Expected primary reconciliation: 392,382 fitting respondents across 112 entity
+codes, 389,341 respondents in 109 mapped entities, 117,075 reconstructed Y003
+indices, eleven 2024 and 33 eligible 2026 cells. The 2026 primary quadrant contains
+33/33 observed means and 330,000/330,000 bootstrap draws; this is descriptive and
+does not establish simultaneous confidence coverage. Chinese administration raises
+self-expression in 15/16 paired cells, with mean displacement about 0.64.
+
+The chain never calls collection or annotation APIs. If desired, regenerate the
+blank human worksheet separately with
+`uv run python scripts/code_traces_2026.py --worksheet`. Completed human labels
+are absent from the frozen analysis. Do not regenerate the trace sample or rerun
+annotators as part of replay: their stored texts and panel identities define the
+reported agreement analysis. Live hosted model tags may change and rerunning
+collection is a new experiment, not exact reproduction.
+
+## Scope and historical paths
+
+The append-only [analysis plan](analysis-plan-2026.md) retains superseded entries
+and their dated corrections. It first entered Git in the v1.1.0 revision. Its
+dates, including the 2026-08-04 writing date, are recorded by the author; this
+repository holds no earlier timestamp that independently shows the plan preceded
+the analyses.
+
+Section 0 of the plan (line 30) promises an out-of-range value category in the
+failure taxonomy. The implemented QC gate has no such category: every retained
+failure is a `parse:` record, and the parsers reject a value outside an item's
+options, so it is classified as format non-compliance, not counted separately.
+`qc_2026.py` classifies failures as refusal, format non-compliance or empty,
+and counts deterministic `provider:` rejections apart from them. Item value ranges
+are checked separately in `data/qc_2026_index_validity.csv`, whose
+`out_of_range` column is a different check.
+
+The plan cites two files that are not in this repository. `docs/statistical-review.md`
+(line 9) was an unpublished internal review. `scripts/verify_paper_claims.py`
+(section 0) is maintained with the paper project. Manuscript claim checking,
+literal-table exports and blog exports all live with the paper, not this source
+repository. Older notebooks are not part of the supported pipeline. A public source
+deposit must also exclude historical commits containing data or notebook outputs;
+ignoring or deleting those paths in a new commit does not remove old copies.
+
+## Publishing the archives (maintainers)
+
+1. Run `make check` and `make verify-data`. If the analysis changes, run
+   `make reproduce` and reconcile the aggregates before packaging.
+2. Build the response archive with the `reproduction_data.py pack` command
+   above. Rebuild the results supplement from the regenerated outputs with
+   `uv run python scripts/reproduction_data.py pack-results --output ../releases/model-cultural-comp-paper-results-2026-09-12.tar.gz`.
+   It refuses any listed file that differs from `docs/results-manifest.json`. Given
+   the v1.1.0 outputs it writes the archive above byte for byte. Preserve the
+   original historical `trace_coding.json`; the current pipeline cannot
+   regenerate it. Both commands write archives outside Git with SHA-256 sidecars.
+   Check the result with `verify-results`.
+3. Record the final archive sizes and SHA-256 values in this guide. Set the
+   changelog date to the release date and its comparison link to the release tag.
+4. Squash-merge the source/documentation PR. Tag **that merged commit** `v1.1.0`
+   and create its GitHub release. Attach both named `.tar.gz` files and both
+   `.tar.gz.sha256` sidecars. GitHub supplies the tagged source downloads.
+5. Download the four assets from the release and verify both checksums. Install
+   the response archive into a clean `v1.1.0` checkout and run `make verify-data`.
+   Confirm the results supplement contains every manifest member. The paper's
+   release-availability statement requires these published downloads as well as
+   the source tag.

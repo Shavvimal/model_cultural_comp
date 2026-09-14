@@ -3,7 +3,7 @@
 Eight diagnostic families feeding the paper's robustness appendix, each a
 typed function returning a DataFrame, written to data/diag_2026_<name>.csv:
 
-  1. variance components (model / language / variant / repeat), in map units
+  1. descriptive nested dispersion (model / language / variant / repeat)
   2. prompt-variant ICC(1) per model x language x item
   3. empirical item keying and an acquiescence/directional-bias table
   4. refusal rates, with an en-vs-zh comparison on the sensitive items
@@ -18,9 +18,10 @@ Run:  uv run python scripts/diagnostics_2026.py
 
 Sources and conventions
 -----------------------
-* Raw corpus: data/collection_2026/*.jsonl, both arms. system_prompt_id and
-  repeat are serialised as both str and int across resumed runs; they are
-  normalised with astype(int) before the keep-last dedup on
+* Raw corpus: data/collection_2026/*.jsonl, both arms, read with
+  app.llm_bootstrap.load_trial_records. system_prompt_id and repeat are
+  serialised as both str and int across resumed runs; they are normalised
+  with astype(int) before the keep-last dedup on
   (llm, language, question, system_prompt_id, repeat).
 * Values are transformed with app.llm_bootstrap._to_value, the same
   Y002/Y003 recodes as the headline pipeline. (load_responses_2026 is not
@@ -29,14 +30,13 @@ Sources and conventions
   (cm.ppca.means after load_model, the "means" array in
   data/cultural_map_model.npz): unweighted nanmeans over the post-2005,
   sentinel-recoded, >=6-items-answered IVS training rows, in IV_QNS order.
-  The vector of these means projects to exactly (0.38, -0.01) - the pooled
-  human respondent mean - so it doubles as the human-grand-mean base point.
-* The variance decomposition in (1) is a balanced nested approximation to
-  the full crossed model x language x variant x repeat G-study: each level
-  is estimated as the mean (over higher-level units) of the ddof=1 sample
-  variance of the next level's means, not by solving the crossed
-  expected-mean-square equations. With near-balanced cells (10 variants x
-  5 repeats) the approximation is close; it is labelled as such.
+  This vector projects to SURVEY_REFERENCE (the rescale offsets), not
+  necessarily to the mean of the conditionally completed respondent scores.
+* The primary dispersion summary is an orthogonal sums-of-squares partition
+  of synthetic ten-item profiles. Language-within-model includes the
+  model-by-language interaction. Legacy per-level variances are descriptive
+  variances of different levels' means, not additive variance components
+  or a fitted crossed generalisability study.
 * Nothing here is stochastic - every quantity is a deterministic function
   of the corpus and the frozen model.
 
@@ -45,68 +45,35 @@ parsed response) are skipped where a complete 10-item mean vector is
 required, and reported rather than imputed.
 """
 
-import json
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from qc_2026 import classify_failure
 
-from app.culture_map import ITEM_VALID_RANGES, IV_QNS, CulturalMap
-from app.llm_bootstrap import _to_value
-from app.llm_meta import cohort_2026
+from app.culture_map import HUMAN_MEAN, ITEM_VALID_RANGES, IV_QNS, CulturalMap
+from app.llm_bootstrap import _to_value, load_trial_records
+from app.llm_meta import FAMILIES, cohort_2026
+from app.study_design import SENSITIVE_QNS
+from scripts.qc_2026 import classify_failure
 
 RAW_DIR = Path("data/collection_2026")
 MODEL_PATH = "data/cultural_map_model.npz"
-HUMAN_MEAN = (0.38, -0.01)  # pooled human respondent mean, map units
-SENSITIVE_QNS = ["F118", "F120", "F063", "G006", "E025"]
 THRESHOLDS = (5, 10, 25)
 CELL = ["llm", "language"]
 PSEUDO_KEY = ["llm", "language", "system_prompt_id", "repeat"]
 AXES = ("PC1_rescaled", "PC2_rescaled")
 
-# Protocol-matched families for the within-family descriptives (6).
-FAMILIES = {
-    "deepseek": ["deepseek-v4-flash", "deepseek-v4-flash:0731", "deepseek-v4-pro"],
-    "gemma": ["gemma4:31b"],
-    "glm": ["glm-5.1", "glm-5.2"],
-    "gpt-oss": ["gpt-oss:20b", "gpt-oss:120b"],
-    "kimi": ["kimi-k2.6", "kimi-k2.7-code"],
-    "minimax": ["minimax-m2.7", "minimax-m3"],
-    "mistral": ["mistral-large-3:675b"],
-    "nemotron": ["nemotron-3-nano:30b", "nemotron-3-super", "nemotron-3-ultra"],
-    "qwen": ["qwen3.5:397b"],
-}
-
-
-def _cohort(llm: str) -> str:
-    try:
-        return cohort_2026(llm)
-    except ValueError:
-        return "unknown"
-
 
 def load_raw() -> pd.DataFrame:
-    """Load every 2026 record with types normalised and resumed runs deduped."""
-    paths = sorted(RAW_DIR.glob("*.jsonl"))
-    if not paths:
-        raise FileNotFoundError(f"no JSONL files in {RAW_DIR}")
-    records = []
-    for path in paths:
-        with path.open() as f:
-            records.extend(json.loads(line) for line in f)
-    df = pd.DataFrame(records)
-    df["language"] = df.get("language", pd.Series([None] * len(df))).fillna("en")
-    # Resumed runs serialised these as str; originals as int. Normalise
-    # before the dedup, or mixed-type duplicates survive the key.
-    df["system_prompt_id"] = df["system_prompt_id"].astype(int)
-    df["repeat"] = df["repeat"].astype(int)
+    """Load every 2026 record with types normalised and resumed runs deduped.
+
+    Uses the shared ``load_trial_records``, then resets the index and fills
+    null ``raw_content`` with an empty string for the failure taxonomy.
+    """
+    df = load_trial_records(RAW_DIR).reset_index(drop=True)
     df["raw_content"] = df["raw_content"].fillna("")
-    df = df.drop_duplicates(
-        subset=["llm", "language", "question", "system_prompt_id", "repeat"], keep="last"
-    )
-    return df.reset_index(drop=True)
+    return df
 
 
 def parsed_values(cm: CulturalMap, raw: pd.DataFrame) -> pd.DataFrame:
@@ -230,13 +197,13 @@ def _orthogonal_ss(pseudo: pd.DataFrame, axis: str) -> dict[str, float]:
 def variance_components(pseudo: pd.DataFrame) -> pd.DataFrame:
     """Nested variance decomposition per axis, in map units.
 
-    Balanced nested approximation to the crossed G-study (module docstring):
+    Descriptive variances of nested means (module docstring):
     each component is the mean, over the units one level up, of the ddof=1
     variance of the next level's means. Language-within-model averages only
     models observed in both arms.
 
-    Reported under both conventions. ``pct_of_total`` is the mean-square
-    share (each level's per-unit variance as a share of the four summed);
+    ``pct_of_total`` is a legacy normalised-level-variance field, not a
+    share of total profile variance (each level's variance divided by their sum);
     ``pct_of_total_ss`` is the orthogonal sums-of-squares share, which
     partitions the total variance exactly and does not over-credit the
     two-level language factor. The two disagree materially for language, so
@@ -283,6 +250,8 @@ def variance_components(pseudo: pd.DataFrame) -> pd.DataFrame:
                     "sum_of_squares": ss[name],
                     "pct_of_total_ss": 100.0 * ss[name] / ss_total if ss_total > 0 else np.nan,
                     "n_units": n_units,
+                    "primary_definition": "orthogonal SS of synthetic ten-item profiles",
+                    "legacy_pct_definition": "normalised variances of nested means; not additive components",
                 }
             )
     return pd.DataFrame(rows)
@@ -394,7 +363,8 @@ def keying_balance(parsed: pd.DataFrame, keying: pd.DataFrame) -> pd.DataFrame:
         rec = {
             "llm": llm,
             "language": lang,
-            "cohort": _cohort(llm),
+            # An unmapped model raises: a cited cohort column cannot say "unknown".
+            "cohort": cohort_2026(llm),
             "n_items": int(row.notna().sum()),
         }
         for name, items in splits.items():
@@ -453,7 +423,7 @@ def refusal_sensitive(rates: pd.DataFrame) -> pd.DataFrame:
             out[f"{metric}_{lang}"] = piv[col] if col in piv.columns else np.nan
     out["refusals_zh_minus_en"] = out["n_refusal_zh"] - out["n_refusal_en"]
     out = out.reset_index()
-    out.insert(1, "cohort", out["llm"].map(_cohort))
+    out.insert(1, "cohort", out["llm"].map(cohort_2026))
     return out.sort_values(["llm", "question"]).reset_index(drop=True)
 
 
@@ -722,7 +692,7 @@ def sensitivity_neutralised(cm: CulturalMap, parsed: pd.DataFrame) -> pd.DataFra
 
 
 def main() -> int:
-    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+    cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
     cm.load_model(MODEL_PATH)
 
     raw = load_raw()

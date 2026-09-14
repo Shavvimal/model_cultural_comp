@@ -1,25 +1,26 @@
-"""Coverage calibration of the chi2 confidence ellipse at K = 10 clusters.
+"""Illustrative Gaussian coverage calculation at K = 10 equal-size clusters.
 
 The published ellipses use the conventional normal-theory radius
 chi2(0.95, 2) = 5.99 applied to the covariance of the cluster-bootstrap
 replicate cloud (``app.llm_bootstrap.confidence_ellipses``). That radius
 treats the replicate covariance as *known*. It is not: it is estimated from
-only K = 10 prompt-variant clusters, so the region under-covers. This script
-quantifies by how much, and checks the conservative alternative radius.
+only K = 10 prompt-variant clusters. This script quantifies undercoverage
+in an equally weighted Gaussian benchmark, not the actual ordinal responses,
+unequal retained counts, or heterogeneous prompt families in the corpus.
 
 Three things are computed, each written to the artefact:
 
   1. ``hotelling_radius`` — the exact radius that would give nominal 95%
-     coverage if the covariance were the unbiased sample covariance of K
-     cluster means:  2(K-1)/(K-2) * F(0.95; 2, K-2).
+     coverage using the unbiased covariance-of-the-mean estimate from K
+     Gaussian clusters: 2(K-1)/(K-2) * F(0.95; 2, K-2). For the bootstrap
+     covariance, the corresponding squared radius is larger by K/(K-1).
   2. ``analytic_*`` — closed-form true coverage of the chi2 radius under two
      readings of "the covariance", both exact for Gaussian cluster means:
        - ``unbiased``: covariance estimated with divisor K-1.
        - ``bootstrap_plugin``: divisor K, which is what the *nonparametric
          cluster bootstrap* converges to as the replicate count grows. This
-         is the reading that matches the pipeline, and it is the source of
-         most of the coverage loss.
-  3. ``simulated`` — a Monte Carlo that runs the actual estimator: draw K
+         matches the bootstrap covariance in the equal-cluster benchmark.
+  3. ``simulated`` — a Monte Carlo of that Gaussian benchmark: draw K
      cluster means, resample K clusters with replacement B times exactly as
      ``bootstrap_llm_positions_cluster`` does, take the replicate cloud's
      mean and ddof=1 covariance exactly as ``confidence_ellipses`` does, and
@@ -52,12 +53,21 @@ SEED = 42
 CORRELATED = np.array([[4.0, 0.9], [0.9, 0.25]])
 
 
-def hotelling_radius(k: int = K, level: float = LEVEL) -> float:
-    """Radius giving exact ``level`` coverage with an unbiased sample covariance."""
-    return 2 * (k - 1) / (k - 2) * f_dist.ppf(level, 2, k - 2)
+def hotelling_radius(k: int = K, level: float = LEVEL, divisor_k: bool = False) -> float:
+    """Squared radius for unbiased or limiting bootstrap covariance of the mean.
+
+    Exact only for equally weighted Gaussian clusters (and, for the
+    bootstrap covariance, infinitely many resampling draws).
+    """
+    if k <= 2:
+        raise ValueError("the two-dimensional Hotelling region requires K > 2")
+    radius = 2 * (k - 1) / (k - 2) * f_dist.ppf(level, 2, k - 2)
+    return radius * k / (k - 1) if divisor_k else radius
 
 
-def analytic_coverage(k: int = K, level: float = LEVEL, divisor_k: bool = False) -> float:
+def analytic_coverage(
+    k: int = K, level: float = LEVEL, divisor_k: bool = False, radius: float | None = None
+) -> float:
     """Exact coverage of the chi2 radius for Gaussian cluster means.
 
     With the unbiased covariance, T^2 = 2(k-1)/(k-2) F(2, k-2), so coverage is
@@ -65,7 +75,7 @@ def analytic_coverage(k: int = K, level: float = LEVEL, divisor_k: bool = False)
     covariance the ellipse shrinks by (k-1)/k in variance, which scales the
     radius the test is compared against by the same factor.
     """
-    radius = chi2.ppf(level, df=2)
+    radius = chi2.ppf(level, df=2) if radius is None else radius
     if divisor_k:
         radius *= (k - 1) / k
     return float(f_dist.cdf(radius / (2 * (k - 1) / (k - 2)), 2, k - 2))
@@ -79,7 +89,7 @@ def simulate_coverage(
     level: float = LEVEL,
     seed: int = SEED,
 ) -> float:
-    """Monte Carlo coverage of the pipeline's chi2 ellipse. True mean is 0."""
+    """Gaussian equal-cluster benchmark for the nominal chi2 ellipse; true mean 0."""
     rng = np.random.default_rng(seed)
     radius = chi2.ppf(level, df=2)
     chol = np.linalg.cholesky(cov)
@@ -109,12 +119,22 @@ def calibration_table() -> pd.DataFrame:
         {
             "quantity": "chi2_radius_nominal_95",
             "value": float(chi2.ppf(LEVEL, df=2)),
-            "note": "the radius the published ellipses use",
+            "note": "nominal normal-theory radius used in plots; not calibrated actual-corpus coverage",
         },
         {
             "quantity": "hotelling_radius",
             "value": hotelling_radius(),
-            "note": f"2(K-1)/(K-2) F(0.95; 2, K-2) at K={K}; conservative alternative",
+            "note": f"unbiased covariance of the mean; equally weighted Gaussian clusters, K={K}",
+        },
+        {
+            "quantity": "hotelling_radius_bootstrap_cov",
+            "value": hotelling_radius(divisor_k=True),
+            "note": "unbiased Hotelling radius multiplied by K/(K-1), for limiting bootstrap covariance",
+        },
+        {
+            "quantity": "analytic_coverage_corrected_hotelling_bootstrap_cov",
+            "value": analytic_coverage(divisor_k=True, radius=hotelling_radius(divisor_k=True)),
+            "note": "Gaussian equal-cluster limit only; unequal observed counts are not calibrated here",
         },
         {
             "quantity": "analytic_coverage_unbiased_cov",
@@ -129,7 +149,7 @@ def calibration_table() -> pd.DataFrame:
         {
             "quantity": "simulated_coverage_identity_cov",
             "value": sim_identity,
-            "note": f"full estimator, {N_TRIALS} cells x {N_BOOT} replicates",
+            "note": f"Gaussian equal-cluster benchmark, {N_TRIALS} cells x {N_BOOT} replicates",
         },
         {
             "quantity": "simulated_coverage_correlated_cov",
@@ -139,6 +159,7 @@ def calibration_table() -> pd.DataFrame:
     ]
     out = pd.DataFrame(rows)
     out["K_clusters"] = K
+    out["scope"] = "illustrative_equal_weight_Gaussian_clusters"
     return out
 
 

@@ -11,21 +11,36 @@ Everything projected afterwards — country data and model data alike — reuses
 the stored rotation, so all points share one coordinate space.
 """
 
+from pathlib import Path
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from factor_analyzer import Rotator
+from matplotlib.axes import Axes
 
 from app.ppca import PPCA
+from app.survey_indices import Y003_CONSTITUENTS, recover_y003
+
+# Declared analysis window: survey waves from this year onwards are pooled.
+MIN_SURVEY_YEAR = 2005
+# Completeness rule: a respondent needs at least this many of the ten items observed.
+MIN_OBSERVED_ITEMS = 6
+# Varimax convergence tolerance, pinned explicitly. The released instrument used
+# factor_analyzer's default (tol=1e-5), which stopped at theta = -37.851 degrees
+# rather than the optimum -39.397. Do not tighten it: that moves every published
+# coordinate by up to 0.06 map units. Pinning guards against a library default change.
+VARIMAX_TOL = 1e-5
 
 # The ten IVS items behind the Inglehart-Welzel map
 IV_QNS = ["A008", "A165", "E018", "E025", "F063", "F118", "F120", "G006", "Y002", "Y003"]
 
 # Valid value ranges per item. IVS microdata uses negative SPSS user-missing
 # codes (-1 "don't know" ... -5 "missing"); anything outside these ranges is a
-# sentinel, not a datum. Y003 is the documented offender: 31.9% of rows carry
-# -3 ("not applicable"), which an earlier version of this pipeline read as
-# data and which zeroed the item's loading on both axes.
+# sentinel, not a datum. The merged EVS Y003 column contains -3 because its
+# precomputed index is absent. After recoding, recover it wherever the four
+# harmonized child-quality responses are observed (see survey_indices.py).
 ITEM_VALID_RANGES = {
     "A008": (1, 4),
     "A165": (1, 2),
@@ -39,8 +54,25 @@ ITEM_VALID_RANGES = {
     "Y003": (-2, 2),
 }
 
-# Published WVS rescaling constants: PC' = a * PC + b
-PC_RESCALE_PARAMS = {"PC1": (1.81, 0.38), "PC2": (1.61, -0.01)}
+# WVS rescaling constants: PC' = a * PC + b, applied to unit-variance rotated
+# scores. Provenance: the WVS Association's published SPSS syntax for the map
+# (https://www.worldvaluessurvey.org/WVSContents.jsp?CMSID=tradrat):
+#     COMPUTE SurvSAgg = 1.81 * SurvSelf + .038 .
+#     COMPUTE TradAgg  = 1.61 * TradRat5 - .1 .
+# Until v1.1.0 this table carried (1.81, 0.38) and (1.61, -0.01), the values
+# printed in Tao et al. (2024), which misplace a decimal in both offsets; an
+# external reader caught the discrepancy (GitHub issue #12, 2 Sept 2026). The
+# slopes were never wrong. Because the offsets are additive and every point
+# (respondent, country, model, region centroid, pooled human mean) passes
+# through this one affine step, the correction is a rigid translation of the
+# whole map by (-0.342, -0.090). Pairwise distances and comparisons against an
+# equally translated reference are unchanged; fixed-zero crossings need not be.
+# The offsets are the projection of the observed per-item marginal-mean vector,
+# not necessarily the mean of completed respondent scores after PPCA imputation.
+PC_RESCALE_PARAMS = {"PC1": (1.81, 0.038), "PC2": (1.61, -0.10)}
+SURVEY_REFERENCE: tuple[float, float] = (PC_RESCALE_PARAMS["PC1"][1], PC_RESCALE_PARAMS["PC2"][1])
+# Compatibility alias, not the mean of completed respondent coordinates.
+HUMAN_MEAN = SURVEY_REFERENCE
 
 CULTURAL_REGION_COLORS = {
     "African-Islamic": "#000000",
@@ -58,10 +90,59 @@ CULTURAL_REGION_COLORS = {
 }
 
 
+def check_preparation(report: dict[str, Any]) -> None:
+    """Reject a survey preparation that cannot support research artefacts.
+
+    ``report`` is :attr:`CulturalMap.survey_preparation_report`. Raises if any
+    Y003 constituent column is absent (no index could be reconstructed) or if
+    any delivered Y003 disagrees with its valid constituents.
+    """
+    y003 = report["y003"]
+    if y003["missing_constituent_columns"]:
+        raise ValueError(
+            "Y003 constituent columns are missing from the harmonized inputs: "
+            f"{y003['missing_constituent_columns']}; supply the full harmonized inputs"
+        )
+    if y003["discordant_direct"]:
+        raise ValueError(
+            f"delivered Y003 disagrees with valid constituents in {y003['discordant_direct']} "
+            "rows; resolve before fitting"
+        )
+
+
+def validate_weights(weights: pd.Series, groups: Any = None, *, context: str) -> pd.Series:
+    """Return S017 weights unchanged after checking the published-mean contract.
+
+    Every weight must be present, finite and non-negative (zero is allowed),
+    and every group given by ``groups`` (anything ``Series.groupby`` accepts)
+    must have a positive sum. Missing weights are never filled: a silent
+    default would change a published weighted mean.
+    """
+    values = pd.to_numeric(weights, errors="coerce").to_numpy(dtype=float)
+    invalid = ~np.isfinite(values) | (values < 0)
+    if invalid.any():
+        raise ValueError(
+            f"{context}: S017 weights must be present, finite and non-negative; "
+            f"{int(invalid.sum())} of {len(values)} are not "
+            f"(missing or non-finite {int((~np.isfinite(values)).sum())}, "
+            f"negative {int((values < 0).sum())})"
+        )
+    if groups is not None:
+        sums = weights.groupby(groups).sum()
+        empty = sums.index[sums.to_numpy() <= 0].tolist()
+        if empty:
+            raise ValueError(f"{context}: S017 weights sum to zero for groups {empty}")
+    elif values.sum() <= 0:
+        raise ValueError(f"{context}: S017 weights sum to zero")
+    return weights
+
+
 class CulturalMap:
     """Fit the IW cultural map on IVS data and project new data onto it."""
 
-    def __init__(self, ivs_df, country_codes):
+    def __init__(
+        self, ivs_df: pd.DataFrame | str | Path, country_codes: pd.DataFrame | str | Path
+    ) -> None:
         """``ivs_df`` and ``country_codes`` may be DataFrames or pickle paths."""
         self.ivs_df = ivs_df if isinstance(ivs_df, pd.DataFrame) else pd.read_pickle(ivs_df)
         self.country_codes = (
@@ -70,37 +151,48 @@ class CulturalMap:
             else pd.read_pickle(country_codes)
         )
 
-        self.subset_ivs_df = None
-        self.valid_data = None
-        self.country_scores_pca = None
-        self.llm_scores_pca = None
+        self.subset_ivs_df: pd.DataFrame | None = None
+        self.valid_data: pd.DataFrame | None = None
+        self.country_scores_pca: pd.DataFrame | None = None
+        self.llm_scores_pca: pd.DataFrame | None = None
 
         self.iv_qns = IV_QNS
         self.pc_rescale_params = PC_RESCALE_PARAMS
         self.cultural_region_colors = CULTURAL_REGION_COLORS
 
         self.ppca = PPCA()
-        self.rotation = None  # (2, 2) varimax rotation, fitted once in fit()
-        self.score_stds = None  # (2,) rotated-score SDs, fixed at fit time
-        self.sentinel_counts = None  # per-item out-of-range recode counts
+        # (2, 2) varimax rotation, fitted once in fit()
+        self.rotation: np.ndarray | None = None
+        # (2,) rotated-score SDs, fixed at fit time
+        self.score_stds: np.ndarray | None = None
+        # per-item out-of-range recode counts
+        self.sentinel_counts: dict[str, int] | None = None
+        # aggregate reconstruction/eligibility audit
+        self.survey_preparation_report: dict[str, Any] | None = None
 
     ##############################################
     ################ Fitting #####################
     ##############################################
 
-    def prepare_data(self):
+    def prepare_data(self) -> None:
         """Filter the IVS to post-2005 waves and the ten map items.
 
         Out-of-range values (SPSS user-missing sentinels) are recoded to NaN
-        *before* the completeness filter, so a sentinel never counts as an
-        answered item. Per-item recode counts are kept in
-        ``self.sentinel_counts``.
+        before recovering missing Y003 from its four valid binary survey
+        constituents, then applying the completeness filter. A sentinel
+        never counts as an answered item. Per-item recode counts are kept
+        in ``self.sentinel_counts``; reconstruction, concordance and
+        eligibility counts are in ``self.survey_preparation_report``.
         """
-        subset = self.ivs_df[["S020", "S003", "S017", *self.iv_qns]]
+        columns = ["S020", "S003", "S017", *[qn for qn in self.iv_qns if qn != "Y003"]]
+        columns += [column for column in ("Y003", *Y003_CONSTITUENTS) if column in self.ivs_df]
+        subset = self.ivs_df[columns]
         subset = subset.rename(columns={"S020": "year", "S003": "country_code", "S017": "weight"})
-        # The waves from 2005 onwards reflect current societal norms; earlier
-        # waves would blend in values measured up to four decades ago.
-        subset = subset[subset["year"] >= 2005].copy()
+        # Apply the declared post-2005 analysis window. Pooling these waves
+        # does not calibrate the map to contemporary country values.
+        subset = subset[subset["year"] >= MIN_SURVEY_YEAR].copy()
+        if "Y003" not in subset:
+            subset["Y003"] = np.nan
 
         self.sentinel_counts = {}
         for qn, (lo, hi) in ITEM_VALID_RANGES.items():
@@ -108,11 +200,34 @@ class CulturalMap:
             self.sentinel_counts[qn] = int(bad.sum())
             subset.loc[bad, qn] = np.nan
 
-        # Require at least 6 of the 10 items answered
-        subset = subset.dropna(subset=self.iv_qns, thresh=6)
-        self.subset_ivs_df = subset
+        eligible_before = subset[self.iv_qns].notna().sum(axis=1) >= MIN_OBSERVED_ITEMS
+        recovery = recover_y003(subset)
+        # prepare_data creates a missing column for an index absent from the
+        # input; retain that distinction in the public aggregate report.
+        recovery.report["input_index_column_present"] = "Y003" in self.ivs_df
+        subset["Y003"] = recovery.values
+        eligible_after = subset[self.iv_qns].notna().sum(axis=1) >= MIN_OBSERVED_ITEMS
+        retained_provenance = recovery.provenance.loc[eligible_after]
+        self.survey_preparation_report = {
+            "schema_version": 1,
+            "years_min": MIN_SURVEY_YEAR,
+            "minimum_observed_items": MIN_OBSERVED_ITEMS,
+            "post_2005_rows": len(subset),
+            "eligible_before_y003_recovery": int(eligible_before.sum()),
+            "eligible_after_y003_recovery": int(eligible_after.sum()),
+            "added_eligible_rows": int((eligible_after & ~eligible_before).sum()),
+            "y003": recovery.report,
+            "retained_y003": {
+                "direct": int(retained_provenance.eq("direct").sum()),
+                "reconstructed": int(retained_provenance.eq("reconstructed").sum()),
+                "still_missing": int(retained_provenance.eq("missing").sum()),
+            },
+        }
+        self.subset_ivs_df = subset.loc[
+            eligible_after, ["year", "country_code", "weight", *self.iv_qns]
+        ].copy()
 
-    def fit(self, seed=42, verbose=False):
+    def fit(self, seed: int | None = 42, verbose: bool = False) -> None:
         """Fit the PPCA and fix the varimax rotation, once.
 
         The rotation is fitted on the training score matrix and stored in
@@ -133,7 +248,7 @@ class CulturalMap:
         )
         scores = self.ppca.transform()
 
-        rotator = Rotator(method="varimax")
+        rotator = Rotator(method="varimax", tol=VARIMAX_TOL)
         rotator.fit_transform(scores)
         self.rotation = rotator.rotation_
         self._orient_rotation()
@@ -144,7 +259,7 @@ class CulturalMap:
         # keep the SDs so projected data goes through the identical path.
         self.score_stds = rotated.std(axis=0, ddof=0)
 
-        self.valid_data = self._rescale(rotated)
+        self.valid_data = self.rescale(rotated)
         self.valid_data["country_code"] = self.subset_ivs_df["country_code"].values
         self.valid_data["weight"] = self.subset_ivs_df["weight"].values
         n_before = len(self.valid_data)
@@ -158,15 +273,17 @@ class CulturalMap:
                 "would silently corrupt every downstream coordinate."
             )
 
-    def _orient_rotation(self):
+    def _orient_rotation(self) -> None:
         """Fix the rotation's sign/order ambiguity to the IW convention.
 
         Varimax determines the rotated axes only up to column order and sign.
-        Pin both using item loadings with unambiguous placement on the map:
+        Pin both using projection coefficients with unambiguous placement on the map:
         F118 (justifiability of homosexuality) marks self-expression (positive
         PC1) and F063 (importance of God) marks traditional values (negative
         PC2).
         """
+        if self.ppca.C is None or self.rotation is None:
+            raise RuntimeError("fit the PPCA and rotation before orienting them")
         loadings = self.ppca.C @ self.rotation
         f118 = self.iv_qns.index("F118")
         f063 = self.iv_qns.index("F063")
@@ -179,7 +296,13 @@ class CulturalMap:
         )
         self.rotation = self.rotation * signs
 
-    def _rescale(self, rotated_scores) -> pd.DataFrame:
+    def rescale(self, rotated_scores: np.ndarray) -> pd.DataFrame:
+        """Standardize rotated scores by the fitted SDs, then apply the WVS affine map.
+
+        This is the single sanctioned final step of the frozen path
+        (standardize, project onto C, rotate, rescale). Returns ``PC1``/``PC2``
+        unit-variance scores and their ``*_rescaled`` map coordinates.
+        """
         if self.score_stds is None:
             raise RuntimeError("score_stds not set; fit() or load_model() first.")
         df = pd.DataFrame(rotated_scores / self.score_stds, columns=["PC1", "PC2"])
@@ -202,18 +325,28 @@ class CulturalMap:
         if self.rotation is None:
             raise RuntimeError("Call fit() (or load_model()) first.")
         scores = self.ppca.transform(data[self.iv_qns].to_numpy())
-        return self._rescale(scores @ self.rotation)
+        return self.rescale(scores @ self.rotation)
 
-    def calculate_mean_scores(self):
+    def calculate_mean_scores(self) -> None:
         """Country-level means of the rescaled individual scores.
 
-        Weighted by the IVS equilibrated weight (S017), which corrects
+        Weighted by the IVS original national weight (S017), which corrects
         within-country sampling design; unweighted means would treat every
-        respondent as equally representative of their country.
+        respondent as equally representative of their country. Every retained
+        weight must be present, finite and non-negative, and each country's
+        weights must have a positive sum; otherwise this raises rather than
+        substituting a default weight.
         """
+        if self.valid_data is None:
+            raise RuntimeError("Call fit() first.")
+        validate_weights(
+            self.valid_data["weight"],
+            self.valid_data["country_code"],
+            context="country mean scores",
+        )
 
         def weighted(group: pd.DataFrame) -> pd.Series:
-            w = group["weight"].fillna(1.0)
+            w = group["weight"]
             return pd.Series(
                 {
                     "PC1_rescaled": np.average(group["PC1_rescaled"], weights=w),
@@ -236,7 +369,7 @@ class CulturalMap:
     ##############################################
 
     @staticmethod
-    def y002_transform(ans) -> float:
+    def y002_transform(ans: Any) -> float:
         """Post-materialist index (Y002) from the two E-goal choices.
 
         Raises on invalid choices rather than returning a sentinel: the
@@ -272,25 +405,25 @@ class CulturalMap:
     ############### Persistence ##################
     ##############################################
 
-    def save_model(self, fpath):
-        """Save PPCA parameters plus the fitted rotation (npz)."""
-        np.savez(
-            fpath,
-            C=self.ppca.C,
-            means=self.ppca.means,
-            stds=self.ppca.stds,
-            eig_vals=self.ppca.eig_vals,
-            rotation=self.rotation,
-            score_stds=self.score_stds,
-        )
+    def save_model(self, fpath: str | Path) -> None:
+        """Save projection, fitted Gaussian parameters and convergence evidence.
 
-    def load_model(self, fpath):
+        The archive never contains completed respondent rows. Legacy archives
+        remain readable, but do not acquire convergence evidence on loading.
+        """
+        if self.rotation is None or self.score_stds is None:
+            raise RuntimeError("Call fit() before save_model().")
+        state: dict[str, Any] = {
+            **self.ppca.state_dict(),
+            "rotation": self.rotation,
+            "score_stds": self.score_stds,
+        }
+        np.savez(fpath, **state)
+
+    def load_model(self, fpath: str | Path) -> None:
         """Load parameters saved by :meth:`save_model`."""
-        with np.load(fpath) as npz:
-            self.ppca.C = npz["C"]
-            self.ppca.means = npz["means"]
-            self.ppca.stds = npz["stds"]
-            self.ppca.eig_vals = npz["eig_vals"]
+        self.ppca.load(fpath)
+        with np.load(fpath, allow_pickle=False) as npz:
             self.rotation = npz["rotation"]
             self.score_stds = npz["score_stds"]
 
@@ -299,8 +432,13 @@ class CulturalMap:
     ##############################################
 
     def visualize_cultural_map(
-        self, title="Inglehart-Welzel Cultural Map", with_llms=False, ax=None
-    ):
+        self,
+        title: str = "Inglehart-Welzel Cultural Map",
+        with_llms: bool = False,
+        ax: Axes | None = None,
+    ) -> Axes:
+        if self.country_scores_pca is None:
+            raise RuntimeError("Call calculate_mean_scores() first.")
         if ax is None:
             _, ax = plt.subplots(figsize=(14, 10))
 

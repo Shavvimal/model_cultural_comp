@@ -2,236 +2,195 @@
 
 [![ci](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml/badge.svg)](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-Where do LLMs sit on the world's cultural map?
+Research code for [Cultural Alignment of Open-Weight LLMs on the
+Inglehart–Welzel Map](https://openreview.net/forum?id=xJHa9ts0mt) (ORACLE
+workshop at EMNLP 2026), with an expanded
+[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map).
+It fits a custom two-dimensional instrument to the Integrated Values Surveys
+and projects model responses and surveyed countries through the same frozen
+transformation. Coordinates describe reported responses under the specified
+protocol, not held values or complete cultural profiles.
 
-This repository maps the cultural alignment of large language models onto the
-Inglehart-Welzel cultural map. The map itself is refitted from scratch on the
-Integrated Values Surveys (IVS) 1981-2022 — a probabilistic PCA over the ten IVS items
-behind the two Inglehart-Welzel axes — and then LLMs are put through the same survey
-and projected onto that map through the *same* fitted transform the countries went
-through. Each model-language cell gets a position with a bootstrap confidence region
-and two region-assignment rules (an SVM reported with its own cross-validated
-accuracy, and the nearest region centroid), plus classifier-free headline statistics.
+The corrected instrument uses 392,382 respondents in 112 country/entity codes;
+country comparisons cover 389,341 respondents in 109 mapped entities. The
+2024 cohort contains eleven model–language cells. The 2026 experiment crosses
+17 models with English and Chinese, giving 34 recorded cells and 33 eligible
+positions. All eligible means occupy the primary reference-relative quadrant;
+Chinese administration increases projected self-expression in 15/16 paired
+models. The rotation, benchmark and prompt sensitivities limit interpretation.
 
-Two cohorts are covered. The **2024 cohort** (eleven model-language cells, served
-locally at Q4 quantisation) is the corrected version of the 2024 blog post
-[Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias): the original projected
-model responses without the survey-fitted standardization and through a re-fitted
-rotation, so models and countries were not actually in the same coordinate space. The
-**2026 cohort** is a designed factorial experiment over the cloud-served frontier
-generation: 17 open-weight models × two administration languages (English and
-Chinese), 34 cells × 500 calls, with reasoning traces and refusals recorded as data.
-The full analysis is written up in
-[Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map);
-see also [CHANGELOG.md](CHANGELOG.md).
+Version [1.1.0](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0)
+contains these corrections. The source checkout contains
+code, tests, documentation and input checksums. **No datasets, generated
+results, fitted binaries or figures belong in Git.** The required retained
+model responses are packaged separately. A second, small results/provenance
+archive supplies the aggregates named in the paper and the historical trace-coding
+record. Download the [response archive](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-responses-2026-09-12.tar.gz)
+and [results supplement](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz)
+from the v1.1.0 release. See [reproduction instructions](docs/REPRODUCING.md) for
+the exact inputs, result assets and checksums, and [CHANGELOG.md](CHANGELOG.md)
+for repairs. `uv run python scripts/reproduction_data.py verify-results <archive>`
+checks a downloaded supplement against the tracked results manifest without
+extracting it.
 
 ## Quickstart
 
 ```bash
 git clone https://github.com/Shavvimal/model_cultural_comp
 cd model_cultural_comp
-uv venv --python 3.11
-uv sync
-make test          # unit suite: synthetic fixtures, no data needed
+git checkout v1.1.0
+uv sync --frozen
+make check
 ```
 
-### Getting the data
+The recorded environment uses Python 3.11, pinned in `.python-version`.
+Tests generate synthetic fixtures and require neither survey inputs nor API
+keys. `make check` also checks that Git's index contains no data or generated
+files. The lockfile keeps the numerical dependencies fixed.
 
-**The survey data is not redistributed here.** It is licensed to you directly by the
-WVS Association and GESIS under data-use agreements that forbid redistribution; `data/`
-and `*.pkl` are gitignored for that reason. Download the two trend files yourself and
-merge them:
-
-| File | Source |
-|---|---|
-| `ZA7503_v3-0-0.sav` — EVS Trend File 1981-2017 (3.0.0) | [GESIS ZA7503](https://search.gesis.org/research_data/ZA7503) |
-| `Trends_VS_1981_2022_sav_v4_0.sav` — WVS Trend File 1981-2022 (4.0.0) | [WVS/EVS trend](https://www.worldvaluessurvey.org/WVSEVStrend.jsp) |
-| `EVS_WVS_Merge Syntax_Spss_June2024.sps` — the official merge syntax | shipped with the WVS trend download |
-
-Running the merge syntax over the two `.sav` files produces the Integrated Values
-Surveys 1981-2022 (~5.8GB), which goes in `data/`. This follows the procedure the WVS
-Association documents for [creating the World Cultural
-Map](https://www.worldvaluessurvey.org/wvs.jsp). The SPSS format is used here; the
-format makes no difference to the results.
-
-With the data present:
+To reproduce the study, obtain the separate frozen response archive and the
+specified licensed survey inputs, then run:
 
 ```bash
-make validate      # reproduces the country coordinates, then the bootstrap
-uv run python scripts/make_figures.py
+uv run python scripts/reproduction_data.py install /path/to/model-cultural-comp-responses-2026-09-12.tar.gz
+# Prepare data/ivs_df.pkl from the licensed merged SAV as documented below.
+make reproduce
 ```
 
-## Pipeline
+[REPRODUCING.md](docs/REPRODUCING.md) explains download versions, merge and
+cache preparation, checksums, command order, output families and limitations.
+`make reproduce` refits the instrument, runs both cohorts, all reported
+sensitivities including twenty fitting seeds, and merges the frozen trace
+panels. It makes no collection or annotation API calls. Generated results
+stay under ignored `data/` and `figures/` directories.
 
-```
-prepare  ->  fit PPCA  ->  fix ONE varimax rotation  ->  project  ->  bootstrap  ->  SVM regions
-                                                        /      \
-                                                 countries    models
-```
+## Code layout
 
-1. **Prepare** (`CulturalMap.prepare_data`) — subset the IVS to the ten map items
-   (`A008 A165 E018 E025 F063 F118 F120 G006 Y002 Y003`), apply the WVS index
-   transforms for the two composite items, and aggregate to country level.
-2. **Fit PPCA** (`app/ppca.py`) — probabilistic PCA by EM, which tolerates the missing
-   entries that are unavoidable in a merged multi-wave survey. The fit is seeded, so it
-   is reproducible run to run — with one documented exception, below.
-3. **One stored rotation** (`CulturalMap.fit`) — a varimax rotation is fitted *exactly
-   once*, on the training score matrix, oriented to the Inglehart-Welzel convention to
-   resolve sign and axis-order ambiguity, and stored on the model.
-4. **Project through one path** (`CulturalMap.project`) — everything, country data and
-   model responses alike, goes through: standardize with the stored means/stds →
-   project onto the principal axes → apply the stored rotation → rescale to published
-   axis units. This single path is the correctness property the whole repository exists
-   to hold; it is asserted by `scripts/validate_projection.py`.
-5. **Bootstrap CIs** (`app/llm_bootstrap.py`) — because the projection is affine in the
-   ten item values, a model's position depends only on its per-question mean response.
-   Two estimators are reported. The *item bootstrap* (B = 1,000) resamples each item's
-   stored responses independently — it omits cross-item covariance and is the only
-   estimator available for 2024, where the prompt-variant id was not recorded. The
-   *cluster bootstrap* (B = 10,000) resamples the ten system-prompt variants with
-   replacement, carrying all items and repeats within a variant, and is the primary
-   estimator for the 2026 cells (its regions are a median 2.9× larger by SD product).
-6. **Region rules** (`app/region_svm.py`) — an RBF-SVM fitted on the country
-   coordinates (reported with its 0.57 cross-validated accuracy) and the nearest
-   region centroid, side by side; where they disagree, the disagreement is a result.
-   The paper's headline statistics route through no classifier: distance to the
-   pooled human respondent mean, share of countries closer, and minimum distance to
-   any non-Western region centroid, computed per bootstrap replicate.
-
-### Reproducibility of the seeded EM fit
-
-Seeding fixes the EM initialisation, not the floating-point summation order beneath
-it. Re-running `scripts/seed_sensitivity.py` reproduces every aggregate the paper
-quotes — rotation spread 5.21°, country-coordinate mean across-seed SD 0.022, max SD
-0.077, max range 0.262 (`data/seed_sensitivity_aggregates.csv`) — exactly at quoted
-precision. The **per-country, per-seed extreme columns** in
-`data/seed_sensitivity.csv` (`*_min`, `*_max`, and the ranges derived from them) are
-not stable to that precision: they can differ from the committed CSV by up to 0.37
-map units, because BLAS thread-order nondeterminism in the EM fit perturbs individual
-seeds and the min/max columns select exactly the perturbed tails. No quoted number is
-affected — the paper quotes only aggregates — and the original CSV is retained rather
-than regenerated. Pin thread counts (e.g. `OMP_NUM_THREADS=1`) if you need the
-per-seed extremes to match bit-for-bit.
-
-## Make targets
-
-| Target | What it does |
+| Location | Responsibility |
 |---|---|
-| `make install` | `uv sync` |
-| `make lint` | `ruff check app scripts tests` |
-| `make format` | `ruff` autofix + format |
-| `make typecheck` | `mypy app` (not in `check`; mypy is pulled in ephemerally) |
-| `make test` | `pytest` — synthetic fixtures, no data, no network, no Ollama |
-| `make check` | `lint` + `test`. Byte-for-byte the CI gate. |
-| `make validate` | Reproduction against the local IVS data. **Never runs in CI** — the data may not be redistributed. |
+| `app/ppca.py`, `app/culture_map.py`, `app/survey_indices.py` | Observed-data Gaussian likelihood, Y003 reconstruction, frozen projection and country aggregation |
+| `app/llm_bootstrap.py`, `app/region_svm.py` | Observed cell means, item/cluster resampling, classifier-free distances and regional labels |
+| `app/cloud_survey.py`, `app/qn_classes.py`, `app/llm_meta.py` | Prompts, parsers, collection and shared model/family metadata |
+| `app/survey_reference.py`, `app/instrument_sensitivity.py` | Reference, rotation, completion and dated country-benchmark diagnostics |
+| `app/appendix_contrasts.py`, `app/control_audit.py` | Item-profile contrasts and prompt-control trial accounting |
+| `app/trace_codebook.py`, `app/trace_diagnostics.py`, `app/agreement.py` | Frozen annotation prompt, majority votes and agreement diagnostics |
+| `scripts/` | Collection drivers, offline analyses, plots and reproducibility utilities |
+| `tests/` | Synthetic regression and mathematical consistency checks |
+| `docs/analysis-plan-2026.md` | Original plan with dated deviations; earlier entries retain superseded numbers |
+| `docs/reproduction-data.json` | Filenames, sizes and hashes of the separate frozen inputs |
 
-## Layout
+The research plotting scripts generate the six study figures. Manuscript
+fact-checking, LaTeX/MDX formatting and interactive-blog exports live with the
+paper. Historical exploratory notebooks and local collection prototypes are
+superseded by the tested pipeline here and are not included.
 
-| Path | |
+[Collection protocol and record schemas](docs/PROTOCOL.md) explain retries,
+prefixes, exclusions, known translation issues and missing historical metadata.
+
+## Pipeline and interpretation
+
+1. **Prepare and fit:** restrict IVS waves to 2005 onward and recode out-of-range
+   missing values. Before the six-item completeness filter, reconstruct a missing
+   autonomy index as `Y003 = A029 + A039 - A040 - A042` only when all four
+   constituent answers are valid 0/1. Preserve valid delivered Y003 values and
+   check their agreement with the scoring rule where constituents are observed.
+   The EVS trend file lacks a precomputed Y003 column but usually contains these
+   four answers. The full merged cache must retain the constituent columns;
+   invalid or unavailable constituents leave the index missing. Preparation
+   counts distinguish delivered, reconstructed and residual-missing indices.
+   This follows the [official longitudinal scoring definition](https://www.worldvaluessurvey.org/WVSContents.jsp?CMSID=autonomous).
+   Then fit respondent-level
+   Gaussian PPCA with two factors and observed-item means/standard deviations
+   fixed before fitting. Missing entries are integrated out in the observed-data
+   likelihood. L-BFGS-B uses three starts; each must satisfy a maximum absolute
+   gradient of at most `1e-7` for negative log likelihood per informative row.
+   If an objective-change stop occurs above that bound, the same likelihood
+   is centered numerically and resumed within the original iteration budget.
+   The highest-likelihood converged start is retained. This is direct likelihood
+   optimisation, not EM, and multiple starts do not prove a global optimum.
+   Missing entries are then completed with exact Gaussian conditional means.
+   Country aggregation uses S017, the original national survey weight, after the
+   unweighted fit. Each country's retained survey years contribute in proportion
+   to their S017 weight mass; years are not equally weighted. S018 and S019 are
+   the distinct equilibrated weights. The saved NPZ
+   contains numeric/string arrays only, loads with `allow_pickle=False`, and
+   retains fitted loadings, noise variance and convergence diagnostics as well
+   as the frozen score transform. It is regenerated locally and not distributed.
+2. **Shared projection:** standardisation, score-side varimax rotation and
+   rescaling parameters are frozen; countries and models use the same affine
+   `CulturalMap.project` path.
+3. **Reference:** `SURVEY_REFERENCE = (0.038, -0.10)` projects observed-item
+   marginal means. It is not the completed respondent mean (reported in
+   `data/validation_survey_reference.csv`),
+   nor a world-population-weighted centre.
+   `HUMAN_MEAN` remains only as a compatibility alias.
+4. **Points:** displayed coordinates project observed item means; language
+   displacement points are norms of observed Chinese-minus-English differences,
+   not averages of bootstrap norms. Monte Carlo permutation p-values use the
+   plus-one correction; exact enumerations use exact tail proportions.
+5. **Uncertainty:** the item bootstrap resamples items independently; the primary
+   2026 cluster bootstrap resamples ten user-message prefix variants. Empty
+   variant–item groups contribute zero counts; fallback applies only when a draw
+   has no retained answer on an item. Ellipses are nominal mean-position regions;
+   actual ten-cluster coverage is unknown. Zero observed quadrant crossings is
+   descriptive, not a simultaneous confidence guarantee.
+6. **Regions and sensitivities:** SVM labels are bootstrap-modal, while centroid
+   labels use observed points. Selected-grid cross-validation reuses tuning
+   folds and is not unbiased accuracy. Orthogonal nested sums-of-squares shares
+   describe constructed profiles, not additive causal effects. Terminal-failure
+   bounds do not cover retry-induced selection.
+
+The historical analysis projected unstandardised model answers through a separately
+refitted rotation, treated the Y003 missing code −3 as data, and pooled languages.
+Camera-ready repairs additionally correct rescaling offsets, zero-count cluster
+pooling, displayed estimators and the missing-data fitting objective. The old
+fitting loop counted imputed entries in an observed residual calculation; an
+independent likelihood audit showed that its fixed point was not the claimed
+observed-data likelihood optimum. The current implementation replaces that loop
+and regenerates its dependent coordinates, statistics and figures. Offset
+correction alone translates points and
+reference together, preserving relative distances; the full revision contains
+other changes and does not preserve every number. Unsupported granular historical
+displacement figures are not represented as current measurements.
+
+The historical plan and dated deviations remain in
+[docs/analysis-plan-2026.md](docs/analysis-plan-2026.md). Later control, coding and
+diagnostic work is distinguished from the original pre-specified analyses.
+
+## Development
+
+| Target | Purpose |
 |---|---|
-| `app/` | the installable package: `ppca.py`, `culture_map.py`, `llm_bootstrap.py`, `region_svm.py`, `qn_classes.py` (response parsers), `llm_meta.py` (the model list — single source of truth) |
-| `scripts/` | reproduction (`validate_projection.py`, `bootstrap_llms.py`), the 2026 analysis suite (`analyze_2026.py`, `confirmatory_2026.py`, `diagnostics_2026.py`, `qc_2026.py`, `plugin_displacement_2026.py`, `coverage_calibration_2026.py`, `seed_sensitivity.py`, `sample_traces_2026.py`), collection (`collect_cloud_2026.py`, `progress.sh`), and figures (`make_figures.py`, `make_figures_2026.py`) |
-| `notebooks/` | exploratory work; not the test suite |
-| `figures/` | generated PDFs and PNGs |
-| `data/` | the IVS inputs and every large derived binary live here and are **gitignored** — they may not be redistributed. The small aggregate artefacts the paper cites by filename (`conf_2026_*.csv`, `diag_2026_*.csv`, `seed_sensitivity*.csv`, the `llm_*` parse-rate/ellipse/language-effect/region aggregates for both cohorts, `trace_coding.json`) are re-included by explicit negation and are committed |
+| `make check` | Git content policy, Ruff and synthetic tests |
+| `make test` / `make lint` / `make format` | Tests / lint and formatting check / automatic formatting |
+| `make typecheck` | mypy over `app/`, pulled in ephemerally; not part of `make check` |
+| `make verify-data` | Verify the separate frozen input files against their manifest |
+| `make validate` | Build country metadata when absent or older than the licensed cache (stops with a message if `data/ivs_df.pkl` is missing), refit and validate the instrument, then analyse the 2024 cohort |
+| `make validate-2026` | Analyse the 2026 cohort and its sensitivities, then draw all six figures; fails early if `make validate` outputs are missing or older than the fitted instrument |
+| `make validate-traces` | Offline trace-panel merge, agreement and sensitivity summaries |
+| `make reproduce` | Complete sequential offline chain, including country metadata |
 
-## Models surveyed
+Each stage also runs on its own. Run them in this order from the repository
+root, after `make verify-data` and with the licensed cache in place. Prefix
+the commands with `OMP_NUM_THREADS=1 MPLBACKEND=Agg`, as the Makefile does,
+to match the recorded outputs:
 
-The model lists live in `app/llm_meta.py` — the single source of truth. Models that
-never produced parseable answers in the 2024 run are recorded there in
-`FAILED_LLMS_2024` rather than being silently dropped.
+| Stage | Command |
+|---|---|
+| Country metadata | `uv run --frozen python scripts/build_country_meta.py` |
+| Fit and validate the instrument | `uv run --frozen python scripts/validate_projection.py` |
+| 2024 bootstrap | `uv run --frozen python scripts/bootstrap_llms.py` |
+| 2026 analyses and sensitivities | `make validate-2026` (its scripts, in Makefile order, end with both figure scripts) |
+| Trace aggregation | `make validate-traces` |
+| Figures only | `uv run --frozen python scripts/make_figures.py` and `uv run --frozen python scripts/make_figures_2026.py` |
+| Whole offline chain | `make reproduce` |
 
-### 2024 cohort — eleven model-language cells
+The figure scripts read outputs of the 2024 bootstrap, the 2026 analyses and
+`instrument_sensitivity.py`, so run them after those stages.
 
-Served locally through [Ollama](https://ollama.com), Q4-quantised GGUF builds, on
-consumer hardware. Two models were administered *only* in Chinese and one in both
-languages (analysed as two cells, marked `[zh]`/`[en]`).
-
-- **Chinese-origin / Chinese fine-tuned:** `qwen2:7b` (both languages),
-  `llama2-chinese:13b` `[zh]`, `wangshenzhi/gemma2-27b-chinese-chat` `[zh]`,
-  `wangrongsheng/llama3-70b-chinese-chat`
-- **Western:** `llama3:70b`, `mistral:7b`, `gemma2:27b`
-- **Uncensored (Dolphin):** `dolphin-llama3:8b`, `dolphin-mistral:7b`,
-  `dolphin-mixtral:8x7b`
-- **Attempted, excluded for producing nothing parseable:** `yi:34b`,
-  `aquilachat2:34b`, `glm4:9b`, `xuanyuan:70b`,
-  `kingzeus/llama-3-chinese-8b-instruct-v3` (five model names; the tracked
-  Modelfiles cannot confirm five distinct base artefacts — the `yi` and `glm`
-  Modelfiles point at the AquilaChat2 GGUF — which is disclosed wherever the
-  2024 coherence denominator is used)
-
-### 2026 cohort — 17 models × two administration languages
-
-Cloud-served (Ollama Cloud; serving precision undisclosed by the provider and
-carried as a confound), 34 cells of 500 calls each, English and Chinese arms.
-
-- **Chinese-origin (10):** `deepseek-v4-flash`, `deepseek-v4-flash:0731`,
-  `deepseek-v4-pro`, `glm-5.1`, `glm-5.2`, `kimi-k2.6`, `kimi-k2.7-code`,
-  `minimax-m2.7`, `minimax-m3`, `qwen3.5:397b`
-- **Western (7):** `gemma4:31b`, `gpt-oss:20b`, `gpt-oss:120b`,
-  `mistral-large-3:675b`, `nemotron-3-nano:30b`, `nemotron-3-super`,
-  `nemotron-3-ultra`
-
-An eighteenth model, `kimi-k3`, was excluded before any data was collected (every
-call returned a billing error; zero records, no part in any denominator). One cell,
-`nemotron-3-ultra [zh]`, is excluded from position estimates (F120 parsed 4/50,
-under the inclusion threshold) — its refusals are analysed as data and its
-worst-case Manski bound is still reported.
-
-Each model carries its own upstream licence; check it before reuse.
-
-## Licensing
-
-The original work in this repository is **MIT** — see [LICENSE](LICENSE).
-
-One file is not original: `app/ppca.py` is derived from
-[pca-magic](https://github.com/allentran/pca-magic) (Copyright Allen Tran), licensed
-under **Apache-2.0**. Apache-2.0 code may be redistributed inside an MIT-licensed
-project provided the upstream notices are retained and the modifications are stated, so
-that is what [NOTICE](NOTICE) and the header of `app/ppca.py` do. Practically, for a
-downstream user: the repository is MIT, and if you redistribute `app/ppca.py` (or a
-derivative of it) you must include a copy of the Apache-2.0 license (see `LICENSES/Apache-2.0.txt`), state any changes you make, and carry the `NOTICE` file and the Apache-2.0 attribution with
-it. The method itself is Tipping & Bishop (1999).
-
-The IVS/WVS/EVS data is under its own terms and is **not** covered by this licence and
-**not** redistributed here — obtain it from GESIS and the WVS Association directly.
-
-## Citation
-
-A paper describing this work is forthcoming; this section will carry its BibTeX entry
-and DOI. The release the paper's numbers were generated from is tagged
-[`v1.0.0`](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.0.0).
-Until then, cite the repository and the write-up:
-
-- Vimalendiran, S. (2026). [Cultural Alignment of Open-Weight LLMs on the
-  Inglehart-Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map)
-  — the full analysis this repository implements.
-- Vimalendiran, S. (2024). [Cultural Bias in LLMs](https://shav.dev/blog/cultural-bias)
-  — the origin post, superseded and corrected by the above.
-
-```bibtex
-@software{vimalendiran_model_cultural_comp,
-  author  = {Vimalendiran, Shav},
-  title   = {model\_cultural\_comp: mapping LLM cultural alignment
-             onto the Inglehart-Welzel map},
-  year    = {2026},
-  url     = {https://github.com/Shavvimal/model_cultural_comp}
-}
-```
-
-Please also cite the underlying data:
-
-- EVS (2022): *EVS Trend File 1981-2017*. GESIS Data Archive, Cologne. ZA7503 Data file
-  Version 3.0.0, doi:10.4232/1.14021
-- Haerpfer, C., Inglehart, R., Moreno, A., Welzel, C., Kizilova, K., Diez-Medrano, J.,
-  Lagos, M., Norris, P., Ponarin, E. & Puranen, B. et al. (eds.). 2022. *World Values
-  Survey Trend File (1981-2022) Cross-National Data-Set*. Madrid & Vienna: JD Systems
-  Institute & WVSA Secretariat. Data File Version 4.0.0, doi:10.14281/18241.27
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and
-[SECURITY.md](SECURITY.md). The short version: one logical change per PR, `make check`
-green, and never commit survey data or API keys.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for changes that could affect results.
+Code is MIT licensed, with the PPCA attribution and third-party survey-text
+notices retained in [NOTICE](NOTICE) and [LICENSES/](LICENSES/).
+[CITATION.cff](CITATION.cff) gives the paper as the preferred citation and
+also describes this software release.

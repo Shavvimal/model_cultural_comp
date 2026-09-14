@@ -1,32 +1,38 @@
 """Cultural-region assignment for map positions.
 
 Two rules are reported side by side (write-up §3.4): an RBF-SVM over the
-country coordinates (with its cross-validated accuracy attached — 0.57 on
-109 countries in 8 classes, against a 0.67 training accuracy, so a single
-label is weak evidence), and the nearest region centroid. Their disagreement
+country coordinates, and the nearest region centroid. The SVM carries its
+tuning score on every row: the mean stratified 5-fold accuracy of the selected
+grid point, on the same folds used to select it. That score is optimistic, not
+an unbiased held-out accuracy, and it sits below the training accuracy, so a
+single SVM label is weak evidence. Analysis scripts print the current value. Their disagreement
 is a result, not a nuisance. "Positional stability" is the share of bootstrap
 replicates falling in a fixed decision region: it reflects sampling
 uncertainty of the position only, never the classifier's own error rate.
 
 Neither rule carries a headline claim. The write-up's headline statistics
-route through no classifier at all (distance from the pooled human respondent
-mean, share of countries closer, minimum distance to any non-Western region
+route through no classifier at all (distance from the fixed survey
+reference, share of countries closer, minimum distance to any non-Western region
 centroid); see ``app.llm_bootstrap.centroid_statistics``.
 """
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_score
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 
 # Includes the regularised regime: the 2024 grid started at C=500, which
 # never evaluates a smooth boundary at all. Grid search is wrapped in a
-# stratified 5-fold CV, and the same folds score the refitted estimator.
+# stratified 5-fold CV. The reported score reuses the selection folds and is
+# therefore a tuning score, not an unbiased held-out accuracy estimate.
 PARAM_GRID = {
     "C": [0.1, 1, 10, 100, 500, 1000, 2000],
     "gamma": [0.01, 0.05, 0.1, 0.2, 0.5, 1.0],
     "kernel": ["rbf"],
 }
+# Fixed fold shuffle for the stratified 5-fold selection and its reported score.
+CV_RANDOM_STATE = 0
+CV_FOLDS = 5
 
 
 class RegionClassifier:
@@ -36,7 +42,7 @@ class RegionClassifier:
         self.svm = None
         self.regions = None  # index -> region name
         self.centroids = None  # region -> (PC1', PC2')
-        self.cv_accuracy = None  # 5-fold stratified CV accuracy of the SVM
+        self.cv_accuracy = None  # selected-grid 5-fold CV score (optimistically selected)
 
     def fit(self, country_scores: pd.DataFrame) -> "RegionClassifier":
         data = country_scores.dropna(subset=["PC1_rescaled", "PC2_rescaled", "Cultural Region"])
@@ -45,11 +51,14 @@ class RegionClassifier:
         xy = data[["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
         codes = labels.codes.astype(int)
 
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+        cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=CV_RANDOM_STATE)
         search = GridSearchCV(SVC(), PARAM_GRID, refit=True, cv=cv)
         search.fit(xy, codes)
         self.svm = search.best_estimator_
-        self.cv_accuracy = float(cross_val_score(search.best_estimator_, xy, codes, cv=cv).mean())
+        # The selected grid point's mean fold score. Re-running cross_val_score on
+        # a clone over the same folds recomputes exactly this value (the SVC is
+        # deterministic), which was checked bit-identical on the released scores.
+        self.cv_accuracy = float(search.best_score_)
 
         self.centroids = data.groupby("Cultural Region")[["PC1_rescaled", "PC2_rescaled"]].mean()
         return self
@@ -66,7 +75,9 @@ class RegionClassifier:
         dists = np.linalg.norm(xy[:, None, :] - self.centroids.to_numpy()[None, :, :], axis=2)
         return [self.centroids.index[i] for i in dists.argmin(axis=1)]
 
-    def region_assignments(self, boot: pd.DataFrame) -> pd.DataFrame:
+    def region_assignments(
+        self, boot: pd.DataFrame, point_estimates: pd.DataFrame | None = None
+    ) -> pd.DataFrame:
         """Both rules per model, with the full SVM share vector.
 
         Returns modal SVM region + positional stability, the runner-up, the
@@ -75,10 +86,21 @@ class RegionClassifier:
         without it.
         """
         rows = []
+        if point_estimates is not None and point_estimates["llm"].duplicated().any():
+            duplicated = sorted(point_estimates.loc[point_estimates["llm"].duplicated(), "llm"])
+            raise ValueError(
+                f"point_estimates must contain one row per llm; duplicated {duplicated}"
+            )
+        points = None if point_estimates is None else point_estimates.set_index("llm")
         for llm, g in boot.groupby("llm"):
             xy = g[["PC1_rescaled", "PC2_rescaled"]].to_numpy()
             shares = pd.Series(self.predict_svm(xy)).value_counts(normalize=True)
-            centroid_region = self.predict_centroid(xy.mean(axis=0, keepdims=True))[0]
+            point = (
+                xy.mean(axis=0)
+                if points is None
+                else points.loc[llm, ["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
+            )
+            centroid_region = self.predict_centroid(point[None, :])[0]
             rows.append(
                 {
                     "llm": llm,

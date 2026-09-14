@@ -1,4 +1,4 @@
-"""Monte Carlo sensitivity of the fit to the EM initialization seed.
+"""Monte Carlo sensitivity of the likelihood fit to its initialization seed.
 
 Run from the repo root (requires the data):
 
@@ -14,10 +14,9 @@ Writes two artefacts:
   * ``data/seed_sensitivity_aggregates.csv`` — the four aggregates the paper
     quotes (rotation spread, mean and max coordinate SD, max coordinate range)
 
-The aggregates used to exist only as stdout, so a reader could not check a
-quoted number against a committed file. They reproduce exactly at quoted
-precision across re-runs; the per-country extreme columns do not (see the
-README's reproducibility note on BLAS/thread-order nondeterminism in EM).
+The per-seed rotation log is written together with the aggregates, at full
+reported precision. Numerical optimization can still vary slightly across
+BLAS/platform versions; all starts must satisfy the fitting gradient criterion.
 
 Because the refit needs the ~5.8 GB IVS download, the aggregates can also be
 recomputed from the retained per-country artefact plus the recorded
@@ -28,11 +27,12 @@ per-seed rotation angles, without refitting:
 
 import re
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from app.culture_map import CulturalMap
+from app.culture_map import CulturalMap, check_preparation
 
 SEEDS = list(range(20))
 STATS_PATH = "data/seed_sensitivity.csv"
@@ -86,16 +86,23 @@ def main(from_stored: bool = False) -> int:
 
     coords = []
     angles = []
+    log_rows = []
+    # The licensed inputs are identical across seeds and need only one read.
+    ivs = pd.read_pickle("data/ivs_df.pkl")
+    countries = pd.read_pickle("data/country_codes.pkl")
     for seed in SEEDS:
-        cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+        cm = CulturalMap(ivs, countries)
         cm.prepare_data()
+        check_preparation(cm.survey_preparation_report)
         cm.fit(seed=seed)
         cm.calculate_mean_scores()
         df = cm.country_scores_pca[["country_code", "PC1_rescaled", "PC2_rescaled"]].copy()
         df["seed"] = seed
         coords.append(df)
         angles.append(np.degrees(np.arctan2(cm.rotation[1, 0], cm.rotation[0, 0])))
-        print(f"seed {seed}: angle {angles[-1]:+.2f} deg", flush=True)
+        line = f"seed {seed}: angle {angles[-1]:+.12f} deg"
+        log_rows.append(line)
+        print(line, flush=True)
 
     allc = pd.concat(coords)
     stats = allc.groupby("country_code")[["PC1_rescaled", "PC2_rescaled"]].agg(
@@ -106,6 +113,7 @@ def main(from_stored: bool = False) -> int:
     stats["range_pc2"] = stats["PC2_rescaled_max"] - stats["PC2_rescaled_min"]
 
     stats.to_csv(STATS_PATH)
+    Path(RUN_LOG).write_text("\n".join(log_rows) + "\n")
     print(f"Wrote {STATS_PATH}")
     _report(stats.reset_index(), aggregates(stats, angles))
     return 0

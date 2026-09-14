@@ -7,8 +7,9 @@ failed (refusal/format) row's raw text for the refusal-phrasing taxonomy.
 Run:  uv run python scripts/sample_traces_2026.py
 Writes data/trace_samples_2026.json — one entry per sampled record with
 llm, language, question, system_prompt_id, repeat, thinking, raw_content,
-parsed, error. The coding itself is manual/agentic and reported as
-qualitative in the paper.
+parsed, error. The frozen study sample is distributed separately; do not
+resample it during reproduction. Five LLM panels label its 900 successful
+excerpts through code_traces_2026.py; the human worksheet remains uncoded.
 """
 
 import json
@@ -17,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from app.study_design import TRIAL_KEY
 
 RAW_DIR = Path("data/collection_2026")
 OUT = Path("data/trace_samples_2026.json")
@@ -44,9 +47,7 @@ def main() -> int:
     df["language"] = df.get("language", pd.Series([None] * len(df))).fillna("en")
     df["system_prompt_id"] = df["system_prompt_id"].astype(int)
     df["repeat"] = df["repeat"].astype(int)
-    df = df.drop_duplicates(
-        subset=["llm", "language", "question", "system_prompt_id", "repeat"], keep="last"
-    )
+    df = df.drop_duplicates(subset=list(TRIAL_KEY), keep="last")
     df["thinking"] = df["thinking"].fillna("")
 
     rng = np.random.default_rng(SEED)
@@ -62,7 +63,10 @@ def main() -> int:
         n_traces = min(PER_ITEM, 5) * with_thinking["question"].nunique()
         print(f"{llm} [{lang}]: {n_traces} traces + {len(failures)} failure rows")
 
-    OUT.write_text(json.dumps(sampled, ensure_ascii=False, indent=1))
+    # JSON null represents missing fields; pandas NaN is not valid JSON.
+    records = pd.DataFrame(sampled).astype(object)
+    records = records.where(records.notna(), None).to_dict("records")
+    OUT.write_text(json.dumps(records, ensure_ascii=False, allow_nan=False, indent=1))
     print(f"\nwrote {len(sampled)} records to {OUT}")
     return 0
 

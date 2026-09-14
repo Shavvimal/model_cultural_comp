@@ -24,9 +24,8 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --group dev
+      - run: uv sync --frozen --group dev
       # The unit suite runs on synthetic fixtures only: no dataset, no network,
       # no Ollama. `make validate` is not run here and cannot be - the survey
       # data may not be redistributed.
-      - run: make lint
-      - run: make test
+      - run: make check

@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.culture_map import CulturalMap
+from app.culture_map import IV_QNS, CulturalMap
 from app.llm_bootstrap import (
     bootstrap_llm_positions,
     bootstrap_llm_positions_cluster,
@@ -34,31 +34,34 @@ from app.llm_bootstrap import (
     centroid_statistics,
     confidence_ellipses,
     load_responses_2026,
+    project_cell_means,
 )
 from app.llm_meta import cohort_2026
 from app.region_svm import RegionClassifier
+from app.study_design import MIN_PER_QUESTION
 
 RAW_DIR = Path("data/collection_2026")
 N_BOOT_CLUSTER = 10_000
 N_BOOT_ITEM = 1000
 SEED = 42
-MIN_PER_QUESTION = 10
 
 
 def base_model(label: str) -> str:
     return label.split(" [")[0]
 
 
-def parse_rates() -> pd.DataFrame:
+def parse_rates(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
     rows = []
-    for path in sorted(RAW_DIR.glob("*.jsonl")):
+    for path in sorted(raw_dir.glob("*.jsonl")):
         recs = [json.loads(line) for line in path.open()]
         frame = pd.DataFrame(recs)
         frame["language"] = frame.get("language", pd.Series(["en"] * len(frame))).fillna("en")
+        for key in ("system_prompt_id", "repeat"):
+            frame[key] = pd.to_numeric(frame[key], errors="raise").astype(int)
         frame = frame.drop_duplicates(
             subset=["question", "system_prompt_id", "repeat", "language"], keep="last"
         )
-        ok = frame["error"].isna()
+        ok = frame["error"].isna() & frame["parsed"].notna()
         llm = frame["llm"].iloc[0]
         rows.append(
             {
@@ -68,9 +71,9 @@ def parse_rates() -> pd.DataFrame:
                 "calls": len(frame),
                 "parsed": int(ok.sum()),
                 "parse_rate": round(float(ok.mean()), 4),
-                "min_per_question": int(frame[ok].groupby("question").size().min())
-                if ok.any()
-                else 0,
+                "min_per_question": int(
+                    frame[ok].groupby("question").size().reindex(IV_QNS, fill_value=0).min()
+                ),
             }
         )
     return pd.DataFrame(rows)
@@ -80,31 +83,44 @@ def language_effects(ellipses: pd.DataFrame, boot: pd.DataFrame) -> pd.DataFrame
     """Per-model zh - en displacement with a bootstrap CI.
 
     Replicates are independent across arms, so the displacement CI pairs
-    replicate i of the zh arm with replicate i of the en arm.
+    replicate i of the zh arm with replicate i of the en arm. Every analysed
+    zh cell needs its English arm, and both arms must carry the same number
+    of replicates; either failure raises rather than silently dropping the
+    model or truncating the interval. English cells without an analysed zh
+    arm (excluded upstream by the inclusion rule) have no contrast.
     """
     rows = []
+    points = ellipses.set_index("llm")[["PC1_rescaled", "PC2_rescaled"]]
     for label in ellipses["llm"]:
         if not label.endswith(" [zh]"):
             continue
         base = base_model(label)
         en = boot[boot["llm"] == base][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
         zh = boot[boot["llm"] == label][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
-        if len(en) == 0 or len(zh) == 0:
-            continue
-        n = min(len(en), len(zh))
-        delta = zh[:n] - en[:n]
+        if len(en) == 0 or len(zh) == 0 or base not in points.index:
+            raise ValueError(
+                f"{base}: language contrast needs both arms, got {len(en)} en and "
+                f"{len(zh)} zh replicates"
+            )
+        if len(en) != len(zh):
+            raise ValueError(
+                f"{base}: arms must have equal replicate counts, got {len(en)} en and {len(zh)} zh"
+            )
+        delta = zh - en
+        point_delta = (points.loc[label] - points.loc[base]).to_numpy()
         dist = np.linalg.norm(delta, axis=1)
         rows.append(
             {
                 "llm": base,
                 "cohort": cohort_2026(base),
-                "delta_pc1": delta[:, 0].mean(),
+                "delta_pc1": point_delta[0],
                 "delta_pc1_lo": np.quantile(delta[:, 0], 0.025),
                 "delta_pc1_hi": np.quantile(delta[:, 0], 0.975),
-                "delta_pc2": delta[:, 1].mean(),
+                "delta_pc2": point_delta[1],
                 "delta_pc2_lo": np.quantile(delta[:, 1], 0.025),
                 "delta_pc2_hi": np.quantile(delta[:, 1], 0.975),
-                "displacement": dist.mean(),
+                "displacement": float(np.linalg.norm(point_delta)),
+                "displacement_bootstrap_norm_mean": float(dist.mean()),
                 "displacement_lo": np.quantile(dist, 0.025),
                 "displacement_hi": np.quantile(dist, 0.975),
             }
@@ -113,7 +129,7 @@ def language_effects(ellipses: pd.DataFrame, boot: pd.DataFrame) -> pd.DataFrame
 
 
 def main() -> int:
-    cm = CulturalMap("data/ivs_df.pkl", "data/country_codes.pkl")
+    cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
     cm.load_model("data/cultural_map_model.npz")
     country_scores = pd.read_csv("data/corrected_country_scores.csv")
 
@@ -124,6 +140,7 @@ def main() -> int:
 
     responses = load_responses_2026(cm, str(RAW_DIR))
     per_item = responses.groupby("llm")["question"].value_counts().unstack(fill_value=0)
+    per_item = per_item.reindex(columns=IV_QNS, fill_value=0)
     usable = per_item[per_item.min(axis=1) >= MIN_PER_QUESTION].index
     excluded = sorted(set(responses["llm"]) - set(usable))
     if excluded:
@@ -134,9 +151,10 @@ def main() -> int:
     responses = responses[responses["llm"].isin(set(usable))]
 
     boot = bootstrap_llm_positions_cluster(cm, responses, n_boot=N_BOOT_CLUSTER, seed=SEED)
-    ellipses = confidence_ellipses(boot)
+    points = project_cell_means(cm, responses)
+    ellipses = confidence_ellipses(boot, point_estimates=points)
 
-    # Item bootstrap alongside, as the explicit lower bound
+    # Independence-assumption sensitivity, not a guaranteed lower bound.
     item_boot = bootstrap_llm_positions(cm, responses, n_boot=N_BOOT_ITEM, seed=SEED)
     item_sd = confidence_ellipses(item_boot)[["llm", "sd_pc1", "sd_pc2"]].rename(
         columns={"sd_pc1": "item_sd_pc1", "sd_pc2": "item_sd_pc2"}
@@ -145,8 +163,8 @@ def main() -> int:
 
     clf = RegionClassifier().fit(country_scores)
     print(f"\nSVM 5-fold CV accuracy: {clf.cv_accuracy:.3f}")
-    regions = clf.region_assignments(boot)
-    headline = centroid_statistics(boot, country_scores)
+    regions = clf.region_assignments(boot, point_estimates=points)
+    headline = centroid_statistics(boot, country_scores, point_estimates=points)
     diagnostics = central_tendency_diagnostics(cm, responses)
     lang_fx = language_effects(ellipses, boot)
 
@@ -187,7 +205,7 @@ def main() -> int:
     headline.to_csv("data/llm_headline_stats_2026.csv", index=False)
     diagnostics.to_csv("data/llm_diagnostics_2026.csv", index=False)
     lang_fx.to_csv("data/llm_language_effects_2026.csv", index=False)
-    print("\nWrote the six data/llm_*_2026.csv artefacts.")
+    print("\nWrote the eight data/llm_*_2026.csv artefacts.")
     return 0
 
 

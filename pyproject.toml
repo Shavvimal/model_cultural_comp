@@ -1,15 +1,14 @@
 [project]
 name = "model-cultural-comp"
-version = "1.0.0"
+version = "1.1.0"
 description = "Mapping the cultural alignment of open-weight LLMs onto the Inglehart-Welzel cultural map, refitted from the Integrated Values Surveys"
 readme = "README.md"
 authors = [{ name = "Shav Vimalendiran", email = "shavhugan@gmail.com" }]
 license = "MIT"
 license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "matplotlib>=3.9.1",
-    "jupyter>=1.0.0",
     "pyreadstat>=1.2.7",
     "scikit-learn>=1.5.1",
     "factor-analyzer>=0.5.1",
@@ -17,17 +16,13 @@ dependencies = [
     "numpy>=2.0.0",
     "pydantic>=2.8.2",
     "ollama>=0.4.7",
-    "huggingface-hub>=0.23.5",
-    "requests>=2.32.3",
-    "beautifulsoup4>=4.12.3",
-    "tqdm>=4.66.0",
-    "seaborn>=0.13.2",
     "scipy>=1.14.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/Shavvimal/model_cultural_comp"
 Repository = "https://github.com/Shavvimal/model_cultural_comp"
+Paper = "https://openreview.net/forum?id=xJHa9ts0mt"
 Write-up = "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
 Changelog = "https://github.com/Shavvimal/model_cultural_comp/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Shavvimal/model_cultural_comp/issues"
@@ -48,6 +43,15 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 # Fullwidth punctuation is correct in the Chinese survey prompts
 "app/cloud_survey.py" = ["RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.11"
+
+# pandas, scipy, scikit-learn and factor_analyzer ship no type information, and
+# stub packages would be new dependencies. Treat their imports as Any.
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*", "scipy", "scipy.*", "sklearn", "sklearn.*", "factor_analyzer", "factor_analyzer.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -21,13 +21,18 @@ Writes vector PDFs (LaTeX) and PNGs (blog) to figures/:
 import os
 import sys
 
+import matplotlib
+
+matplotlib.use("Agg")  # headless, platform-independent; must precede pyplot
+
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse
 
+from app.culture_map import SURVEY_REFERENCE
 from app.llm_meta import cohort_2026
-from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, _draw_countries
+from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, draw_countries, draw_midpoint
 
 # Okabe-Ito, CVD-validated
 COHORT_COLORS = {"Chinese": "#d55e00", "Western": "#0072b2"}
@@ -106,9 +111,18 @@ def _draw_cell(ax, row, marker: str, color: str) -> None:
     )
 
 
-def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
-    fig, ax = plt.subplots(figsize=(9.5, 7.5))
-    _draw_countries(ax, countries, label_alpha=0.3)
+def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame, midpoint=None):
+    fig, ax = plt.subplots(figsize=(7.0, 5.8))
+    draw_countries(
+        ax,
+        countries,
+        label_alpha=0.9,
+        labelled_countries={"Japan", "Germany", "China", "India"},
+        label_size=8,
+        monochrome=True,
+    )
+    ax.axvline(SURVEY_REFERENCE[0], color="0.45", lw=0.7, ls="--", zorder=1)
+    ax.axhline(SURVEY_REFERENCE[1], color="0.45", lw=0.7, ls="--", zorder=1)
 
     ell = ellipses.copy()
     ell["language"] = ["zh" if s.endswith(" [zh]") else "en" for s in ell["llm"]]
@@ -136,21 +150,23 @@ def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
             )
         for _, row in pair.iterrows():
             _draw_cell(ax, row, "D" if row["language"] == "en" else "^", color)
-        if len(en):
+        if len(en) and base in {"gemma4:31b", "minimax-m3", "mistral-large-3:675b"}:
             dx, dy, ha = LABEL_OFFSETS_2026.get(base, (5, 4, "left"))
             ax.annotate(
-                _short(base),
+                base,
                 (en["PC1_rescaled"].iloc[0], en["PC2_rescaled"].iloc[0]),
                 xytext=(dx, dy),
                 textcoords="offset points",
                 ha=ha,
-                fontsize=6,
+                fontsize=8,
                 fontweight="bold",
                 color=color,
                 zorder=7,
             )
 
+    draw_midpoint(ax, midpoint)
     handles = [
+        Line2D([], [], marker="o", ls="", color="0.6", label="Surveyed country/territory"),
         Line2D([], [], marker="D", ls="", color="0.35", label="English administration"),
         Line2D([], [], marker="^", ls="", color="0.35", label="Chinese administration"),
         Line2D([], [], marker="s", ls="", color=COHORT_COLORS["Chinese"], label="Chinese-origin"),
@@ -159,8 +175,7 @@ def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame):
     ax.legend(handles=handles, fontsize=7.5, loc="lower right", framealpha=0.9)
     _finish(
         ax,
-        "2026 frontier cohort: both administration arms "
-        "(cluster-bootstrap 95% regions; arrows en→zh)",
+        "2026 cohort: English → Chinese administration",
     )
     return fig
 
@@ -191,16 +206,16 @@ def fig4_language_forest(lang_fx: pd.DataFrame):
     ]
     axes[1].legend(handles=handles, fontsize=8, loc="lower right", framealpha=0.9)
     fig.suptitle(
-        "Language-of-administration effect per model (zh − en, replicate-paired 95% CI)",  # noqa: RUF001
+        "Language effect per model (zh − en; nominal 95% intervals, independently resampled arms)",  # noqa: RUF001
         fontsize=11,
     )
     fig.tight_layout()
     return fig
 
 
-def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame):
+def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame, midpoint=None):
     fig, ax = plt.subplots(figsize=(9.5, 7.5))
-    _draw_countries(ax, countries, label_alpha=0.35)
+    draw_countries(ax, countries, label_alpha=0.8)
     ax.scatter(
         e2024["PC1_rescaled"],
         e2024["PC2_rescaled"],
@@ -210,7 +225,7 @@ def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame
         edgecolor=AI_2024,
         linewidth=1.2,
         zorder=6,
-        label="2024 cohort (item bootstrap, lower-bound CIs)",
+        label="2024 cohort, observed-mean positions",
     )
     lang = ["zh" if s.endswith(" [zh]") else "en" for s in e2026["llm"]]
     for marker, arm in [("D", "en"), ("^", "zh")]:
@@ -224,8 +239,9 @@ def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame
             edgecolor="white",
             linewidth=0.5,
             zorder=6,
-            label=f"2026 cohort, {arm} arm (cluster bootstrap)",
+            label=f"2026 cohort, {'English' if arm == 'en' else 'Chinese'} administration",
         )
+    draw_midpoint(ax, midpoint)
     ax.legend(fontsize=7.5, loc="lower right", framealpha=0.9)
     _finish(
         ax,
@@ -240,12 +256,16 @@ def main() -> int:
     e2026 = pd.read_csv("data/llm_ellipses_2026.csv")
     lang_fx = pd.read_csv("data/llm_language_effects_2026.csv")
     e2024 = pd.read_csv("data/llm_ellipses.csv")
+    references = pd.read_csv("data/validation_survey_reference.csv").set_index("reference")
+    midpoint = references.loc["scale_midpoint", ["PC1_rescaled", "PC2_rescaled"]].to_numpy(
+        dtype=float
+    )
     os.makedirs("figures", exist_ok=True)
 
     for name, fig in [
-        ("fig3_map_2026", fig3_map_2026(countries, e2026)),
+        ("fig3_map_2026", fig3_map_2026(countries, e2026, midpoint)),
         ("fig4_language_forest", fig4_language_forest(lang_fx)),
-        ("fig5_joint_2024_2026", fig5_joint(countries, e2024, e2026)),
+        ("fig5_joint_2024_2026", fig5_joint(countries, e2024, e2026, midpoint)),
     ]:
         fig.savefig(f"figures/{name}.pdf", bbox_inches="tight")
         fig.savefig(f"figures/{name}.png", dpi=200, bbox_inches="tight")
