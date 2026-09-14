@@ -44,6 +44,15 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
 # Fullwidth punctuation is correct in the Chinese survey prompts
 "app/cloud_survey.py" = ["RUF001", "RUF002", "RUF003"]
 
+[tool.mypy]
+python_version = "3.11"
+
+# pandas, scipy, scikit-learn and factor_analyzer ship no type information, and
+# stub packages would be new dependencies. Treat their imports as Any.
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*", "scipy", "scipy.*", "sklearn", "sklearn.*", "factor_analyzer", "factor_analyzer.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

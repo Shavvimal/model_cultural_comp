@@ -5,7 +5,13 @@ import pytest
 from scipy.optimize import OptimizeResult, minimize
 from scipy.stats import multivariate_normal
 
-from app.ppca import PPCA, _likelihood_change, _negative_log_likelihood, _pattern_statistics
+from app.ppca import (
+    PPCA,
+    _likelihood_change,
+    _negative_log_likelihood,
+    _pattern_statistics,
+    conditional_complete,
+)
 
 
 @pytest.fixture(scope="module")
@@ -155,12 +161,25 @@ def test_explained_variance_is_the_projected_centered_sum_of_squares(fitted):
     assert 0 < fitted.var_exp[-1] < 1
 
 
-def test_all_missing_rows_and_filtered_columns(incomplete_data):
+def test_entirely_unobserved_rows_are_rejected(incomplete_data):
+    """A zero-completed empty row would still move the score covariance and axes."""
+    raw = np.vstack([incomplete_data, np.full(incomplete_data.shape[1], np.nan)])
+    model = PPCA()
+    with pytest.raises(ValueError, match="observe at least one retained column"):
+        model.fit(raw, d=2, min_obs=1, seed=42)
+    assert model.C is None
+    # A row observed only in a column dropped by min_obs is empty after filtering.
+    filtered = np.c_[incomplete_data, np.full(len(incomplete_data), np.nan)]
+    filtered[-1, :6] = np.nan
+    filtered[-1, 6] = 1.0
+    with pytest.raises(ValueError, match="1 rows observe none"):
+        PPCA().fit(filtered, d=2, min_obs=2, seed=42)
+
+
+def test_filtered_columns(incomplete_data):
     raw = np.c_[incomplete_data, np.full(len(incomplete_data), np.nan)]
-    raw = np.vstack([raw, np.full(raw.shape[1], np.nan)])
     model = PPCA().fit(raw, d=2, min_obs=2, seed=42)
     assert model.valid_series.tolist() == [True] * 6 + [False]
-    np.testing.assert_array_equal(model.data[-1], np.zeros(6))
     complete = np.tile(model.means, (2, 1))
     np.testing.assert_array_equal(
         model.transform(complete), model.transform(np.c_[complete, [np.nan, np.nan]])
@@ -223,6 +242,8 @@ def test_premature_objective_stop_resumes_within_iteration_budget(monkeypatch, i
     assert np.all(model.start_gradient_norms_ <= 1e-7)
     assert len(model.start_converged_) == 3
     assert model.n_iter_ <= 1000
+    assert model.n_optimizer_restarts_ >= 1
+    assert "n_optimizer_restarts_" not in model.state_dict()
 
 
 def test_persistent_objective_stagnation_fails_without_accepting_fit(monkeypatch, incomplete_data):
@@ -318,3 +339,33 @@ def test_one_dimension_and_legacy_projection_archive(tmp_path):
     np.testing.assert_allclose(loaded.transform(raw), fitted.transform(raw), atol=1e-14)
     assert not loaded.converged_  # legacy projection arrays do not prove convergence
     assert loaded.noise_variance_ is None
+
+
+def test_fit_completion_is_the_shared_conditional_mean(incomplete_data, fitted):
+    standardized = (incomplete_data - fitted.means) / fitted.stds
+    completed = conditional_complete(standardized, fitted.loadings_, fitted.noise_variance_)
+    np.testing.assert_array_equal(completed, fitted.data)
+    assert fitted.n_optimizer_restarts_ == 0
+
+
+def test_completed_training_data_are_c_ordered_for_fortran_input(incomplete_data, fitted):
+    """Pandas hands the survey over in Fortran order; the released fit completed a C copy."""
+    model = PPCA().fit(np.asfortranarray(incomplete_data), d=2, min_obs=1, seed=42)
+    assert model.data.flags.c_contiguous
+    np.testing.assert_array_equal(model.data, fitted.data)
+    np.testing.assert_array_equal(model.var_exp, fitted.var_exp)
+    layout = conditional_complete(
+        np.asfortranarray([[1.0, np.nan], [2.0, 3.0]]), np.ones((2, 1)), 1.0
+    )
+    assert layout.flags.f_contiguous  # frozen diagnostics keep the caller's layout
+
+
+def test_rounding_guard_names_the_eigenvalue(monkeypatch, incomplete_data, fitted):
+    data = (incomplete_data - fitted.means) / fitted.stds
+    reference = np.r_[fitted.loadings_.ravel(), np.log(fitted.noise_variance_)]
+    groups = _pattern_statistics(data)
+    monkeypatch.setattr(
+        "app.ppca.np.linalg.eigh", lambda matrix: (np.full(len(matrix), -1.0), np.eye(len(matrix)))
+    )
+    with pytest.raises(ValueError, match="floating-point rounding"):
+        _likelihood_change(reference, reference, groups, 6, 2, len(data))

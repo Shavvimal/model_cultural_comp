@@ -25,8 +25,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+from app.stats import bh_adjust
+from app.study_design import TRIAL_KEY
+
 ROOT = Path(__file__).resolve().parents[1]
-KEY = ["llm", "language", "question", "system_prompt_id", "repeat"]
+KEY = list(TRIAL_KEY)
+# The historical exploratory family has exactly seven declared tests.
+HISTORICAL_FAMILY_SIZE = 7
 CAP = 2000
 
 
@@ -87,22 +92,6 @@ def raw_features(directory: Path) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(features)
-
-
-def bh_adjust(p_values: np.ndarray) -> np.ndarray:
-    """BH using the declared family size; undefined tests do not shrink m."""
-    p_values = np.asarray(p_values, dtype=float)
-    valid = np.isfinite(p_values)
-    if ((p_values[valid] < 0) | (p_values[valid] > 1)).any():
-        raise ValueError("p-values must be in [0, 1]")
-    result = np.full(len(p_values), np.nan)
-    indices = np.flatnonzero(valid)
-    order = np.argsort(p_values[indices], kind="stable")
-    sorted_indices = indices[order]
-    if len(indices):
-        adjusted = p_values[sorted_indices] * len(p_values) / np.arange(1, len(indices) + 1)
-        result[sorted_indices] = np.minimum(1, np.minimum.accumulate(adjusted[::-1])[::-1])
-    return result
 
 
 def correlation(
@@ -242,8 +231,10 @@ def compute_correlations(
     result["bh_family_size"] = 0
     result["adjustment"] = "none_separate_single_test_status_stated"
     selected = result["family"].eq("historical_seven")
-    result.loc[selected, "p_bh"] = bh_adjust(result.loc[selected, "p_raw_two_sided"].to_numpy())
-    result.loc[selected, "bh_family_size"] = 7
+    result.loc[selected, "p_bh"] = bh_adjust(
+        result.loc[selected, "p_raw_two_sided"].to_numpy(), family_size=HISTORICAL_FAMILY_SIZE
+    )
+    result.loc[selected, "bh_family_size"] = HISTORICAL_FAMILY_SIZE
     result.loc[selected, "adjustment"] = "BH_over_exactly_seven_historical_tests"
     return result, cells
 

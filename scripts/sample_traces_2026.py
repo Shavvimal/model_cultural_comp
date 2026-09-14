@@ -19,6 +19,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from app.study_design import TRIAL_KEY
+
 RAW_DIR = Path("data/collection_2026")
 OUT = Path("data/trace_samples_2026.json")
 PER_ITEM = 3
@@ -45,9 +47,7 @@ def main() -> int:
     df["language"] = df.get("language", pd.Series([None] * len(df))).fillna("en")
     df["system_prompt_id"] = df["system_prompt_id"].astype(int)
     df["repeat"] = df["repeat"].astype(int)
-    df = df.drop_duplicates(
-        subset=["llm", "language", "question", "system_prompt_id", "repeat"], keep="last"
-    )
+    df = df.drop_duplicates(subset=list(TRIAL_KEY), keep="last")
     df["thinking"] = df["thinking"].fillna("")
 
     rng = np.random.default_rng(SEED)

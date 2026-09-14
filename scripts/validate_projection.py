@@ -50,7 +50,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from app.culture_map import CulturalMap
+from app.culture_map import CulturalMap, check_preparation
 from app.instrument_sensitivity import rotation_grid
 from app.survey_reference import survey_reference_tables
 
@@ -200,16 +200,15 @@ def main() -> int:
     print("Preparing data & fitting PPCA (seeded)...")
     cm.prepare_data()
     preparation = cm.survey_preparation_report
-    if preparation["y003"]["missing_constituent_columns"]:
-        raise ValueError("Y003 constituent columns are missing; supply the full harmonized inputs")
-    if preparation["y003"]["discordant_direct"]:
-        raise ValueError("delivered Y003 disagrees with valid constituents; resolve before fitting")
+    check_preparation(preparation)
     print(f"rows after filtering: {len(cm.subset_ivs_df):,}")
     print(
         "sentinel recodes (out-of-range -> NaN): "
         + ", ".join(f"{q}={n:,}" for q, n in cm.sentinel_counts.items() if n)
     )
     cm.fit(seed=SEED)
+    # Log only: the summary CSV and model archive schemas are frozen.
+    print(f"PPCA optimizer resumes across starts: {cm.ppca.n_optimizer_restarts_}")
     cm.calculate_mean_scores()
 
     published = load_published_2024()

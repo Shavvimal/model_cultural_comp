@@ -178,3 +178,83 @@ def test_trace_agreement_cli_rejects_corruption_before_coercing_it_away(tmp_path
     with pytest.raises(ValueError, match="labels must be binary or missing"):
         trace_agreement_2026.main(str(tmp_path / "output"))
     assert not list((tmp_path / "output").iterdir())
+
+
+def test_prefix_family_mapping_is_unchanged():
+    from app.trace_diagnostics import PREFIX_FAMILY
+
+    assert PREFIX_FAMILY == {
+        **dict.fromkeys([0, 1, 3, 4, 6, 7], "averaging"),
+        **dict.fromkeys([2, 5, 8], "bare"),
+        9: "world_citizen",
+    }
+
+
+def test_prompt_sensitivity_requires_the_no_persona_arm(tmp_path, monkeypatch):
+    import scripts.prompt_sensitivity_2026 as prompt
+
+    with pytest.raises(FileNotFoundError, match="no-persona"):
+        prompt.require_nosys_collection(str(tmp_path / "absent"))
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(FileNotFoundError, match="no-persona"):
+        prompt.require_nosys_collection(str(empty))
+    (empty / "m.jsonl").write_text("{}\n")
+    assert prompt.require_nosys_collection(str(empty)) == empty
+
+    monkeypatch.setattr(prompt, "NOSYS_DIR", str(tmp_path / "absent"))
+    with pytest.raises(FileNotFoundError, match="no-persona"):
+        prompt.main(str(tmp_path / "output"))
+    assert not (tmp_path / "output").exists()
+
+
+def code_traces_workspace(tmp_path, monkeypatch):
+    """code_traces_2026 pointed at a scratch data/ with the two synthetic traces."""
+    from scripts import code_traces_2026
+
+    sample, labels = traces_and_labels()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    monkeypatch.setattr(code_traces_2026, "load_traces", lambda: sample.assign(raw_content="1"))
+    return code_traces_2026, labels
+
+
+def write_panel(path, labels):
+    path.write_text("\n".join(json.dumps(r) for r in labels.to_dict("records")) + "\n")
+
+
+def test_merge_rejects_a_corrupt_code_instead_of_coercing_it_to_missing(tmp_path, monkeypatch):
+    code_traces, labels = code_traces_workspace(tmp_path, monkeypatch)
+    panel = labels[labels["annotator"] == "model-a"].astype(object)
+    panel.iloc[0, panel.columns.get_loc(CODES[0])] = "corrupt"
+    write_panel(tmp_path / "data" / "trace_labels_2026__model-a.jsonl", panel)
+    with pytest.raises(ValueError, match="labels must be binary or missing"):
+        code_traces.merge()
+    assert not (tmp_path / "data" / "trace_labels_2026.csv").exists()
+
+
+def test_merge_reports_uncoded_human_rows_it_drops(tmp_path, monkeypatch, capsys):
+    code_traces, labels = code_traces_workspace(tmp_path, monkeypatch)
+    write_panel(
+        tmp_path / "data" / "trace_labels_2026__model-a.jsonl",
+        labels[labels["annotator"] == "model-a"],
+    )
+    human = labels[labels["annotator"] == "model-b"].drop(columns=["annotator", "error"])
+    human = human.astype({CODES[1]: float})
+    human.iloc[0, human.columns.get_loc(CODES[1])] = np.nan
+    human.to_csv(tmp_path / "data" / "trace_labels_human_2026.csv", index=False)
+    assert code_traces.merge() == 0
+    assert "dropped 1 of 2 rows with a blank code" in capsys.readouterr().out
+    merged = pd.read_csv(tmp_path / "data" / "trace_labels_2026.csv")
+    assert (merged["annotator"] == "human").sum() == 1
+
+
+def test_resume_and_merge_both_raise_on_a_corrupt_label_line(tmp_path, monkeypatch):
+    code_traces, labels = code_traces_workspace(tmp_path, monkeypatch)
+    record = labels[labels["annotator"] == "model-a"].to_dict("records")[0]
+    path = tmp_path / "data" / "trace_labels_2026__model-a.jsonl"
+    path.write_text(json.dumps(record) + "\n\n{truncated\n")
+    with pytest.raises(ValueError, match=r"trace_labels_2026__model-a\.jsonl:3: corrupt label"):
+        code_traces.completed(path)
+    with pytest.raises(ValueError, match=r"trace_labels_2026__model-a\.jsonl:3: corrupt label"):
+        code_traces.merge()

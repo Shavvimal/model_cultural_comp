@@ -38,15 +38,35 @@ FORBIDDEN_SUFFIXES = {
     ".pem",
     ".key",
     ".pyc",
+    # Other formats survey microdata and extracts are commonly shipped in.
+    ".dta",
+    ".rds",
+    ".rdata",
+    ".xlsx",
+    ".xls",
+    ".tsv",
+    ".feather",
+    ".h5",
+    ".hdf5",
+    ".sqlite",
+    ".db",
+    ".tar",
+    ".xz",
+    ".7z",
 }
 
 
-def violations(entries):
+def violations(entries: list[tuple[str, str]]) -> list[str]:
+    """Return indexed names that break the policy, given (mode, path) index entries.
+
+    Directory and suffix matching ignore case, so `DATA/x.json` and `wvs.RData`
+    are caught on case-insensitive filesystems too.
+    """
     bad = []
     for mode, name in entries:
         path = PurePosixPath(name)
         if (
-            set(path.parts) & FORBIDDEN_DIRECTORIES
+            {part.lower() for part in path.parts} & FORBIDDEN_DIRECTORIES
             or path.suffix.lower() in FORBIDDEN_SUFFIXES
             or path.name == ".env"
             or path.name.startswith(".env.")
@@ -57,7 +77,7 @@ def violations(entries):
     return bad
 
 
-def main():
+def main() -> int:
     root = Path(__file__).resolve().parents[1]
     raw = subprocess.check_output(["git", "-C", str(root), "ls-files", "--stage", "-z"])
     entries = []

@@ -26,17 +26,14 @@ RAW_DIRS = {
     "nosys": Path("data/collection_2026_nosys"),
 }
 RAW_DIR = RAW_DIRS["persona"]
-
-
-def load_dotenv(path=".env"):
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                os.environ.setdefault(key.strip(), value.strip())
+# Outer re-sweeps of trials deferred by transport failures, values unchanged from
+# the original collection. The backoff lets transient throttling clear between
+# sweeps; the cap stops a persistently failing provider holding a run open.
+# Each sweep gives a deferred trial up to MAX_ATTEMPTS fresh calls, so one
+# invocation makes at most MAX_ATTEMPTS x MAX_SWEEPS calls per trial (15);
+# re-running the collector has no bound across invocations.
+MAX_SWEEPS = 5
+SWEEP_BACKOFF_S = 120
 
 
 async def list_cloud_models(survey) -> list[str]:
@@ -51,7 +48,8 @@ async def list_cloud_models(survey) -> list[str]:
             return sorted(m.model for m in response.models)
         except Exception as exc:
             print(
-                f"startup list failed (attempt {attempt + 1}): {str(exc)[:80]} — retrying in 60s",
+                f"startup list failed (attempt {attempt + 1}): "
+                f"{survey._redact(str(exc))[:80]} — retrying in 60s",
                 flush=True,
             )
             await asyncio.sleep(60)
@@ -59,8 +57,10 @@ async def list_cloud_models(survey) -> list[str]:
 
 
 async def main() -> int:
+    # CloudSurvey reads OLLAMA_API_KEY when constructed, so .env must load first.
+    from app.cloud_survey import CloudSurvey, load_dotenv
+
     load_dotenv()
-    from app.cloud_survey import CloudSurvey
 
     args = sys.argv[1:]
     language = "en"
@@ -97,7 +97,7 @@ async def main() -> int:
     # in-flight requests. The outer loop re-sweeps deferred transport
     # failures until every cell converges (refusals are persisted and count
     # as complete), so a single invocation reaches 100% or reports why not.
-    for sweep in range(1, 6):
+    for sweep in range(1, MAX_SWEEPS + 1):
         deferred_total = 0
         for i in range(0, len(models), model_parallelism):
             batch = models[i : i + model_parallelism]
@@ -107,12 +107,15 @@ async def main() -> int:
             print(f"converged after sweep {sweep}", flush=True)
             return 0
         print(
-            f"sweep {sweep}: {deferred_total} deferred rows remain; re-sweeping in 120s", flush=True
+            f"sweep {sweep}: {deferred_total} deferred rows remain; "
+            f"re-sweeping in {SWEEP_BACKOFF_S}s",
+            flush=True,
         )
-        await asyncio.sleep(120)
+        await asyncio.sleep(SWEEP_BACKOFF_S)
 
     print(
-        "WARNING: deferred rows remain after 5 sweeps — provider persistently failing", flush=True
+        f"WARNING: deferred rows remain after {MAX_SWEEPS} sweeps — provider persistently failing",
+        flush=True,
     )
     return 1
 

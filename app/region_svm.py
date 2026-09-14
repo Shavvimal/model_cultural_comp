@@ -1,9 +1,11 @@
 """Cultural-region assignment for map positions.
 
 Two rules are reported side by side (write-up §3.4): an RBF-SVM over the
-country coordinates (with its cross-validated accuracy attached — 0.57 on
-109 countries in 8 classes, against a 0.67 training accuracy, so a single
-label is weak evidence), and the nearest region centroid. Their disagreement
+country coordinates, and the nearest region centroid. The SVM carries its
+tuning score on every row: the mean stratified 5-fold accuracy of the selected
+grid point, on the same folds used to select it. That score is optimistic, not
+an unbiased held-out accuracy, and it sits below the training accuracy, so a
+single SVM label is weak evidence. Analysis scripts print the current value. Their disagreement
 is a result, not a nuisance. "Positional stability" is the share of bootstrap
 replicates falling in a fixed decision region: it reflects sampling
 uncertainty of the position only, never the classifier's own error rate.
@@ -16,7 +18,7 @@ centroid); see ``app.llm_bootstrap.centroid_statistics``.
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_score
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
 
 # Includes the regularised regime: the 2024 grid started at C=500, which
@@ -28,6 +30,9 @@ PARAM_GRID = {
     "gamma": [0.01, 0.05, 0.1, 0.2, 0.5, 1.0],
     "kernel": ["rbf"],
 }
+# Fixed fold shuffle for the stratified 5-fold selection and its reported score.
+CV_RANDOM_STATE = 0
+CV_FOLDS = 5
 
 
 class RegionClassifier:
@@ -46,11 +51,14 @@ class RegionClassifier:
         xy = data[["PC1_rescaled", "PC2_rescaled"]].to_numpy(dtype=float)
         codes = labels.codes.astype(int)
 
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+        cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=CV_RANDOM_STATE)
         search = GridSearchCV(SVC(), PARAM_GRID, refit=True, cv=cv)
         search.fit(xy, codes)
         self.svm = search.best_estimator_
-        self.cv_accuracy = float(cross_val_score(search.best_estimator_, xy, codes, cv=cv).mean())
+        # The selected grid point's mean fold score. Re-running cross_val_score on
+        # a clone over the same folds recomputes exactly this value (the SVC is
+        # deterministic), which was checked bit-identical on the released scores.
+        self.cv_accuracy = float(search.best_score_)
 
         self.centroids = data.groupby("Cultural Region")[["PC1_rescaled", "PC2_rescaled"]].mean()
         return self
@@ -78,6 +86,11 @@ class RegionClassifier:
         without it.
         """
         rows = []
+        if point_estimates is not None and point_estimates["llm"].duplicated().any():
+            duplicated = sorted(point_estimates.loc[point_estimates["llm"].duplicated(), "llm"])
+            raise ValueError(
+                f"point_estimates must contain one row per llm; duplicated {duplicated}"
+            )
         points = None if point_estimates is None else point_estimates.set_index("llm")
         for llm, g in boot.groupby("llm"):
             xy = g[["PC1_rescaled", "PC2_rescaled"]].to_numpy()

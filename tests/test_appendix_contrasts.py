@@ -2,6 +2,7 @@
 
 from itertools import combinations
 from math import comb
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -202,6 +203,36 @@ class TestOriginProfilePermutation:
             )
 
 
+OUTPUTS = ["OUT_PETITION", "OUT_ORIGIN", "OUT_ORIGIN_STANDARDISED"]
+
+
+def _wire_appendix_replay(script, fitted_map, tmp_path, monkeypatch) -> None:
+    """Point the appendix CLI at synthetic aggregate inputs and scratch outputs."""
+    rng = np.random.default_rng(19)
+    models = ["deepseek-v4-flash", "glm-5.1", "gemma4:31b", "gpt-oss:20b"]
+    profiles = pd.DataFrame(rng.normal(size=(4, 10)), index=models, columns=IV_QNS)
+    long = (
+        profiles.rename_axis("llm")
+        .reset_index()
+        .melt(id_vars="llm", var_name="question", value_name="cell_mean")
+    )
+    long["language"] = "en"
+    item_fx = long[["llm", "question"]].assign(delta=rng.normal(size=40))
+    keying = pd.DataFrame({"question": IV_QNS, "d_pc1_per_unit": rng.normal(size=10)})
+    _, _, items, _ = survey_reference_tables(fitted_map)
+    for constant, frame in [
+        ("ITEM_FX_CSV", item_fx),
+        ("KEYING_CSV", keying),
+        ("PROFILES_CSV", long),
+        ("ITEM_BASELINES_CSV", items),
+    ]:
+        path = tmp_path / f"{constant}.csv"
+        frame.to_csv(path, index=False)
+        monkeypatch.setattr(script, constant, str(path))
+    for constant in OUTPUTS:
+        monkeypatch.setattr(script, constant, str(tmp_path / f"{constant}.csv"))
+
+
 class TestReleasedStandardisation:
     def test_csv_route_matches_frozen_npz_transform_and_statistics(self, fitted_map, tmp_path):
         _, _, items, _ = survey_reference_tables(fitted_map)
@@ -246,29 +277,7 @@ class TestReleasedStandardisation:
     ):
         import scripts.appendix_contrasts_2026 as script
 
-        rng = np.random.default_rng(19)
-        models = ["deepseek-v4-flash", "glm-5.1", "gemma4:31b", "gpt-oss:20b"]
-        profiles = pd.DataFrame(rng.normal(size=(4, 10)), index=models, columns=IV_QNS)
-        long = (
-            profiles.rename_axis("llm")
-            .reset_index()
-            .melt(id_vars="llm", var_name="question", value_name="cell_mean")
-        )
-        long["language"] = "en"
-        item_fx = long[["llm", "question"]].assign(delta=rng.normal(size=40))
-        keying = pd.DataFrame({"question": IV_QNS, "d_pc1_per_unit": rng.normal(size=10)})
-        _, _, items, _ = survey_reference_tables(fitted_map)
-        for constant, frame in [
-            ("ITEM_FX_CSV", item_fx),
-            ("KEYING_CSV", keying),
-            ("PROFILES_CSV", long),
-            ("ITEM_BASELINES_CSV", items),
-        ]:
-            path = tmp_path / f"{constant}.csv"
-            frame.to_csv(path, index=False)
-            monkeypatch.setattr(script, constant, str(path))
-        for constant in ["OUT_PETITION", "OUT_ORIGIN", "OUT_ORIGIN_STANDARDISED"]:
-            monkeypatch.setattr(script, constant, str(tmp_path / f"{constant}.csv"))
+        _wire_appendix_replay(script, fitted_map, tmp_path, monkeypatch)
 
         def reject_npz(*args, **kwargs):
             raise AssertionError("aggregate-only replay must not load a fitted NPZ")
@@ -277,3 +286,46 @@ class TestReleasedStandardisation:
         assert script.main() == 0
         for constant in ["OUT_PETITION", "OUT_ORIGIN", "OUT_ORIGIN_STANDARDISED"]:
             assert not pd.read_csv(getattr(script, constant)).empty
+
+    def test_failed_invariant_leaves_every_output_unwritten(
+        self, fitted_map, tmp_path, monkeypatch
+    ):
+        import scripts.appendix_contrasts_2026 as script
+
+        _wire_appendix_replay(script, fitted_map, tmp_path, monkeypatch)
+        real = script.origin_profile_permutation
+        calls = []
+
+        def corrupt_standardised(profiles, is_chinese):
+            out = real(profiles, is_chinese)
+            calls.append(1)
+            if len(calls) == 2:  # the survey-standardised sensitivity
+                out["p_exact_ge"] = 1.5
+            return out
+
+        monkeypatch.setattr(script, "origin_profile_permutation", corrupt_standardised)
+        with pytest.raises(ValueError, match=r"standardised profiles: p_exact_ge .*1\.5"):
+            script.main()
+        for constant in OUTPUTS:
+            assert not Path(getattr(script, constant)).exists()
+
+    def test_invalid_petition_summary_raises_value_error(self):
+        from scripts.appendix_contrasts_2026 import check_invariants
+
+        summary = pd.Series(
+            {"n_target_more_survival_ward": 1, "n_effective": 2, "p_sign_two_sided": np.nan}
+        )
+        with pytest.raises(ValueError, match="sign-test p"):
+            check_invariants(summary, {})
+        with pytest.raises(ValueError, match="survival-ward count 3"):
+            check_invariants(summary.replace({1: 3}), {})
+
+    def test_item_mismatch_names_missing_and_extra_items(self, fitted_map):
+        _, _, items, _ = survey_reference_tables(fitted_map)
+        profiles = pd.DataFrame([np.ones(10)], columns=[*IV_QNS[:-1], "Z999"])
+        with pytest.raises(ValueError, match=r"profiles .*missing \['Y003'\], extra \['Z999'\]"):
+            standardise_profiles(profiles, items)
+        with pytest.raises(ValueError, match=r"item baselines .*missing \['Y003'\], extra \[\]"):
+            standardise_profiles(
+                pd.DataFrame([np.ones(10)], columns=IV_QNS), items[items["question"] != "Y003"]
+            )

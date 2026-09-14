@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from app.stats import bh_adjust
 from scripts.exploratory_correlations_2026 import (
-    bh_adjust,
     compute_correlations,
     correlation,
     raw_features,
@@ -74,11 +74,11 @@ def test_no_thinking_cells_excluded_not_zero_imputed_and_models_not_double_count
 
 
 def test_bh_undefined_test_does_not_shrink_declared_family():
-    corrected = bh_adjust(np.array([0.01, 0.04, np.nan]))
+    corrected = bh_adjust(np.array([0.01, 0.04, np.nan]), family_size=3)
     assert corrected[:2] == pytest.approx([0.03, 0.06])
     assert np.isnan(corrected[2])
     with pytest.raises(ValueError, match="p-values"):
-        bh_adjust(np.array([-0.1]))
+        bh_adjust(np.array([-0.1]), family_size=1)
 
 
 def test_constant_input_is_explicitly_unestimable():

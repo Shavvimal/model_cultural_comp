@@ -11,6 +11,13 @@ import pandas as pd
 
 from app.culture_map import CulturalMap
 from app.llm_bootstrap import load_responses_2026
+from scripts.analyze_2026 import N_BOOT_CLUSTER
+
+# Dedicated stream for the paired design, dated when the sensitivity was added.
+SEED = 20260911
+# Same draw count as the primary cluster bootstrap, so the paired and
+# independent SDs compared in the output are like for like.
+N_DRAWS = N_BOOT_CLUSTER
 
 
 def main() -> int:
@@ -19,12 +26,18 @@ def main() -> int:
     answers = load_responses_2026(cm, "data/collection_2026")
     primary = pd.read_csv("data/llm_language_effects_2026.csv")
     boot = pd.read_csv("data/llm_bootstrap_replicates_2026.csv")
-    rng = np.random.default_rng(20260911)
+    rng = np.random.default_rng(SEED)
     rows = []
     for model in primary["llm"]:
         groups = [answers[answers["llm"] == label] for label in (model, f"{model} [zh]")]
         variants = sorted(set(groups[0]["system_prompt_id"]) | set(groups[1]["system_prompt_id"]))
-        draws = rng.integers(0, len(variants), size=(10_000, len(variants)))
+        draws = rng.integers(0, len(variants), size=(N_DRAWS, len(variants)))
+        # This kernel is kept local rather than calling app.llm_bootstrap: the
+        # paired design must apply one draw matrix to both arms, whereas
+        # bootstrap_llm_positions_cluster draws inside its per-cell loop (with
+        # rng.choice) and exposes no way to pass shared draws in. Reusing it
+        # would need a change to that module and a different generator call
+        # sequence, so the published paired intervals could move.
         positions = []
         for group in groups:
             agg = group.groupby(["system_prompt_id", "question"])["value"].agg(["sum", "count"])

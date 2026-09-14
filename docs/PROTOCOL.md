@@ -4,7 +4,7 @@
 |---|---|
 | `data/collection/*_responses_df.jsonl` | Eleven 2024 JSONL cell files, 500 parsed responses each; no recoverable variant IDs, failed-attempt text or reasoning excerpts |
 | `data/collection_2026/<model>.jsonl`, `<model>__zh.jsonl` | 34 persona cells, 17,000 unique recorded trials; 215 terminal parse failures, including but not limited to refusals |
-| `data/collection_2026_nosys/<model>.jsonl` | Seventeen English no-persona files: 8,500 scheduled trials, 8,442 unique recorded trials; qwen3.5:397b has 450 and nemotron-3-ultra 492. Resumed-run duplicates are removed by type-normalised trial keys. Absent records are not counted as refusals. |
+| `data/collection_2026_nosys/<model>.jsonl` | Seventeen English no-persona files: 8,500 scheduled trials, 8,442 unique recorded trials; qwen3.5:397b has 450 and nemotron-3-ultra 492. Resumed-run duplicates are removed by type-normalised trial keys, keeping the last line in file order: the 82 duplicated keys are all nemotron-3-ultra, and keep-last supersedes 15 parsed records with later failures and 2 failures with later parses. The QC gate does not cover this directory; `scripts/qc_2026.py` prints a report-only duplicate and missing-trial count for it. Absent records are not counted as refusals. |
 | `data/trace_samples_2026.json` | Frozen sample of 900 excerpts from successful responses: 30 per trace-emitting cell, three per item, seed 42. Four cells from two non-emitting models are absent; 164 excerpts reach the 2,000-character cap. |
 | `data/trace_labels_2026__<annotator>.jsonl` | Frozen-code labels from five LLM annotators; gpt-oss:120b and nemotron-3-super each label 60 own-model excerpts |
 | `data/trace_coding_human_worksheet.csv` | Regenerated optionally with `scripts/code_traces_2026.py --worksheet`; no completed human reliability estimate is claimed |
@@ -21,9 +21,31 @@ Each 2026 JSONL row records a trial, not a single API attempt:
 | `raw_content` | Most recent returned answer text; earlier rejected drafts are not exhaustively retained |
 | `thinking` | Stored reasoning excerpt, capped at 2,000 characters; empty when no text is emitted |
 | `parsed` | Parsed integer or null |
-| `error` | Final error, including parse and transport failures; a failure need not be a refusal |
-| `attempts` | Up to three recorded attempts in that task invocation; re-sweeps restart the count, so this is not a complete API-call or billing ledger |
+| `error` | Terminal error or null. Every retained error is a `parse:` failure; future collection may also write `provider:` rejections. Transport-only failures are never terminal. A failure need not be a refusal |
+| `attempts` | Up to `MAX_ATTEMPTS = 3` calls in the task invocation that wrote the record. The collector re-sweeps transport-deferred trials up to `MAX_SWEEPS = 5` times, so one invocation can make up to 15 calls per trial, and re-running the collector has no bound. Re-sweeps restart the count, so this is not a complete API-call or billing ledger |
 | `duration_ms`, `ts` | Recorded latency and final-attempt timestamp |
+
+The retained 2026 records predate schema version 2. No record in either
+directory has `schema_version`, `request`, `response`, `request_provenance` or
+`task_run_id`. The 17,000 persona records have no `prompt_variant` field, and
+4,122 of them have no `language` field; both take the defaults above. All 8,524
+no-persona lines carry `language` and `prompt_variant`.
+
+Each request sends two messages in this order. The user message joins the
+persona prefix (omitted with no persona), the item wording and the format
+instruction. It is followed by a trailing system-role message, the primer, which
+is the only system message and reads verbatim `Sure thing! Here is my numerical
+answer:` in English and `好的！这是我的数字答案：` in Chinese. It is the
+2024-protocol refusal mitigation, kept for comparability.
+
+The F120 anchor order differs between arms: the English prompt names 10 first
+("10 means always justifiable and 1 means never justifiable"), while the Chinese
+F120 prompt and both F118 prompts name 1 first. Translation caveat: Chinese
+prefixes 0, 3 and 6 render "average" as 普通 ("ordinary, common"), which the
+analyses count as an averaging cue, as they do 典型 ("typical"). 普通 reads
+closer to "ordinary" than to a statistical average. Both strings stay verbatim,
+because the retained corpus was collected with them; corrected wording would be a
+new, versioned prompt set collected into a new directory.
 
 The historical respondent calls supplied the model tag and messages without
 explicit temperature, top-p, top-k, seed, token-limit or reasoning-effort settings.
@@ -80,6 +102,32 @@ host match the current configuration. Changed prompts, generation options,
 thinking settings or host require a new output directory. Historical records
 without those fields remain valid offline analysis inputs, but cannot establish
 compatibility for appending new responses and therefore cannot be resumed.
+
+Each task invocation makes up to `MAX_ATTEMPTS = 3` calls. A parse failure is
+retried, and the last one is persisted as a terminal `parse:` error. Once a
+trial has produced a parse failure, it is persisted with its last parse failure
+even if a later attempt in the same invocation fails in transport. A 4xx response
+other than 408 or 429 is persisted at once as a terminal `provider:` error, which
+QC accepts and counts separately from parse failures. A trial with only transport
+failures stays absent; `scripts/collect_cloud_2026.py` re-sweeps it up to
+`MAX_SWEEPS = 5` times, `SWEEP_BACKOFF_S = 120` seconds apart. That is at most 15
+calls per trial per invocation, and there is no bound across invocations. These
+rules govern future collection only. The retained corpus was collected when a
+trial whose final attempt failed in transport was re-swept even after earlier
+parse failures, so refusing trials on unreliable endpoints could receive more
+chances to answer.
+
+The API key is sent only in the request header and is excluded from the harness
+`repr`. A host containing a username, password or query string is rejected, and
+records keep only its scheme, host and port. Error text has every exact
+occurrence of the configured key replaced with `[REDACTED]` before it is stored.
+
+If a crash leaves a truncated final line, resuming and the QC gate both stop and
+name `file:line`. To recover a new collection, keep a copy of the file, delete
+only that incomplete last line (it is not valid JSON and has no closing newline),
+check that every remaining line parses, then re-run the same collector command.
+The trial has no terminal record, so it is asked again; its earlier calls remain
+in `attempt_audit/`. Never edit the frozen retained directories this way.
 
 The collector reads `OLLAMA_API_KEY` and optionally `OLLAMA_HOST` from the
 environment or a local `.env`. Run explicitly, from a separate checkout or

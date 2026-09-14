@@ -79,3 +79,16 @@ class TestKrippendorff:
 
 def test_percent_agreement():
     assert percent_agreement([1, 1, 0, 0], [1, 0, 0, 0]) == 0.75
+
+
+class TestUndefinedAgreement:
+    """Kappa and alpha are 0/0 when chance agreement is certain: NaN, not 1.0."""
+
+    def test_constant_raters_give_nan_cohen_kappa(self):
+        assert np.isnan(cohen_kappa([0, 0, 0], [0, 0, 0]))
+
+    def test_single_category_fleiss_kappa_is_nan(self):
+        assert np.isnan(fleiss_kappa([[3, 0], [3, 0]]))
+
+    def test_single_category_krippendorff_alpha_is_nan(self):
+        assert np.isnan(krippendorff_alpha_nominal(np.zeros((3, 4))))

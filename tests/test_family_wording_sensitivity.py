@@ -39,3 +39,21 @@ def test_targeted_exclusion_does_not_remove_other_item_comparisons():
     assert result.loc["A165", "n_units"] == 8
     with pytest.raises(ValueError, match="exactly the ten"):
         item_signs(frame.drop(columns="A008"), "synthetic")
+
+
+def test_failed_y003_guard_writes_no_output(tmp_path, monkeypatch):
+    import scripts.family_wording_sensitivity as family_wording
+
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "data"
+    data.mkdir()
+    models = ["deepseek-v4-flash", "gemma4:31b"]  # neither has a documented Y003 issue
+    rows = [
+        {"llm": model, "question": q, "delta": float(i - j), "mean_en": 1.0}
+        for i, model in enumerate(models)
+        for j, q in enumerate(IV_QNS)
+    ]
+    pd.DataFrame(rows).to_csv(data / "conf_2026_item_language_effects.csv", index=False)
+    with pytest.raises(ValueError, match="Y003 wording models must be present; missing"):
+        family_wording.main()
+    assert [p.name for p in data.iterdir()] == ["conf_2026_item_language_effects.csv"]

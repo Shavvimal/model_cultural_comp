@@ -1,6 +1,8 @@
 """Generate the paper/blog figures from the corrected pipeline outputs.
 
-Run from the repo root after validate_projection.py and bootstrap_llms.py:
+Run from the repo root after validate_projection.py, bootstrap_llms.py and
+instrument_sensitivity.py (which writes the country-year aggregates that date
+Figure 0):
 
     uv run python scripts/make_figures.py
 
@@ -12,6 +14,7 @@ Writes vector PDFs (for LaTeX) and PNGs (for the blog) to figures/:
 
 import os
 import sys
+from pathlib import Path
 
 import matplotlib as mpl
 
@@ -33,6 +36,10 @@ from app.region_svm import RegionClassifier
 # this. Set at module scope so scripts/make_figures_2026.py inherits it on import.
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
+
+# Written by scripts/instrument_sensitivity.py earlier in `make validate-2026`;
+# its year column is the retained S020 survey year of each country aggregate.
+YEAR_AGGREGATES = Path("data/validation_country_year_aggregates.csv")
 
 AI_COLOR = CULTURAL_REGION_COLORS["AI Model"]
 XLIM = (-2.1, 4.0)
@@ -95,7 +102,7 @@ def _offsets(llm: str):
     return LABEL_OFFSETS.get(llm) or LABEL_OFFSETS.get(llm.split(" [")[0]) or (5, -9, "left")
 
 
-def _draw_midpoint(ax, midpoint):
+def draw_midpoint(ax, midpoint) -> None:
     """Mark a hypothetical scale-midpoint profile, not an observed respondent."""
     if midpoint is None:
         return
@@ -115,14 +122,15 @@ def _draw_midpoint(ax, midpoint):
     )
 
 
-def _draw_countries(
+def draw_countries(
     ax,
     countries: pd.DataFrame,
-    label_alpha=1.0,
-    labelled_countries=REFERENCE_COUNTRIES,
-    label_size=7,
-    monochrome=False,
-):
+    label_alpha: float = 1.0,
+    labelled_countries: frozenset[str] | set[str] | None = REFERENCE_COUNTRIES,
+    label_size: float = 7,
+    monochrome: bool = False,
+) -> None:
+    """Scatter mapped countries by cultural region and label the reference set."""
     for region, color in CULTURAL_REGION_COLORS.items():
         if region == "AI Model":
             continue
@@ -205,24 +213,45 @@ def _finish(ax, title):
     ax.tick_params(labelsize=8)
 
 
-def fig0_countries_only(countries):
+def survey_year_range(yearly: pd.DataFrame, countries: pd.DataFrame) -> tuple[int, int]:
+    """First and last retained survey year among the countries drawn on the map.
+
+    `yearly` has one row per country code and survey year; `countries` is the
+    mapped country-score table. Raises rather than guessing a range.
+    """
+    if not {"country_code", "year"} <= set(yearly.columns):
+        raise ValueError(f"yearly needs country_code and year columns, got {list(yearly.columns)}")
+    if "country_code" not in countries.columns:
+        raise ValueError(f"countries needs a country_code column, got {list(countries.columns)}")
+    plotted = yearly.loc[yearly["country_code"].isin(countries["country_code"]), "year"]
+    if plotted.empty:
+        raise ValueError("no country-year aggregate matches a mapped country; rerun the pipeline")
+    years = plotted.to_numpy(dtype=float)
+    if not np.isfinite(years).all() or not np.equal(years, np.round(years)).all():
+        raise ValueError(f"survey years must be finite whole numbers, got {sorted(set(years))}")
+    return int(years.min()), int(years.max())
+
+
+def fig0_countries_only(countries: pd.DataFrame, years: tuple[int, int]):
     """The IW map redrawn from our own fitted IVS coordinates.
 
     Replaces the copyrighted official WVS map figure: same layout, but every
-    point is computed from the microdata by this repo's pipeline.
+    point is computed from the microdata by this repo's pipeline. `years` is
+    the retained survey-year range from `survey_year_range`.
     """
     fig, ax = plt.subplots(figsize=(9, 7))
-    _draw_countries(ax, countries)
+    draw_countries(ax, countries)
     ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
-    _finish(ax, "Inglehart–Welzel Cultural Map, reconstructed from the IVS (2005–2022)")  # noqa: RUF001
+    first, last = years
+    _finish(ax, f"Inglehart–Welzel Cultural Map, reconstructed from the IVS ({first}–{last})")  # noqa: RUF001
     return fig
 
 
 def fig1_cultural_map(countries, ellipses, midpoint=None):
     fig, ax = plt.subplots(figsize=(9, 7))
-    _draw_countries(ax, countries)
+    draw_countries(ax, countries)
     _draw_models(ax, ellipses)
-    _draw_midpoint(ax, midpoint)
+    draw_midpoint(ax, midpoint)
     handles, labels = ax.get_legend_handles_labels()
     handles.append(
         Line2D(
@@ -257,9 +286,9 @@ def fig2_svm_regions(countries, ellipses, midpoint=None):
     ax.contourf(
         xx, yy, zz, levels=np.arange(len(clf.regions) + 1) - 0.5, cmap=cmap, alpha=0.18, zorder=1
     )
-    _draw_countries(ax, countries, label_alpha=0.75)
+    draw_countries(ax, countries, label_alpha=0.75)
     _draw_models(ax, ellipses)
-    _draw_midpoint(ax, midpoint)
+    draw_midpoint(ax, midpoint)
     ax.legend(fontsize=7, loc="lower right", framealpha=0.9)
     _finish(ax, "SVM cultural-region decision boundaries with LLM positions")
     return fig
@@ -267,6 +296,12 @@ def fig2_svm_regions(countries, ellipses, midpoint=None):
 
 def main() -> int:
     countries = pd.read_csv("data/corrected_country_scores.csv")
+    if not YEAR_AGGREGATES.is_file():
+        raise FileNotFoundError(
+            f"{YEAR_AGGREGATES} is missing; run scripts/instrument_sensitivity.py "
+            "(part of make validate-2026) before drawing figures"
+        )
+    years = survey_year_range(pd.read_csv(YEAR_AGGREGATES), countries)
     ellipses = pd.read_csv("data/llm_ellipses.csv")
     references = pd.read_csv("data/validation_survey_reference.csv").set_index("reference")
     midpoint = references.loc["scale_midpoint", ["PC1_rescaled", "PC2_rescaled"]].to_numpy(
@@ -275,7 +310,7 @@ def main() -> int:
     os.makedirs("figures", exist_ok=True)
 
     for name, fig in [
-        ("fig0_countries_only", fig0_countries_only(countries)),
+        ("fig0_countries_only", fig0_countries_only(countries, years)),
         ("fig1_cultural_map", fig1_cultural_map(countries, ellipses, midpoint)),
         ("fig2_svm_regions", fig2_svm_regions(countries, ellipses, midpoint)),
     ]:

@@ -14,6 +14,8 @@ import pandas as pd
 Y003_CONSTITUENTS = ("A029", "A039", "A040", "A042")
 Y003_FORMULA = "A029 + A039 - A040 - A042"
 Y003_DEFINITION_URL = "https://www.worldvaluessurvey.org/WVSContents.jsp?CMSID=autonomous"
+# Closed range of the index: two mentioned minus two mentioned qualities.
+Y003_RANGE = (-2, 2)
 
 
 @dataclass
@@ -51,7 +53,7 @@ def recover_y003(frame: pd.DataFrame) -> Y003Recovery:
         if "Y003" in frame
         else pd.Series(np.nan, index=frame.index, name="Y003")
     )
-    direct = delivered.between(-2, 2).fillna(False).astype(bool)
+    direct = delivered.between(*Y003_RANGE).fillna(False).astype(bool)
     values = delivered.where(direct).astype(float)
     missing_columns = [column for column in Y003_CONSTITUENTS if column not in frame]
     complete = pd.Series(False, index=frame.index)
@@ -59,11 +61,20 @@ def recover_y003(frame: pd.DataFrame) -> Y003Recovery:
     if not missing_columns:
         parts = frame[list(Y003_CONSTITUENTS)]
         complete = parts.isin([0, 1]).all(axis=1)
-        # Compute only on complete rows; do not sum with skipna=True.
-        valid_parts = parts.loc[complete]
+        # Compute only on complete rows; do not sum with skipna=True. Cast the
+        # validated 0/1 constituents to signed float first: subtraction on an
+        # unsigned integer frame would wrap -2 and -1 to 254 and 255.
+        valid_parts = parts.loc[complete].astype(float)
         derived.loc[complete] = (
             valid_parts["A029"] + valid_parts["A039"] - valid_parts["A040"] - valid_parts["A042"]
         )
+        out_of_range = derived.notna() & ~derived.between(*Y003_RANGE)
+        if out_of_range.any():
+            raise ValueError(
+                f"reconstructed Y003 must lie in {list(Y003_RANGE)}; got "
+                f"{sorted(derived.loc[out_of_range].unique().tolist())} "
+                f"for {int(out_of_range.sum())} rows"
+            )
 
     reconstructed = ~direct & complete
     comparable = direct & complete

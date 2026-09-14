@@ -90,6 +90,13 @@ WESTERN_LLMS_2026 = frozenset(
 )
 
 
+# Attempted but excluded before any responses were collected (billing errors).
+EXCLUDED_LLMS_2026 = frozenset({"kimi-k3"})
+
+# The 17 collected models: every cohort member except the excluded attempts.
+COLLECTED_LLMS_2026 = (CHINESE_LLMS_2026 | WESTERN_LLMS_2026) - EXCLUDED_LLMS_2026
+
+
 def cohort_2026(llm: str) -> str:
     if llm in CHINESE_LLMS_2026:
         return "Chinese"

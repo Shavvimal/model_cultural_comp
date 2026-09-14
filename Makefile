@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check validate validate-2026 validate-traces verify-data reproduce check-public-tree progress watch
+.PHONY: install lint format typecheck test check validate validate-2026 validate-outputs validate-traces verify-data reproduce check-public-tree progress watch
 
 install:
 	uv sync --frozen
@@ -26,11 +26,40 @@ check: check-public-tree lint test
 REPRO_ENV = PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MPLBACKEND=Agg
 PYTHON ?= uv run --frozen python
 
-validate: verify-data
+# The licensed cache is prepared by hand (docs/REPRODUCING.md); never guess it.
+data/ivs_df.pkl:
+	@echo "Missing $@: prepare it from the licensed IVS inputs as docs/REPRODUCING.md describes." >&2
+	@exit 1
+
+# validate_projection.py reads country metadata. Built only when absent or older
+# than its inputs, so `make reproduce` (which builds it first) runs it once.
+data/country_codes.pkl: data/ivs_df.pkl scripts/build_country_meta.py
+	$(REPRO_ENV) $(PYTHON) scripts/build_country_meta.py
+
+validate: verify-data data/country_codes.pkl
 	$(REPRO_ENV) $(PYTHON) scripts/validate_projection.py
 	$(REPRO_ENV) $(PYTHON) scripts/bootstrap_llms.py
 
-validate-2026: verify-data
+# Outputs of `make validate` that validate-2026 reads. Those written after the
+# fitted instrument must not be older than it; the other two precede it by design.
+VALIDATE_FITTED = data/cultural_map_model.npz
+VALIDATE_AFTER_FIT = data/corrected_country_scores.csv data/validation_survey_reference.csv \
+	data/validation_survey_item_baselines.csv data/llm_ellipses.csv data/llm_bootstrap_replicates.csv
+VALIDATE_BEFORE_FIT = data/country_codes.pkl data/validation_rotation_sensitivity.csv
+
+validate-outputs:
+	@for f in $(VALIDATE_FITTED) $(VALIDATE_BEFORE_FIT) $(VALIDATE_AFTER_FIT); do \
+		if [ ! -f "$$f" ]; then \
+			echo "validate-2026: missing $$f; run make validate first." >&2; exit 1; \
+		fi; \
+	done
+	@for f in $(VALIDATE_AFTER_FIT); do \
+		if [ "$$f" -ot $(VALIDATE_FITTED) ]; then \
+			echo "validate-2026: $$f is older than $(VALIDATE_FITTED); rerun make validate." >&2; exit 1; \
+		fi; \
+	done
+
+validate-2026: verify-data validate-outputs
 	$(REPRO_ENV) $(PYTHON) scripts/qc_2026.py
 	$(REPRO_ENV) $(PYTHON) scripts/analyze_2026.py
 	$(REPRO_ENV) $(PYTHON) scripts/confirmatory_2026.py

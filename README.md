@@ -4,7 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Research code for [Cultural Alignment of Open-Weight LLMs on the
-Inglehart–Welzel Map](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map).
+Inglehart–Welzel Map](https://openreview.net/forum?id=xJHa9ts0mt) (ORACLE
+workshop at EMNLP 2026), with an expanded
+[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map).
 It fits a custom two-dimensional instrument to the Integrated Values Surveys
 and projects model responses and surveyed countries through the same frozen
 transformation. Coordinates describe reported responses under the specified
@@ -28,7 +30,9 @@ record. Download the [response archive](https://github.com/Shavvimal/model_cultu
 and [results supplement](https://github.com/Shavvimal/model_cultural_comp/releases/download/v1.1.0/model-cultural-comp-paper-results-2026-09-12.tar.gz)
 from the v1.1.0 release. See [reproduction instructions](docs/REPRODUCING.md) for
 the exact inputs, result assets and checksums, and [CHANGELOG.md](CHANGELOG.md)
-for repairs.
+for repairs. `uv run python scripts/reproduction_data.py verify-results <archive>`
+checks a downloaded supplement against the tracked results manifest without
+extracting it.
 
 ## Quickstart
 
@@ -160,13 +164,33 @@ diagnostic work is distinguished from the original pre-specified analyses.
 |---|---|
 | `make check` | Git content policy, Ruff and synthetic tests |
 | `make test` / `make lint` / `make format` | Tests / lint and formatting check / automatic formatting |
+| `make typecheck` | mypy over `app/`, pulled in ephemerally; not part of `make check` |
 | `make verify-data` | Verify the separate frozen input files against their manifest |
-| `make validate` | Refit and validate the instrument, then analyse the 2024 cohort |
-| `make validate-2026` | Analyse the 2026 cohort and its sensitivities; requires `make validate` outputs |
+| `make validate` | Build country metadata when absent or older than the licensed cache (stops with a message if `data/ivs_df.pkl` is missing), refit and validate the instrument, then analyse the 2024 cohort |
+| `make validate-2026` | Analyse the 2026 cohort and its sensitivities, then draw all six figures; fails early if `make validate` outputs are missing or older than the fitted instrument |
 | `make validate-traces` | Offline trace-panel merge, agreement and sensitivity summaries |
 | `make reproduce` | Complete sequential offline chain, including country metadata |
+
+Each stage also runs on its own. Run them in this order from the repository
+root, after `make verify-data` and with the licensed cache in place. Prefix
+the commands with `OMP_NUM_THREADS=1 MPLBACKEND=Agg`, as the Makefile does,
+to match the recorded outputs:
+
+| Stage | Command |
+|---|---|
+| Country metadata | `uv run --frozen python scripts/build_country_meta.py` |
+| Fit and validate the instrument | `uv run --frozen python scripts/validate_projection.py` |
+| 2024 bootstrap | `uv run --frozen python scripts/bootstrap_llms.py` |
+| 2026 analyses and sensitivities | `make validate-2026` (its scripts, in Makefile order, end with both figure scripts) |
+| Trace aggregation | `make validate-traces` |
+| Figures only | `uv run --frozen python scripts/make_figures.py` and `uv run --frozen python scripts/make_figures_2026.py` |
+| Whole offline chain | `make reproduce` |
+
+The figure scripts read outputs of the 2024 bootstrap, the 2026 analyses and
+`instrument_sensitivity.py`, so run them after those stages.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for changes that could affect results.
 Code is MIT licensed, with the PPCA attribution and third-party survey-text
 notices retained in [NOTICE](NOTICE) and [LICENSES/](LICENSES/).
-Use [CITATION.cff](CITATION.cff) when citing the software.
+[CITATION.cff](CITATION.cff) gives the paper as the preferred citation and
+also describes this software release.

@@ -42,6 +42,8 @@ make check          # indexed-file policy + Ruff + pytest
 ```
 
 Individual targets are available too: `make lint`, `make format`, `make test`.
+`make typecheck` runs mypy over `app/` with an ephemeral mypy install; it is not
+part of `make check` or CI.
 
 `make test` runs synthetic, seeded fixtures without datasets, API credentials or
 network calls. Add regression coverage when a change could affect scientific

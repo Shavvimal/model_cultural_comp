@@ -19,6 +19,7 @@ authors:
 repository-code: "https://github.com/Shavvimal/model_cultural_comp"
 url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
 version: "1.1.0"
+date-released: "2026-09-14"
 license: MIT
 keywords:
   - nlp
@@ -29,20 +30,30 @@ keywords:
   - pca
   - reproducible-research
   - evaluation
+preferred-citation:
+  type: conference-paper
+  title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
+  authors:
+    - family-names: Vimalendiran
+      given-names: Shav
+      orcid: "https://orcid.org/0000-0003-3236-248X"
+  year: 2026
+  conference:
+    name: "Workshop on Open Reasoning Across Cultures and Languages (ORACLE) at EMNLP 2026"
+  publisher:
+    name: "Association for Computational Linguistics"
+  url: "https://openreview.net/forum?id=xJHa9ts0mt"
+  notes: "The paper this repository implements; accepted 4 September 2026. ACL Anthology DOI to be added on publication."
 references:
-  - type: conference-paper
+  - type: blog
     title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
     authors:
       - family-names: Vimalendiran
         given-names: Shav
         orcid: "https://orcid.org/0000-0003-3236-248X"
     year: 2026
-    conference:
-      name: "Workshop on Open Reasoning Across Cultures and Languages (ORACLE) at EMNLP 2026"
-    publisher:
-      name: "Association for Computational Linguistics"
     url: "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
-    notes: "The paper this repository implements; accepted 4 September 2026. ACL Anthology DOI to be added on publication."
+    notes: "Expanded write-up of the paper."
   - type: data
     title: "EVS Trend File 1981-2017"
     authors:

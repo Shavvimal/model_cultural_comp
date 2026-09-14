@@ -9,8 +9,9 @@ would defeat a naive drop_duplicates), and reports:
   1. design completeness per model x language cell (500 = 10 x 10 x 5)
   2. duplicate audit (duplicates are fatal and are never silently removed)
   3. parse-rate table per model x language x item (flags <95% and <10)
-  4. failure taxonomy from raw_content (refusal / format / out-of-range /
-     empty), with counts per model x language x item
+  4. failure taxonomy from raw_content (refusal / format / empty), with
+     deterministic provider rejections (``provider:`` errors) counted
+     separately from parse failures, per model x language x item
   5. retry-intensity (attempts) distributions, en vs zh
   6. latency sanity (duration_ms; early en records measured queue-wait
      before the harness fix - treat en latencies as upper bounds)
@@ -19,6 +20,8 @@ would defeat a naive drop_duplicates), and reports:
   8. thinking-trace inventory (which models emit thinking, lengths,
      zh-script share under each arm, leakage heuristic)
   9. index validity for Y002 pairs and Y003 choice lists
+ 10. a report-only integrity pass over data/collection_2026_nosys/: duplicate
+     and missing-trial counts are printed, never fatal, and nothing is written
 
 Run:  uv run python scripts/qc_2026.py
 Writes data/qc_2026_*.csv and prints the gate report.
@@ -35,17 +38,22 @@ import pandas as pd
 
 from app.cloud_survey import N_REPEATS, PARSERS, PROMPT_VARIANTS
 from app.culture_map import ITEM_VALID_RANGES, IV_QNS
-from app.llm_meta import CHINESE_LLMS_2026, WESTERN_LLMS_2026
+from app.llm_meta import COLLECTED_LLMS_2026
+from app.study_design import DESIGN_CALLS, MIN_PER_QUESTION, TRIAL_KEY
 
 RAW_DIR = Path("data/collection_2026")
+NOSYS_DIR = Path("data/collection_2026_nosys")
 # llm_meta records kimi-k3 as attempted but excluded before any responses:
 # its billing-only attempts are not one of the 17 collected model cells.
-EXPECTED_MODELS = (CHINESE_LLMS_2026 | WESTERN_LLMS_2026) - {"kimi-k3"}
+EXPECTED_MODELS = COLLECTED_LLMS_2026
 EXPECTED_LANGUAGES = tuple(PROMPT_VARIANTS)
-DESIGN_CALLS = len(IV_QNS) * len(PROMPT_VARIANTS["en"]["persona"]) * N_REPEATS
-KEY_COLUMNS = ["llm", "language", "question", "system_prompt_id", "repeat"]
+# Scheduled trials per model-language cell (500): study_design.DESIGN_CALLS is per item.
+CELL_DESIGN_CALLS = len(IV_QNS) * DESIGN_CALLS
+KEY_COLUMNS = list(TRIAL_KEY)
 PARSE_TARGET = 0.95
-MIN_PER_QUESTION = 10
+# The only terminal error forms the harness writes: exhausted parse retries and
+# deterministic provider rejections. Transport errors are never terminal.
+TERMINAL_ERROR_PREFIXES = ("parse:", "provider:")
 
 REFUSAL_MARKERS = [
     "as an ai",
@@ -84,11 +92,12 @@ def _integer(value) -> int:
     return int(value)
 
 
-def load_raw() -> pd.DataFrame:
+def load_raw(directory: Path | None = None) -> pd.DataFrame:
     """Load all terminal records; normalize historical types without deduping."""
-    paths = sorted(RAW_DIR.glob("*.jsonl"))
+    directory = RAW_DIR if directory is None else directory
+    paths = sorted(directory.glob("*.jsonl"))
     if not paths:
-        raise FileNotFoundError(f"no JSONL files in {RAW_DIR}")
+        raise FileNotFoundError(f"no JSONL files in {directory}")
     records = []
     required = {
         "llm",
@@ -230,8 +239,14 @@ def record_integrity(df: pd.DataFrame) -> pd.DataFrame:
                     raise ValueError("stored answer disagrees with reparsed raw content")
             except (ValueError, TypeError, KeyError, AttributeError) as exc:
                 problems.append(f"invalid parsed response: {exc}")
-        elif not isinstance(error, str) or not error or parsed is not None:
-            problems.append("failed terminal record needs a nonempty error and null parsed value")
+        elif (
+            not isinstance(error, str)
+            or not error.startswith(TERMINAL_ERROR_PREFIXES)
+            or parsed is not None
+        ):
+            problems.append(
+                "failed terminal record needs a parse: or provider: error and null parsed value"
+            )
         if problems:
             rows.append(
                 {
@@ -264,13 +279,14 @@ def parse_rate_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def classify_failure(raw: str, error: str) -> str:
+    """Provider rejections first (they carry no content), then content categories."""
+    if error.startswith("provider:"):
+        return "provider"
     low = raw.strip().lower().replace("\u2019", "'")
     if not low:
         return "empty"
     if any(m in low for m in REFUSAL_MARKERS):
         return "refusal"
-    if error and "out of range" in error.lower():
-        return "out_of_range"
     return "format"
 
 
@@ -413,6 +429,58 @@ def index_validity(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["question", "n_parsed", "out_of_range", "min", "max"])
 
 
+def nosys_integrity_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Per-model duplicate and missing-trial counts for the English no-persona arm."""
+    repeats = CELL_DESIGN_CALLS // (len(IV_QNS) * len(PROMPT_VARIANTS["en"]["nosys"]))
+    expected = {
+        (q, s, r)
+        for q in IV_QNS
+        for s in range(len(PROMPT_VARIANTS["en"]["nosys"]))
+        for r in range(repeats)
+    }
+    groups = dict(tuple(df.groupby("llm")))
+    rows = []
+    for llm in sorted(EXPECTED_MODELS | set(groups)):
+        g = groups.get(llm, df.iloc[:0])
+        keys = list(
+            zip(g["language"], g["question"], g["system_prompt_id"], g["repeat"], strict=True)
+        )
+        got = {key[1:] for key in keys if key[0] == "en"}
+        rows.append(
+            {
+                "llm": llm,
+                "records": len(g),
+                "duplicate_records": len(keys) - len(set(keys)),
+                "missing_trials": len(expected - got) if llm in EXPECTED_MODELS else 0,
+                "extra_trials": len(set(keys) - {("en", *key) for key in expected}),
+            }
+        )
+    return pd.DataFrame(
+        rows, columns=["llm", "records", "duplicate_records", "missing_trials", "extra_trials"]
+    )
+
+
+def report_nosys_integrity(directory: Path | None = None) -> None:
+    """Print the no-persona integrity pass. Report only: never fails, writes nothing."""
+    directory = NOSYS_DIR if directory is None else directory
+    print("\n=== 10. No-persona integrity (report only; not a gate) ===")
+    if not directory.is_dir():
+        print(f"{directory} absent; not checked")
+        return
+    try:
+        summary = nosys_integrity_summary(load_raw(directory))
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"not checked: {exc}")
+        return
+    print(summary.to_string(index=False))
+    print(
+        f"total: {int(summary['records'].sum())} records, "
+        f"{int(summary['duplicate_records'].sum())} duplicate records, "
+        f"{int(summary['missing_trials'].sum())} missing trials, "
+        f"{int(summary['extra_trials'].sum())} extra trials"
+    )
+
+
 def main() -> int:
     try:
         df = load_raw()
@@ -460,6 +528,11 @@ def main() -> int:
         flagged = pr[pr["below_target"] | pr["below_min"]]
         print(flagged.to_string(index=False) if len(flagged) else "none flagged")
         print("\n=== 4. Failure taxonomy (top 30 by count) ===")
+        errors = df["error"].dropna().astype(str)
+        print(
+            f"terminal failures: {int(errors.str.startswith('parse:').sum())} parse, "
+            f"{int(errors.str.startswith('provider:').sum())} provider rejections"
+        )
         ft = artefacts["qc_2026_failures"]
         print(ft.head(30).to_string(index=False) if len(ft) else "no failures")
         print("\n=== 5. Retry intensity ===")
@@ -472,6 +545,7 @@ def main() -> int:
         print(artefacts["qc_2026_thinking"].to_string(index=False))
         print("\n=== 9. Index validity ===")
         print(artefacts["qc_2026_index_validity"].to_string(index=False))
+        report_nosys_integrity()
 
     for name, frame in artefacts.items():
         frame.to_csv(f"data/{name}.csv", index=False)

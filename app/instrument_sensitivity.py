@@ -6,18 +6,63 @@ Neither supplies an externally calibrated alternative IW map.
 """
 
 from itertools import combinations
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from factor_analyzer import Rotator
+from numpy.typing import ArrayLike
 
-from app.culture_map import ITEM_VALID_RANGES, IV_QNS, PC_RESCALE_PARAMS, SURVEY_REFERENCE
+from app.culture_map import (
+    ITEM_VALID_RANGES,
+    IV_QNS,
+    PC_RESCALE_PARAMS,
+    SURVEY_REFERENCE,
+    VARIMAX_TOL,
+    CulturalMap,
+    validate_weights,
+)
+from app.ppca import PPCA, conditional_complete
+
+__all__ = [
+    "SLOPES",
+    "XY",
+    "conditional_complete",
+    "country_year_benchmarks",
+    "imputation_diagnostics",
+    "matrix_from_row",
+    "oriented_rotation",
+    "rotation_grid",
+    "rotation_outcomes",
+    "transport_coordinates",
+    "uniform_choice_baseline",
+    "weighted_coordinates",
+]
 
 XY = ["PC1_rescaled", "PC2_rescaled"]
 SLOPES = np.array([PC_RESCALE_PARAMS[pc][0] for pc in ("PC1", "PC2")])
+# Illustrative uniform-choice baseline: fixed seed (the 11 Sep 2026 run date),
+# simulated cells, and responses per item matching the 2026 design's 50 calls.
+UNIFORM_BASELINE_SEED = 11092026
+UNIFORM_BASELINE_CELLS = 100_000
+UNIFORM_BASELINE_RESPONSES = 50
 
 
-def oriented_rotation(basis, rotation):
+def _fitted_state(cm: CulturalMap) -> tuple[PPCA, np.ndarray, np.ndarray]:
+    """Return the frozen PPCA, rotation and score SDs, or raise if not fitted."""
+    ppca = cm.ppca
+    if (
+        cm.rotation is None
+        or cm.score_stds is None
+        or ppca.C is None
+        or ppca.means is None
+        or ppca.stds is None
+    ):
+        raise RuntimeError("fit() or load_model() the cultural map first")
+    return ppca, cm.rotation, cm.score_stds
+
+
+def oriented_rotation(basis: np.ndarray, rotation: ArrayLike) -> np.ndarray:
     """Apply the primary F118-positive/F063-negative coefficient anchors."""
     result = np.array(rotation, dtype=float, copy=True)
     coefficients = basis @ result
@@ -33,7 +78,7 @@ def oriented_rotation(basis, rotation):
     return result
 
 
-def rotation_grid(cm):
+def rotation_grid(cm: CulturalMap) -> pd.DataFrame:
     """Persist full oriented matrices, avoiding angle-only reconstruction.
 
     Every orientation scores the original (unwhitened) fitted subspace and
@@ -43,21 +88,26 @@ def rotation_grid(cm):
     CSV keys saying "loadings C" name score-axis bases, not Gaussian loadings
     or item/score correlations; manuscript tables label these as bases.
     """
-    scores = cm.ppca.transform()
-    eig = cm.ppca.eig_vals
+    ppca, primary_rotation, primary_stds = _fitted_state(cm)
+    if ppca.C is None or ppca.eig_vals is None:
+        raise RuntimeError("fit() or load_model() the cultural map first")
+    basis = ppca.C
+    scores = ppca.transform()
+    eig = ppca.eig_vals
     criteria = {
         "scores (Kaiser)": (scores, True),
         "scores (no Kaiser)": (scores, False),
         "whitened scores (Kaiser)": (scores / np.sqrt(eig), True),
-        "loadings C (Kaiser)": (cm.ppca.C, True),
-        "loadings C*sqrt(eig) (Kaiser)": (cm.ppca.C * np.sqrt(eig), True),
-        "loadings C*sqrt(eig) (no Kaiser)": (cm.ppca.C * np.sqrt(eig), False),
+        "loadings C (Kaiser)": (basis, True),
+        "loadings C*sqrt(eig) (Kaiser)": (basis * np.sqrt(eig), True),
+        "loadings C*sqrt(eig) (no Kaiser)": (basis * np.sqrt(eig), False),
     }
     rows = []
     for criterion, (values, kaiser) in criteria.items():
-        rotator = Rotator(method="varimax", normalize=kaiser)
+        # Same pinned tolerance as the primary fit; see VARIMAX_TOL.
+        rotator = Rotator(method="varimax", normalize=kaiser, tol=VARIMAX_TOL)
         rotator.fit_transform(values)
-        rotation = oriented_rotation(cm.ppca.C, rotator.rotation_)
+        rotation = oriented_rotation(basis, rotator.rotation_)
         stds = (scores @ rotation).std(axis=0, ddof=0)
         row = {
             "criterion": criterion,
@@ -74,14 +124,14 @@ def rotation_grid(cm):
         rows.append(row)
     result = pd.DataFrame(rows)
     primary = result.iloc[0]
-    np.testing.assert_allclose(matrix_from_row(primary), cm.rotation, atol=1e-10)
+    np.testing.assert_allclose(matrix_from_row(primary), primary_rotation, atol=1e-10)
     np.testing.assert_allclose(
-        primary[["score_sd_pc1", "score_sd_pc2"]].astype(float), cm.score_stds
+        primary[["score_sd_pc1", "score_sd_pc2"]].astype(float), primary_stds
     )
     return result
 
 
-def matrix_from_row(row):
+def matrix_from_row(row: pd.Series | dict[str, Any]) -> np.ndarray:
     """Read an orthogonal matrix, including possible reflection, from a row."""
     matrix = np.array([[row[f"r_{i}{j}"] for j in range(2)] for i in range(2)], dtype=float)
     if not np.allclose(matrix.T @ matrix, np.eye(2), atol=1e-10):
@@ -89,16 +139,26 @@ def matrix_from_row(row):
     return matrix
 
 
-def transport_coordinates(xy, primary_rotation, primary_stds, rotation, stds):
+def transport_coordinates(
+    xy: ArrayLike,
+    primary_rotation: np.ndarray,
+    primary_stds: ArrayLike,
+    rotation: np.ndarray,
+    stds: ArrayLike,
+) -> np.ndarray:
     """Undo the primary affine map and apply the alternative frozen orientation."""
     stds = np.asarray(stds, dtype=float)
     if stds.shape != (2,) or not np.isfinite(stds).all() or (stds <= 0).any():
         raise ValueError("two positive finite score SDs are required")
-    scores = (np.asarray(xy) - SURVEY_REFERENCE) / SLOPES * primary_stds @ primary_rotation.T
+    scores = (
+        (np.asarray(xy) - SURVEY_REFERENCE) / SLOPES * np.asarray(primary_stds) @ primary_rotation.T
+    )
     return scores @ rotation / stds * SLOPES + SURVEY_REFERENCE
 
 
-def rotation_outcomes(grid, cm, points, replicates):
+def rotation_outcomes(
+    grid: pd.DataFrame, cm: CulturalMap, points: pd.DataFrame, replicates: pd.DataFrame
+) -> pd.DataFrame:
     """Point and finite-bootstrap quadrant outcomes for all six orientations."""
     if points.llm.duplicated().any() or set(replicates.llm) != set(points.llm):
         raise ValueError("replicate and unique eligible point labels must match exactly")
@@ -107,12 +167,15 @@ def rotation_outcomes(grid, cm, points, replicates):
         or not np.isfinite(replicates[XY].to_numpy()).all()
     ):
         raise ValueError("all point and replicate coordinates must be finite")
+    _, primary_rotation, primary_stds = _fitted_state(cm)
     rows = []
     for _, row in grid.iterrows():
         rotation = matrix_from_row(row)
         stds = row[["score_sd_pc1", "score_sd_pc2"]].to_numpy(dtype=float)
-        xy = transport_coordinates(points[XY], cm.rotation, cm.score_stds, rotation, stds)
-        cloud = transport_coordinates(replicates[XY], cm.rotation, cm.score_stds, rotation, stds)
+        xy = transport_coordinates(points[XY], primary_rotation, primary_stds, rotation, stds)
+        cloud = transport_coordinates(
+            replicates[XY], primary_rotation, primary_stds, rotation, stds
+        )
         if row.criterion == "scores (Kaiser)":
             np.testing.assert_allclose(xy, points[XY].to_numpy(), rtol=0, atol=1e-10)
             np.testing.assert_allclose(cloud, replicates[XY].to_numpy(), rtol=0, atol=1e-10)
@@ -142,33 +205,17 @@ def rotation_outcomes(grid, cm, points, replicates):
     return pd.DataFrame(rows)
 
 
-def conditional_complete(standardized, loadings, noise):
-    """Frozen Gaussian conditional means; observed entries are never replaced.
+def weighted_coordinates(frame: pd.DataFrame, groups: list[str]) -> pd.DataFrame:
+    """S017-weighted aggregates under the same weight contract as the map.
 
-    This is a diagnostic application of the fitted PPCA covariance, not a
-    second estimation procedure. Entirely unobserved rows predict zero.
+    Weights must be present, finite and non-negative (see
+    :func:`app.culture_map.validate_weights`); each group needs a positive sum.
+    ``conditional_complete`` is re-exported here from :mod:`app.ppca`, where
+    the fit itself uses it: a diagnostic application of the fitted PPCA
+    covariance, not a second estimation procedure.
     """
-    values = np.array(standardized, dtype=float, copy=True)
-    if np.isinf(values).any() or not np.isfinite(noise) or noise <= 0:
-        raise ValueError("finite values or NaN and positive Gaussian noise are required")
-    patterns, membership = np.unique(np.isfinite(values), axis=0, return_inverse=True)
-    for i, observed in enumerate(patterns):
-        if observed.all():
-            continue
-        rows = np.flatnonzero(membership == i)
-        if not observed.any():
-            values[rows] = 0.0
-            continue
-        w = loadings[observed]
-        gain = np.linalg.solve(w @ w.T + noise * np.eye(len(w)), w @ loadings[~observed].T)
-        values[np.ix_(rows, ~observed)] = values[np.ix_(rows, observed)] @ gain
-    return values
-
-
-def weighted_coordinates(frame, groups):
-    """S017-weighted aggregates; same missing-weight=1 convention as the map."""
     values = frame.copy()
-    values["weight"] = values["weight"].fillna(1.0)
+    validate_weights(values["weight"], context="weighted coordinates")
     for name in XY:
         values[f"weighted_{name}"] = values[name] * values.weight
     summed = values.groupby(groups)[["weight", *[f"weighted_{q}" for q in XY]]].sum()
@@ -181,7 +228,9 @@ def weighted_coordinates(frame, groups):
     return summed.reset_index()
 
 
-def country_year_benchmarks(positions, country_codes, points):
+def country_year_benchmarks(
+    positions: pd.DataFrame, country_codes: pd.DataFrame, points: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compare pooled respondents to each country's latest available year.
 
     Both benchmarks preserve S017; latest-year is a different dated reference,
@@ -212,7 +261,13 @@ def country_year_benchmarks(positions, country_codes, points):
     return comparison, nearest, yearly
 
 
-def uniform_choice_baseline(cm, *, cells=100_000, responses=50, seed=11092026):
+def uniform_choice_baseline(
+    cm: CulturalMap,
+    *,
+    cells: int = UNIFORM_BASELINE_CELLS,
+    responses: int = UNIFORM_BASELINE_RESPONSES,
+    seed: int = UNIFORM_BASELINE_SEED,
+) -> pd.DataFrame:
     """Illustrative content-free choices, independent over responses and items.
 
     Y002 samples distinct pairs uniformly; Y003 samples exactly five of eleven
@@ -225,6 +280,7 @@ def uniform_choice_baseline(cm, *, cells=100_000, responses=50, seed=11092026):
     means = np.empty((cells, len(IV_QNS)))
     expectations = []
     for j, question in enumerate(IV_QNS):
+        options: list[float]
         if question == "Y002":
             options = [cm.y002_transform(pair) for pair in combinations(range(1, 5), 2)]
         elif question == "Y003":
@@ -254,3 +310,138 @@ def uniform_choice_baseline(cm, *, cells=100_000, responses=50, seed=11092026):
             }
         ]
     )
+
+
+def imputation_diagnostics(
+    cm: CulturalMap,
+    standardized: np.ndarray,
+    completed: np.ndarray,
+    positions: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, int | float | str]]:
+    """Range and frozen-fit Y003 masking diagnostics, explicitly in sample.
+
+    Returns ``(ranges, coverage, masking, summary)``: per-item imputed ranges,
+    per-country/item coverage, per-country Y003 masking errors, and the scalar
+    summary rows. Writes nothing; the caller owns every output file.
+    """
+    ppca, rotation, score_stds = _fitted_state(cm)
+    if (
+        cm.subset_ivs_df is None
+        or ppca.C is None
+        or ppca.means is None
+        or ppca.stds is None
+        or ppca.loadings_ is None
+        or ppca.noise_variance_ is None
+    ):
+        raise RuntimeError("prepare_data() and a fitted Gaussian model are required")
+    observed = cm.subset_ivs_df
+    raw = observed[IV_QNS].to_numpy()
+    decoded = completed * ppca.stds + ppca.means
+    rows = []
+    for j, question in enumerate(IV_QNS):
+        values = decoded[~np.isfinite(raw[:, j]), j]
+        lo, hi = ITEM_VALID_RANGES[question]
+        rows.append(
+            {
+                "question": question,
+                "n_imputed": len(values),
+                "imputed_min": values.min() if len(values) else np.nan,
+                "imputed_max": values.max() if len(values) else np.nan,
+                "n_below_range": int((values < lo).sum()),
+                "n_above_range": int((values > hi).sum()),
+            }
+        )
+    ranges = pd.DataFrame(rows)
+    # Flag which country ingredients still rely on imputation. Reconstructed
+    # Y003 is counted as observed here; its separate provenance is exported
+    # by validate_projection. These are country/item totals, never rows.
+    grouped = observed.groupby("country_code")
+    coverage = (
+        grouped[IV_QNS]
+        .count()
+        .rename_axis(columns="question")
+        .stack()
+        .rename("n_observed")
+        .reset_index()
+    )
+    coverage["n_respondents"] = coverage.country_code.map(grouped.size())
+    coverage["n_missing"] = coverage.n_respondents - coverage.n_observed
+    coverage["missing_fraction"] = coverage.n_missing / coverage.n_respondents
+    coverage["wholly_missing"] = coverage.n_observed.eq(0)
+    coverage = coverage.merge(
+        cm.country_codes[["Numeric", "Country"]],
+        left_on="country_code",
+        right_on="Numeric",
+        how="left",
+    )
+    coverage["is_mapped"] = coverage.Numeric.notna()
+    coverage = coverage.drop(columns="Numeric")
+    coverage["scope"] = (
+        "after Y003 recovery and eligibility; observed includes reconstructed indices"
+    )
+    np.testing.assert_array_equal(
+        coverage.groupby("question").n_missing.sum().reindex(IV_QNS).to_numpy(),
+        ranges.set_index("question").n_imputed.reindex(IV_QNS).to_numpy(),
+    )
+    # Range clipping is a frozen-coordinate perturbation, not a replacement
+    # estimator. Observed values are valid already and remain unchanged.
+    clipped = decoded.copy()
+    for j, question in enumerate(IV_QNS):
+        clipped[:, j] = np.clip(clipped[:, j], *ITEM_VALID_RANGES[question])
+    clipped_positions = positions.copy()
+    clipped_positions[XY] = cm.project(pd.DataFrame(clipped, columns=IV_QNS))[XY].to_numpy()
+    pooled = weighted_coordinates(positions, ["country_code"])
+    clip_pooled = weighted_coordinates(clipped_positions, ["country_code"])
+    np.testing.assert_array_equal(pooled.country_code, clip_pooled.country_code)
+    clipping_shift = np.linalg.norm(pooled[XY].to_numpy() - clip_pooled[XY].to_numpy(), axis=1)
+
+    y003 = IV_QNS.index("Y003")
+    masked = standardized.copy()
+    masked[:, y003] = np.nan
+    predicted = conditional_complete(masked, ppca.loadings_, ppca.noise_variance_)
+    predicted = predicted[:, y003] * ppca.stds[y003] + ppca.means[y003]
+    present = np.isfinite(raw[:, y003])
+    # Reuse weighted aggregation with temporary axis names for actual/predicted
+    # scalar values. Outcomes were used in fitting: this is not held-out testing.
+    masking = positions.loc[present, ["country_code", "weight"]].copy()
+    masking[XY[0]] = raw[present, y003]
+    masking[XY[1]] = predicted[present]
+    masking = weighted_coordinates(masking, ["country_code"]).rename(
+        columns={XY[0]: "observed_y003_mean", XY[1]: "predicted_y003_mean"}
+    )
+    masking["prediction_error"] = masking.predicted_y003_mean - masking.observed_y003_mean
+    coefficient = ppca.C[y003] @ rotation / score_stds * SLOPES / ppca.stds[y003]
+    masking["single_item_coordinate_shift"] = masking.prediction_error.abs() * np.linalg.norm(
+        coefficient
+    )
+    masking["scope"] = (
+        "frozen fit; observed Y003 used in training; in-sample diagnostic, not held out"
+    )
+    y003_observed_counts = observed.groupby("country_code").Y003.count()
+    mapped = y003_observed_counts.index.isin(cm.country_codes.Numeric)
+    summary: dict[str, int | float | str] = {
+        "remaining_imputed_entries": int(ranges.n_imputed.sum()),
+        "out_of_range_imputed_entries": int(
+            ranges.n_below_range.sum() + ranges.n_above_range.sum()
+        ),
+        "fit_n_country_codes": len(y003_observed_counts),
+        "whole_fit_entity_y003_missing": int(y003_observed_counts.eq(0).sum()),
+        "whole_mapped_country_y003_missing": int(y003_observed_counts.loc[mapped].eq(0).sum()),
+        "y003_remaining_missing_rows": int(observed.Y003.isna().sum()),
+        "frozen_clipping_country_shift_median": float(np.median(clipping_shift)),
+        "frozen_clipping_country_shift_max": float(clipping_shift.max()),
+        "y003_masked_observed_rows": int(present.sum()),
+        "y003_masked_country_mean_absolute_error_median": float(
+            masking.prediction_error.abs().median()
+        ),
+        "y003_masked_country_mean_absolute_error_max": float(masking.prediction_error.abs().max()),
+        "y003_masked_single_item_coordinate_shift_median": float(
+            masking.single_item_coordinate_shift.median()
+        ),
+        "y003_masked_single_item_coordinate_shift_max": float(
+            masking.single_item_coordinate_shift.max()
+        ),
+        "masking_scope": "in-sample frozen-fit diagnostic, not held-out predictive validation",
+        "clipping_scope": "completed-value perturbation, not a refitted estimator or prescribed correction",
+    }
+    return ranges, coverage, masking, summary

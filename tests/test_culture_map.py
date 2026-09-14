@@ -1,8 +1,20 @@
+from copy import copy
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from app.culture_map import HUMAN_MEAN, IV_QNS, PC_RESCALE_PARAMS, SURVEY_REFERENCE, CulturalMap
+from app.culture_map import (
+    HUMAN_MEAN,
+    IV_QNS,
+    MIN_OBSERVED_ITEMS,
+    MIN_SURVEY_YEAR,
+    PC_RESCALE_PARAMS,
+    SURVEY_REFERENCE,
+    VARIMAX_TOL,
+    CulturalMap,
+    check_preparation,
+)
 
 
 class TestRotationIsFittedOnce:
@@ -172,3 +184,68 @@ class TestSentinelRecode:
         cm = CulturalMap(poisoned, synthetic_country_codes)
         cm.prepare_data()
         assert poisoned.index[0] not in cm.subset_ivs_df.index
+
+
+class TestPreparationContract:
+    @pytest.mark.parametrize(
+        "y003,message",
+        [
+            ({"missing_constituent_columns": ["A042"], "discordant_direct": 0}, "A042"),
+            ({"missing_constituent_columns": [], "discordant_direct": 3}, "in 3 rows"),
+        ],
+    )
+    def test_check_preparation_rejects_unusable_y003(self, y003, message):
+        with pytest.raises(ValueError, match=message):
+            check_preparation({"y003": y003})
+
+    def test_check_preparation_accepts_complete_concordant_inputs(self):
+        check_preparation({"y003": {"missing_constituent_columns": [], "discordant_direct": 0}})
+
+    def test_report_states_the_rules_the_filter_used(self, fitted_map):
+        report = fitted_map.survey_preparation_report
+        assert report["years_min"] == MIN_SURVEY_YEAR == 2005
+        assert report["minimum_observed_items"] == MIN_OBSERVED_ITEMS == 6
+
+    def test_varimax_tolerance_is_the_released_default(self):
+        """Tightening it moves published coordinates; see VARIMAX_TOL."""
+        assert VARIMAX_TOL == 1e-5
+
+
+class TestWeights:
+    @pytest.mark.parametrize("bad", [np.nan, np.inf, -1.0])
+    def test_country_means_reject_missing_nonfinite_or_negative_weight(self, fitted_map, bad):
+        cm = copy(fitted_map)
+        cm.valid_data = fitted_map.valid_data.copy()
+        cm.valid_data.loc[cm.valid_data.index[3], "weight"] = bad
+        with pytest.raises(ValueError, match="S017 weights must be present"):
+            cm.calculate_mean_scores()
+
+    def test_country_means_reject_zero_weight_sum(self, fitted_map):
+        cm = copy(fitted_map)
+        cm.valid_data = fitted_map.valid_data.copy()
+        cm.valid_data.loc[cm.valid_data.country_code.eq(2), "weight"] = 0.0
+        with pytest.raises(ValueError, match=r"sum to zero for groups \[2\]"):
+            cm.calculate_mean_scores()
+
+    def test_zero_weights_are_allowed_and_country_means_are_weighted(self, fitted_map):
+        cm = copy(fitted_map)
+        cm.valid_data = fitted_map.valid_data.copy()
+        weights = np.random.default_rng(5).uniform(0.2, 3.0, len(cm.valid_data))
+        weights[0] = 0.0
+        cm.valid_data["weight"] = weights
+        cm.calculate_mean_scores()
+        first = cm.valid_data.country_code.eq(1)
+        expected = np.average(
+            cm.valid_data.loc[first, "PC1_rescaled"], weights=weights[first.to_numpy()]
+        )
+        got = cm.country_scores_pca.set_index("country_code").loc[1, "PC1_rescaled"]
+        assert got == pytest.approx(expected, abs=1e-12)
+        unweighted = cm.valid_data.loc[first, "PC1_rescaled"].mean()
+        assert abs(got - unweighted) > 1e-6
+
+    def test_public_rescale_is_the_projection_step(self, fitted_map):
+        scores = fitted_map.ppca.transform() @ fitted_map.rotation
+        pd.testing.assert_frame_equal(
+            fitted_map.rescale(scores)[["PC1_rescaled", "PC2_rescaled"]],
+            fitted_map.valid_data[["PC1_rescaled", "PC2_rescaled"]],
+        )

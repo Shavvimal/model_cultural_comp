@@ -42,6 +42,7 @@ from app.agreement import (
     krippendorff_alpha_nominal,
     percent_agreement,
 )
+from app.study_design import TRIAL_KEY
 from app.trace_codebook import CODES
 from app.trace_diagnostics import (
     CODE_LABELS,
@@ -54,7 +55,7 @@ LABELS = Path("data/trace_labels_2026.csv")
 OUT_AGREEMENT = Path("data/trace_agreement_2026.csv")
 OUT_CELLS = Path("data/trace_coding_2026.csv")
 OUT_HEADLINE = Path("data/trace_coding_headline_2026.csv")
-KEY = ["llm", "language", "question", "system_prompt_id", "repeat"]
+KEY = list(TRIAL_KEY)
 LANGS = ("english", "mixed", "cjk")
 
 

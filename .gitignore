@@ -16,6 +16,20 @@
 *.png
 *.tar.gz
 *.zip
+*.dta
+*.[rR][dD][sS]
+*.[rR][dD][aA][tT][aA]
+*.xlsx
+*.xls
+*.tsv
+*.feather
+*.h5
+*.hdf5
+*.sqlite
+*.db
+*.tar
+*.xz
+*.7z
 
 # Credentials and prospective request logs.
 .env

@@ -11,6 +11,7 @@ from app.llm_bootstrap import (
     centroid_statistics,
     confidence_ellipses,
     load_transformed_responses,
+    load_trial_records,
     project_cell_means,
 )
 
@@ -99,6 +100,25 @@ class TestConfidenceEllipses:
         assert (ellipses["ellipse_height"] > 0).all()
         assert (ellipses["ellipse_width"] >= ellipses["ellipse_height"]).all()
 
+    def test_collinear_cloud_has_zero_height_not_nan(self):
+        x = np.linspace(-1.0, 1.0, 101)
+        boot = pd.DataFrame({"llm": "m", "PC1_rescaled": 0.3 * x, "PC2_rescaled": 0.7 * x + 0.1})
+        ellipse = confidence_ellipses(boot).iloc[0]
+        assert np.isfinite(ellipse.ellipse_height)
+        assert 0.0 <= ellipse.ellipse_height < 1e-6
+        assert ellipse.ellipse_width > 0
+
+    def test_clipping_leaves_a_positive_definite_cloud_unchanged(self):
+        from scipy.stats import chi2
+
+        xy = np.random.default_rng(8).standard_normal((200, 2)) @ [[1.0, 0.4], [0.0, 0.6]]
+        boot = pd.DataFrame({"llm": "m", "PC1_rescaled": xy[:, 0], "PC2_rescaled": xy[:, 1]})
+        ellipse = confidence_ellipses(boot).iloc[0]
+        vals = np.linalg.eigh(np.cov(xy.T))[0]
+        expected = 2 * np.sqrt(chi2.ppf(0.95, df=2) * vals[::-1])
+        assert ellipse.ellipse_width == expected[0]
+        assert ellipse.ellipse_height == expected[1]
+
 
 def _cluster_responses():
     return pd.DataFrame(
@@ -178,6 +198,11 @@ class TestClusterPoolingRegression:
     def test_missing_entire_item_raises(self, fitted_map):
         responses = _cluster_responses().query("question != 'F120'")
         with pytest.raises(ValueError, match="F120"):
+            bootstrap_llm_positions_cluster(fitted_map, responses, n_boot=5)
+
+    def test_single_variant_cell_raises(self, fitted_map):
+        responses = _cluster_responses().query("system_prompt_id == 20")
+        with pytest.raises(ValueError, match=r"at least two prompt variants; got 1 \(\[20\]\)"):
             bootstrap_llm_positions_cluster(fitted_map, responses, n_boot=5)
 
     def test_missing_variant_id_raises(self, fitted_map):
@@ -327,3 +352,34 @@ class TestClusterBootstrap:
         broken.loc[broken.index[0], "system_prompt_id"] = pd.NA
         with pytest.raises(ValueError, match="system_prompt_id"):
             bootstrap_llm_positions_cluster(fitted_map, broken, n_boot=5, seed=1)
+
+
+def test_midpoint_diagnostic_rejects_a_cell_missing_an_item(fitted_map):
+    from app.llm_bootstrap import central_tendency_diagnostics
+
+    responses = _cluster_responses().query("question != 'G006'")
+    with pytest.raises(ValueError, match="cluster-model: no stored responses for \\['G006'\\]"):
+        central_tendency_diagnostics(fitted_map, responses)
+    complete = central_tendency_diagnostics(fitted_map, _cluster_responses())
+    assert np.isfinite(complete.midpoint_distance).all()
+
+
+def test_trial_records_keep_last_after_type_normalisation(tmp_path):
+    base = {"llm": "m", "question": "A008", "error": None, "parsed": 1}
+    first = {**base, "system_prompt_id": "0", "repeat": "0", "parsed": 1}
+    later = {**base, "system_prompt_id": 0, "repeat": 0, "parsed": 2}
+    other = {**base, "language": "zh", "system_prompt_id": 0, "repeat": 0}
+    (tmp_path / "a.jsonl").write_text(json.dumps(first) + "\n" + json.dumps(other) + "\n")
+    (tmp_path / "b.jsonl").write_text(json.dumps(later) + "\n")
+    out = load_trial_records(tmp_path)
+    assert list(out["language"]) == ["zh", "en"]
+    assert out.loc[out["language"] == "en", "parsed"].tolist() == [2]
+    assert list(out.index) == [1, 2]  # index is not reset
+
+
+def test_trial_records_require_jsonl_and_reject_blank_lines(tmp_path):
+    with pytest.raises(FileNotFoundError, match="no JSONL files"):
+        load_trial_records(tmp_path)
+    (tmp_path / "a.jsonl").write_text("\n")
+    with pytest.raises(json.JSONDecodeError):
+        load_trial_records(tmp_path)

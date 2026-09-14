@@ -60,7 +60,7 @@ def test_full_design_with_historical_encodings_and_low_parse_rate_passes(
 ):
     records = copy.deepcopy(complete_records)
     # Entire one-cell failure remains a complete, reportable collection.
-    for record in records[: qc.DESIGN_CALLS]:
+    for record in records[: qc.CELL_DESIGN_CALLS]:
         record.update(parsed=None, error="parse: refusal", raw_content="I cannot answer")
     for record in records:
         record["repeat"] = str(record["repeat"])
@@ -76,7 +76,7 @@ def test_full_design_with_historical_encodings_and_low_parse_rate_passes(
 
 
 def test_cli_499_records_cannot_hide_33_absent_cells(tmp_path, complete_records):
-    write_records(tmp_path, complete_records[: qc.DESIGN_CALLS - 1])
+    write_records(tmp_path, complete_records[: qc.CELL_DESIGN_CALLS - 1])
     result = subprocess.run(
         [sys.executable, str(Path(qc.__file__).resolve())],
         cwd=tmp_path,
@@ -89,7 +89,7 @@ def test_cli_499_records_cannot_hide_33_absent_cells(tmp_path, complete_records)
     cells = pd.read_csv(tmp_path / "data/qc_2026_cells.csv")
     assert len(cells) == 34
     assert (cells["records"] == 0).sum() == 33
-    assert cells["missing_keys"].sum() == 33 * qc.DESIGN_CALLS + 1
+    assert cells["missing_keys"].sum() == 33 * qc.CELL_DESIGN_CALLS + 1
 
 
 @pytest.mark.parametrize(
@@ -106,6 +106,8 @@ def test_cli_499_records_cannot_hide_33_absent_cells(tmp_path, complete_records)
         {"parsed": 99, "raw_content": "99"},
         {"parsed": None},
         {"error": "parse: failed"},
+        {"parsed": None, "error": "ResponseError: 500 (status code: 500)", "raw_content": ""},
+        {"parsed": None, "error": "refused", "raw_content": "No"},
         {"transport_failure": True},
         {"attempts": 0},
         {"duration_ms": -1},
@@ -174,3 +176,72 @@ def test_all_terminal_failures_are_reportable(tmp_path, monkeypatch, complete_re
         for r in complete_records
     ]
     assert run_qc(tmp_path, monkeypatch, records) == 0
+
+
+QC_ARTEFACTS = {
+    "qc_2026_attempts.csv",
+    "qc_2026_cells.csv",
+    "qc_2026_dedup.csv",
+    "qc_2026_determinism.csv",
+    "qc_2026_failures.csv",
+    "qc_2026_index_validity.csv",
+    "qc_2026_integrity_errors.csv",
+    "qc_2026_latency.csv",
+    "qc_2026_parse_rates.csv",
+    "qc_2026_thinking.csv",
+}
+
+
+def test_provider_rejections_pass_and_are_counted_apart_from_parse_failures(
+    tmp_path, monkeypatch, complete_records, capsys
+):
+    records = copy.deepcopy(complete_records)
+    records[0].update(
+        parsed=None, error="provider: ResponseError: blocked (status code: 403)", raw_content=""
+    )
+    records[1].update(parsed=None, error="parse: refusal", raw_content="")
+    assert run_qc(tmp_path, monkeypatch, records) == 0
+    failures = pd.read_csv(tmp_path / "data/qc_2026_failures.csv")
+    assert dict(zip(failures["category"], failures["n"], strict=True)) == {
+        "provider": 1,
+        "empty": 1,
+    }
+    assert "terminal failures: 1 parse, 1 provider rejections" in capsys.readouterr().out
+
+
+def test_failure_taxonomy_has_no_out_of_range_category():
+    assert qc.classify_failure("", "provider: blocked") == "provider"
+    assert qc.classify_failure("99", "parse: 99 out of range") == "format"
+    assert qc.classify_failure("", "parse: empty") == "empty"
+
+
+def test_nosys_integrity_pass_reports_without_failing_or_writing(
+    tmp_path, monkeypatch, complete_records, capsys
+):
+    llm = sorted(qc.EXPECTED_MODELS)[0]
+    nosys = [
+        {
+            **complete_records[0],
+            "llm": llm,
+            "question": question,
+            "system_prompt_id": 0,
+            "repeat": repeat,
+            "prompt_variant": "nosys",
+            "raw_content": "1,2" if question in ("Y002", "Y003") else "1",
+            "parsed": [1, 2] if question in ("Y002", "Y003") else 1,
+        }
+        for question in qc.IV_QNS
+        for repeat in range(50)
+    ]
+    nosys = [*nosys[:-1], nosys[0]]  # one missing trial and one duplicate
+    directory = tmp_path / "data" / "collection_2026_nosys"
+    directory.mkdir(parents=True)
+    (directory / "fixture.jsonl").write_text("".join(json.dumps(r) + "\n" for r in nosys))
+    assert run_qc(tmp_path, monkeypatch, complete_records) == 0
+    out = capsys.readouterr().out
+    assert "No-persona integrity (report only" in out
+    missing = 1 + (len(qc.EXPECTED_MODELS) - 1) * qc.CELL_DESIGN_CALLS
+    assert f"total: 500 records, 1 duplicate records, {missing} missing trials" in out
+    written = {p.name for p in (tmp_path / "data").iterdir() if p.is_file()}
+    assert written == QC_ARTEFACTS
+    assert [p.name for p in directory.iterdir()] == ["fixture.jsonl"]

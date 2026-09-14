@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [1.1.0] — 2026-09-12
+## [1.1.0] - 2026-09-14
 
 The corrected instrument and analyses support the revised paper. The
 [v1.1.0 release](https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.1.0)
@@ -31,6 +31,40 @@ provides the source revision and separate response and results archives.
   every paired contrast is tied.
 - Describe user-message prefixes, the retained no-persona system primer,
   terminal failure records and selected trace panels accurately.
+- Keep the collection API key out of the harness `repr` and redact it from
+  stored and printed error text. Reject hosts that embed a username, password
+  or query string; records keep only the scheme, host and port.
+- Persist a 4xx provider response other than 408 or 429 as a terminal
+  `provider:` error, which QC counts separately from parse failures. Detect
+  throttling from status 429 or a word-boundary "rate limit", not any "rate"
+  substring; trace annotation now uses the same `is_throttled` check.
+- Persist a trial's last parse failure even when a later attempt in the same
+  invocation fails in transport, so it is no longer re-swept for another answer.
+  These collection changes affect future runs only.
+- Accept ASCII digits only in the response parsers. Re-parsing every retained
+  answer still gives the stored parsed value.
+- Reject non-finite paired deltas, empty comparison cohorts and malformed
+  p-value families in the shared statistics helpers. The item sign test gives
+  p=1 when every contrast is tied, and BH adjustment requires one p-value per
+  declared test.
+- Cast Y003 constituents to float before the signed arithmetic, so unsigned
+  integer columns cannot wrap, and raise on a reconstructed value outside [-2, 2].
+- Validate S017 weights as present, finite and non-negative with a positive sum
+  per group; missing weights raise and are never filled.
+- Raise when a PPCA fit receives a row with no observed item, and when the
+  cluster bootstrap meets a cell with fewer than two prompt variants.
+- Report undefined kappa and alpha as NaN instead of 1.0.
+- Require the no-persona collection in `prompt_sensitivity_2026.py` instead of
+  writing its outputs without the no-persona rows.
+- Raise with `path:line` when trace-coding resume or merge meets a corrupt
+  label line, and validate stored labels before the integer cast.
+- Copy the confirmatory mean-displacement and origin-permutation CSVs byte for
+  byte under their plug-in names, after checking they match the language
+  effects, instead of computing them a second time.
+- Correct two figure titles: Figure 0 (`fig0_countries_only`) now gives the
+  survey-year range of the plotted countries (2005-2023), and Figure 6
+  (`fig4_language_forest`) describes nominal 95% intervals from independently
+  resampled arms.
 
 ### Added
 
@@ -48,22 +82,59 @@ provides the source revision and separate response and results archives.
   and the original, superseded trace-coding record without putting data in Git.
 - A Git-index policy gate in `make check` and CI to reject data, generated files,
   notebooks, private state and symlinks, including forced additions.
+- `reproduction_data.py verify-results`, which checks a results supplement
+  against the tracked `docs/results-manifest.json` without extracting it, and
+  `pack-results`, which rebuilds the supplement byte for byte from matching
+  local outputs and the tracked `docs/results-supplement-README.md`.
+- A golden SHA-256 test over every request prompt, so an edited prompt cannot
+  pass silently.
+- One shared preparation check, `check_preparation`, used by the instrument
+  fit, seed sensitivity and instrument sensitivity stages.
+- Makefile stage prerequisites: `make validate` builds `data/country_codes.pkl`
+  when it is absent or out of date and stops with a message if the licensed
+  cache is missing; `make validate-2026` fails early if the `make validate`
+  outputs it reads are missing or older than the fitted instrument.
+- Per-stage commands in the README, and documentation of the SPSS-free cache
+  route and of which stages need the licensed survey inputs.
 
 ### Changed
 
 - Git contains source, tests and documentation only. Stop tracking existing
   aggregates, figures and obsolete exploratory notebooks; local files remain
   ignored. Retained inputs are distributed separately and outputs regenerated.
-- Move manuscript fact checks, LaTeX table exports and blog exports into the
-  paper project. Retire the combined source/corpus release-candidate builder.
-- Share family metadata in `app/llm_meta.py`; rename the scientific
-  `final_review_sensitivities.py` driver to `family_wording_sensitivity.py`.
+- Keep manuscript fact checks, LaTeX table exports and blog exports with the
+  paper project, not in this repository.
+- Share family metadata in `app/llm_meta.py`; `family_wording_sensitivity.py`
+  runs the family and wording sensitivities.
 - Keep shared profile standardization in `app/appendix_contrasts.py`; scripts
   consume this application helper instead of importing it from another CLI.
 - Remove notebook-only and unused direct dependencies and update the lockfile
   without upgrading retained numerical packages.
 - Retain historical plan entries and older changelog sections as dated records;
   their old tracked-data policy and superseded results are not current guidance.
+- Tighten the public-tree policy: more data and archive suffixes, and
+  case-insensitive directory and suffix matching, with matching `.gitignore`
+  patterns.
+- Name the analysis-design and solver constants with their rationale, values
+  unchanged: `app/study_design.py` holds the inclusion threshold, trial design,
+  trial key, sensitive items and prefix families; the varimax tolerance is pinned
+  at `VARIMAX_TOL = 1e-5`; PPCA optimiser, survey-year, minimum-item,
+  cross-validation and tie-tolerance literals are named where they are used.
+- Consolidate duplicated helpers: BH adjustment, sign and permutation tests in
+  `app/stats.py`; Gaussian conditional completion in `app/ppca.py`; the 2026
+  trial loader shared by the bootstrap and diagnostics stages; `.env` loading and
+  throttle detection in `app/cloud_survey.py`; and the collected and excluded
+  2026 model sets in `app/llm_meta.py`.
+- Configure mypy to treat untyped third-party imports as `Any`.
+
+### Known limitations
+
+- The cluster bootstrap draws every cell from one shared random generator, so a
+  cell's resamples depend on the cells drawn before it. Per-cell seeding would
+  move every published interval, so it is deferred to a later version.
+
+No published result changed in this round: every regenerated CSV is
+byte-identical, and only the titles of Figures 0 and 6 differ.
 
 ## [1.0.0] - 2026-08-05
 

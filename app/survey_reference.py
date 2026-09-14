@@ -9,7 +9,7 @@ not be admissible individual answers on categorical items.
 import numpy as np
 import pandas as pd
 
-from app.culture_map import ITEM_VALID_RANGES, SURVEY_REFERENCE, CulturalMap
+from app.culture_map import ITEM_VALID_RANGES, SURVEY_REFERENCE, CulturalMap, validate_weights
 
 XY = ["PC1_rescaled", "PC2_rescaled"]
 # Labels from the IVS merge syntax, for the current unmapped survey codes.
@@ -19,7 +19,17 @@ UNMAPPED_LABELS = {197: "Northern Cyprus", 909: "Northern Ireland", 915: "Kosovo
 def survey_reference_tables(
     cm: CulturalMap,
 ) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Summarise the already-fitted survey, with explicit populations and weights."""
+    """Summarise the already-fitted survey, with explicit populations and weights.
+
+    S017 weights must be present, finite and non-negative, with a positive sum
+    in every weighted scope and for every item's observed rows; otherwise this
+    raises (:func:`app.culture_map.validate_weights`). No weight is filled.
+    The exported ``completed_*_weighted`` definition still ends "missing
+    weight=1", and the ``mode_weighted`` definition says nothing about missing
+    weights. Both strings are kept byte-identical because they are released
+    output values; under this validation no row with a missing weight can
+    reach either estimate.
+    """
     observed = cm.subset_ivs_df
     completed = cm.valid_data
     if observed is None or completed is None or len(observed) != len(completed):
@@ -59,7 +69,9 @@ def survey_reference_tables(
         if group.empty:
             continue
         xy = group[XY].to_numpy()
-        weights = group["weight"].fillna(1.0).to_numpy()
+        weights = validate_weights(
+            group["weight"], context=f"completed_{scope}_weighted reference"
+        ).to_numpy()
         add(
             f"completed_{scope}_unweighted",
             xy.mean(axis=0),
@@ -88,7 +100,13 @@ def survey_reference_tables(
         modes = values.mode().sort_values().to_numpy()
         weighted = (
             pd.DataFrame(
-                {"value": values, "weight": observed.loc[values.index, "weight"].fillna(1.0)}
+                {
+                    "value": values,
+                    "weight": validate_weights(
+                        observed.loc[values.index, "weight"],
+                        context=f"{question} weighted mode",
+                    ),
+                }
             )
             .groupby("value")["weight"]
             .sum()
@@ -150,7 +168,17 @@ def reference_sensitivity(
     Point summaries and optional sampled-replicate extrema are descriptive.
     Region-centroid distances are unchanged by a choice of reference.
     Country shares use strict distance comparisons, as in the main analysis.
+    Non-finite point or replicate coordinates raise: a NaN would otherwise be
+    written as outside the quadrant with country share 1.0 and "no change".
     """
+    if not np.isfinite(points[XY].to_numpy(dtype=float)).all():
+        bad = points.loc[~np.isfinite(points[XY].to_numpy(dtype=float)).all(axis=1), "llm"]
+        raise ValueError(f"point coordinates must be finite; non-finite for {bad.tolist()}")
+    if replicates is not None and not np.isfinite(replicates[XY].to_numpy(dtype=float)).all():
+        bad = replicates.loc[
+            ~np.isfinite(replicates[XY].to_numpy(dtype=float)).all(axis=1), "llm"
+        ].unique()
+        raise ValueError(f"replicate coordinates must be finite; non-finite for {bad.tolist()}")
     clouds = (
         {}
         if replicates is None

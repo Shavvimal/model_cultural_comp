@@ -143,3 +143,16 @@ def test_preparation_supports_absent_delivered_index_column():
     assert cm.subset_ivs_df.loc[8, "Y003"] == 0
     assert not cm.survey_preparation_report["y003"]["input_index_column_present"]
     assert cm.survey_preparation_report["retained_y003"]["reconstructed"] == 1
+
+
+@pytest.mark.parametrize("dtype", ["uint8", "int8", "int64", "float64"])
+def test_reconstruction_is_signed_for_every_constituent_dtype(dtype):
+    """Unsigned subtraction would wrap -2 and -1 to 254 and 255."""
+    frame = pd.DataFrame(
+        [[0, 0, 1, 1], [0, 0, 1, 0], [1, 1, 0, 0], [0, 1, 0, 1]],
+        columns=Y003_CONSTITUENTS,
+    ).astype(dtype)
+    recovered = recover_y003(frame)
+    np.testing.assert_array_equal(recovered.values, [-2, -1, 2, 0])
+    assert recovered.values.dtype == np.float64
+    assert recovered.report["reconstructed"] == 4

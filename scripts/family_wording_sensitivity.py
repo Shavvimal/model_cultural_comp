@@ -50,6 +50,11 @@ def item_signs(deltas: pd.DataFrame, unit: str) -> pd.DataFrame:
             }
         )
     result = pd.DataFrame(rows)
+    # The family is exactly the ten items (checked above), so m = 10. This keeps
+    # scipy's BH rather than app.stats.bh_adjust: scipy multiplies by m / rank
+    # while bh_adjust computes p * m / rank, and on the released family-unit
+    # tests the two differ by one unit in the last place (0.4817708333333333 vs
+    # 0.48177083333333337), which would change the published CSV bytes.
     result["p_bh"] = false_discovery_control(result["p_sign_two_sided"].to_numpy())
     return result
 
@@ -63,22 +68,24 @@ def family_means(profiles: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> int:
+    """Compute and validate every sensitivity first, then write all five CSVs.
+
+    A failed guard therefore leaves every previously released output untouched.
+    """
     item_fx = pd.read_csv("data/conf_2026_item_language_effects.csv", float_precision="round_trip")
     deltas = item_fx.pivot(index="llm", columns="question", values="delta").reindex(columns=IV_QNS)
     if deltas.isna().any().any():
         raise ValueError("release item comparisons are incomplete")
     grouped = family_means(deltas)
     grouped.index.name = "family"
-    grouped.to_csv("data/conf_2026_family_item_deltas.csv")
     signs = item_signs(grouped, "equal-weight developer family mean")
-    signs.to_csv("data/conf_2026_family_item_sign_tests.csv", index=False)
 
     omitted = deltas.copy()
-    if not KNOWN_Y003_WORDING_MODELS.issubset(omitted.index):
-        raise ValueError("the documented Y003 wording models must be present")
+    absent = sorted(KNOWN_Y003_WORDING_MODELS - set(omitted.index))
+    if absent:
+        raise ValueError(f"the documented Y003 wording models must be present; missing {absent}")
     omitted.loc[sorted(KNOWN_Y003_WORDING_MODELS), "Y003"] = np.nan
     wording = item_signs(omitted, "release; four documented model/Y003 comparisons omitted")
-    wording.to_csv("data/conf_2026_y003_wording_sign_tests.csv", index=False)
 
     paired = pd.read_csv("data/llm_language_effects_2026.csv")["llm"]
     keying = pd.read_csv("data/diag_2026_item_keying.csv", float_precision="round_trip")
@@ -103,7 +110,6 @@ def main() -> int:
             }
         )
     geometry = pd.DataFrame(geometric_rows)
-    geometry.to_csv("data/conf_2026_y003_geometry_sensitivity.csv", index=False)
 
     profiles = item_fx.pivot(index="llm", columns="question", values="mean_en")
     baselines = pd.read_csv(
@@ -129,6 +135,11 @@ def main() -> int:
         result["n_families"] = len(means)
         profile_rows.append(result)
     origin = pd.concat(profile_rows, ignore_index=True)
+
+    grouped.to_csv("data/conf_2026_family_item_deltas.csv")
+    signs.to_csv("data/conf_2026_family_item_sign_tests.csv", index=False)
+    wording.to_csv("data/conf_2026_y003_wording_sign_tests.csv", index=False)
+    geometry.to_csv("data/conf_2026_y003_geometry_sensitivity.csv", index=False)
     origin.to_csv("data/conf_2026_family_origin_similarity.csv", index=False)
     print("Exploratory family-unit item tests:")
     print(signs.to_string(index=False))

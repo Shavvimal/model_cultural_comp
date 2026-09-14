@@ -38,12 +38,12 @@ from app.llm_bootstrap import (
 )
 from app.llm_meta import cohort_2026
 from app.region_svm import RegionClassifier
+from app.study_design import MIN_PER_QUESTION
 
 RAW_DIR = Path("data/collection_2026")
 N_BOOT_CLUSTER = 10_000
 N_BOOT_ITEM = 1000
 SEED = 42
-MIN_PER_QUESTION = 10
 
 
 def base_model(label: str) -> str:
@@ -83,7 +83,11 @@ def language_effects(ellipses: pd.DataFrame, boot: pd.DataFrame) -> pd.DataFrame
     """Per-model zh - en displacement with a bootstrap CI.
 
     Replicates are independent across arms, so the displacement CI pairs
-    replicate i of the zh arm with replicate i of the en arm.
+    replicate i of the zh arm with replicate i of the en arm. Every analysed
+    zh cell needs its English arm, and both arms must carry the same number
+    of replicates; either failure raises rather than silently dropping the
+    model or truncating the interval. English cells without an analysed zh
+    arm (excluded upstream by the inclusion rule) have no contrast.
     """
     rows = []
     points = ellipses.set_index("llm")[["PC1_rescaled", "PC2_rescaled"]]
@@ -93,10 +97,16 @@ def language_effects(ellipses: pd.DataFrame, boot: pd.DataFrame) -> pd.DataFrame
         base = base_model(label)
         en = boot[boot["llm"] == base][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
         zh = boot[boot["llm"] == label][["PC1_rescaled", "PC2_rescaled"]].to_numpy()
-        if len(en) == 0 or len(zh) == 0:
-            continue
-        n = min(len(en), len(zh))
-        delta = zh[:n] - en[:n]
+        if len(en) == 0 or len(zh) == 0 or base not in points.index:
+            raise ValueError(
+                f"{base}: language contrast needs both arms, got {len(en)} en and "
+                f"{len(zh)} zh replicates"
+            )
+        if len(en) != len(zh):
+            raise ValueError(
+                f"{base}: arms must have equal replicate counts, got {len(en)} en and {len(zh)} zh"
+            )
+        delta = zh - en
         point_delta = (points.loc[label] - points.loc[base]).to_numpy()
         dist = np.linalg.norm(delta, axis=1)
         rows.append(

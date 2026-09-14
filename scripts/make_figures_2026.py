@@ -32,7 +32,7 @@ from matplotlib.patches import Ellipse
 
 from app.culture_map import SURVEY_REFERENCE
 from app.llm_meta import cohort_2026
-from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, _draw_countries, _draw_midpoint
+from scripts.make_figures import XLABEL, XLIM, YLABEL, YLIM, draw_countries, draw_midpoint
 
 # Okabe-Ito, CVD-validated
 COHORT_COLORS = {"Chinese": "#d55e00", "Western": "#0072b2"}
@@ -113,7 +113,7 @@ def _draw_cell(ax, row, marker: str, color: str) -> None:
 
 def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame, midpoint=None):
     fig, ax = plt.subplots(figsize=(7.0, 5.8))
-    _draw_countries(
+    draw_countries(
         ax,
         countries,
         label_alpha=0.9,
@@ -164,7 +164,7 @@ def fig3_map_2026(countries: pd.DataFrame, ellipses: pd.DataFrame, midpoint=None
                 zorder=7,
             )
 
-    _draw_midpoint(ax, midpoint)
+    draw_midpoint(ax, midpoint)
     handles = [
         Line2D([], [], marker="o", ls="", color="0.6", label="Surveyed country/territory"),
         Line2D([], [], marker="D", ls="", color="0.35", label="English administration"),
@@ -206,7 +206,7 @@ def fig4_language_forest(lang_fx: pd.DataFrame):
     ]
     axes[1].legend(handles=handles, fontsize=8, loc="lower right", framealpha=0.9)
     fig.suptitle(
-        "Language effect per model (zh − en; nominal 95% paired intervals)",  # noqa: RUF001
+        "Language effect per model (zh − en; nominal 95% intervals, independently resampled arms)",  # noqa: RUF001
         fontsize=11,
     )
     fig.tight_layout()
@@ -215,7 +215,7 @@ def fig4_language_forest(lang_fx: pd.DataFrame):
 
 def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame, midpoint=None):
     fig, ax = plt.subplots(figsize=(9.5, 7.5))
-    _draw_countries(ax, countries, label_alpha=0.8)
+    draw_countries(ax, countries, label_alpha=0.8)
     ax.scatter(
         e2024["PC1_rescaled"],
         e2024["PC2_rescaled"],
@@ -241,7 +241,7 @@ def fig5_joint(countries: pd.DataFrame, e2024: pd.DataFrame, e2026: pd.DataFrame
             zorder=6,
             label=f"2026 cohort, {'English' if arm == 'en' else 'Chinese'} administration",
         )
-    _draw_midpoint(ax, midpoint)
+    draw_midpoint(ax, midpoint)
     ax.legend(fontsize=7.5, loc="lower right", framealpha=0.9)
     _finish(
         ax,

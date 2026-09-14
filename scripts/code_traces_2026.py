@@ -39,31 +39,29 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.cloud_survey import IV_QN_PROMPTS, SYSTEM_PROMPTS, SYSTEM_PROMPTS_ZH
+from app.cloud_survey import (
+    IV_QN_PROMPTS,
+    SYSTEM_PROMPTS,
+    SYSTEM_PROMPTS_ZH,
+    is_throttled,
+    load_dotenv,
+    status_code,
+)
+from app.study_design import TRIAL_KEY
 from app.trace_codebook import CODEBOOK, CODES, build_unit, parse_labels, reasoning_language
+from app.trace_diagnostics import validate_trace_labels
 
 SAMPLE = Path("data/trace_samples_2026.json")
 LABELS_GLOB = "trace_labels_2026__*.jsonl"
 MERGED = Path("data/trace_labels_2026.csv")
 HUMAN = Path("data/trace_labels_human_2026.csv")
 WORKSHEET = Path("data/trace_coding_human_worksheet.csv")
-KEY = ["llm", "language", "question", "system_prompt_id", "repeat"]
+KEY = list(TRIAL_KEY)
 SEED = 42
 PER_CELL_HUMAN = 5
 MAX_ATTEMPTS = 3
 MAX_THROTTLE_WAITS = 20  # a 429 is not an answer: wait it out rather than persist it
 TEMPERATURE = 0.0
-
-
-def load_dotenv(path=".env"):
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                os.environ.setdefault(key.strip(), value.strip())
 
 
 def _is_missing(value) -> bool:
@@ -104,14 +102,30 @@ def labels_path(annotator: str) -> Path:
     )
 
 
+def read_label_records(path: Path) -> list[dict]:
+    """Every non-blank JSONL record in one annotator file.
+
+    A corrupt line raises with ``path:line`` for both resume and merge, so a
+    truncated or damaged record is repaired by hand rather than skipped on one
+    path and fatal on the other.
+    """
+    records = []
+    for number, line in enumerate(path.read_text().splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"{path}:{number}: corrupt label record ({exc.msg}); repair or remove the line"
+            ) from exc
+    return records
+
+
 def completed(path: Path) -> set[tuple]:
     done = set()
     if path.exists():
-        for line in path.read_text().splitlines():
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+        for rec in read_label_records(path):
             # A persisted failure (transport or parse after MAX_ATTEMPTS) is not
             # a label: leave it out of ``done`` so a resume re-asks it, and let
             # --merge keep the last record per key.
@@ -172,7 +186,7 @@ async def annotate(annotator: str, concurrency: int, timeout_s: float, limit: in
             except Exception as exc:  # transport / API: back off and retry
                 message = f"{type(exc).__name__}: {exc}"
                 record["error"] = message[:300]
-                throttled = "429" in message or "rate" in message.lower()
+                throttled = is_throttled(status_code(exc), message)
                 if throttled and throttle_waits < MAX_THROTTLE_WAITS:
                     # Throttling does not consume an attempt; the budget recovers.
                     throttle_waits += 1
@@ -235,13 +249,18 @@ def write_worksheet() -> int:
 def merge() -> int:
     frames = []
     for path in sorted(Path("data").glob(LABELS_GLOB)):
-        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(read_label_records(path))
         df = df.drop_duplicates(subset=KEY, keep="last")
         frames.append(df[["annotator", *KEY, *CODES, "error"]] if "error" in df else df)
     if HUMAN.exists():
         human = pd.read_csv(HUMAN)
-        human = human.dropna(subset=list(CODES))
+        uncoded = human[list(CODES)].isna().any(axis=1)
+        # A worksheet row with any blank code is not yet coded, so it is left
+        # out of the human panel; the count is printed so a partial sheet is visible.
+        print(
+            f"human worksheet: dropped {int(uncoded.sum())} of {len(human)} rows with a blank code"
+        )
+        human = human.loc[~uncoded]
         human["annotator"] = "human"
         human["error"] = None
         frames.append(human[["annotator", *KEY, *CODES, "error"]])
@@ -253,8 +272,11 @@ def merge() -> int:
         tuple(r[k] for k in KEY): reasoning_language(r["thinking"]) for _, r in traces.iterrows()
     }
     long["reasoning_language"] = [lang.get(tuple(r[k] for k in KEY)) for _, r in long.iterrows()]
+    # Validate before the integer cast: a corrupt stored code must raise here,
+    # not become NA and then pass downstream as a genuinely missing label.
+    long = validate_trace_labels(long)
     for code in CODES:
-        long[code] = pd.to_numeric(long[code], errors="coerce").astype("Int64")
+        long[code] = long[code].astype("Int64")
     long = long.sort_values(["annotator", *KEY]).reset_index(drop=True)
     long.to_csv(MERGED, index=False)
     summary = long.groupby("annotator").agg(

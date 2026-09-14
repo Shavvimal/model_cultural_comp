@@ -13,7 +13,9 @@ and post-confirmatory (analysis-plan ledger, camera-ready entry):
    reported with an item-bootstrap CI (both sides).
 2. A no-persona baseline arm (data/collection_2026_nosys/, English, fifty
    repeats per item, collected by collect_cloud_2026.py --prompt-variant=
-   nosys) compared with the full persona protocol of the same model.
+   nosys) compared with the full persona protocol of the same model. The
+   arm is required: the script raises if it is absent rather than writing
+   the cited outputs without their no-persona rows.
 
 Inclusion rules. The persona arm is filtered by the main analysis rule
 (>= MIN_PER_QUESTION parsed answers on every item, as in analyze_2026). The
@@ -38,7 +40,7 @@ Run from the repo root (after analyze_2026.py):
     uv run python scripts/prompt_sensitivity_2026.py
 
 Writes data/prompt_sensitivity_variant_family_2026.csv (one row per cell x
-sub-family, and per cell x rule for the nosys arm where collected) and
+sub-family, and per cell x rule for the nosys arm) and
 data/prompt_sensitivity_2026.csv (one row per cell x contrast x rule:
 displacements).
 """
@@ -53,6 +55,7 @@ import pandas as pd
 from app.control_audit import coverage_tables
 from app.culture_map import SURVEY_REFERENCE, CulturalMap
 from app.llm_bootstrap import bootstrap_llm_positions, load_responses_2026
+from app.study_design import MIN_PER_QUESTION, PERSONA_PREFIX_FAMILIES, PERSONA_PREFIX_FAMILY_OF
 
 RAW_DIR = "data/collection_2026"
 NOSYS_DIR = "data/collection_2026_nosys"
@@ -60,15 +63,14 @@ MODEL_PATH = "data/cultural_map_model.npz"
 CLUSTER_REPLICATES = Path("data/llm_bootstrap_replicates_2026.csv")
 OUT_FAMILY = Path("data/prompt_sensitivity_variant_family_2026.csv")
 OUT_DELTA = Path("data/prompt_sensitivity_2026.csv")
-FAMILIES = {
-    "averaging": [0, 1, 3, 4, 6, 7],
-    "bare": [2, 5, 8],
-    "world_citizen": [9],
-    "all_persona": list(range(10)),
+# Persona-prefix sub-families plus the full ten-prefix protocol, in output order.
+# Named for prefixes so it cannot be confused with app.llm_meta.FAMILIES.
+PREFIX_FAMILIES: dict[str, tuple[int, ...]] = {
+    **PERSONA_PREFIX_FAMILIES,
+    "all_persona": tuple(sorted(PERSONA_PREFIX_FAMILY_OF)),
 }
 N_BOOT = 2000
 SEED = 42
-MIN_PER_QUESTION = 10
 RULES = {"min10": MIN_PER_QUESTION, "min1": 1}
 # One independent RNG child per family/arm; the index is fixed so a stream
 # never depends on which arms happen to be present.
@@ -226,6 +228,21 @@ def load_cluster_replicates(path: Path = CLUSTER_REPLICATES) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def require_nosys_collection(directory: str = NOSYS_DIR) -> Path:
+    """Return the no-persona collection directory, raising if it holds no JSONL.
+
+    The no-persona contrast is the reason the cited CSVs exist; writing them
+    without those rows would publish a partial artefact.
+    """
+    path = Path(directory)
+    if not (path.is_dir() and any(path.glob("*.jsonl"))):
+        raise FileNotFoundError(
+            f"no no-persona collection in {directory}; install the response archive "
+            "described in docs/REPRODUCING.md"
+        )
+    return path
+
+
 def contrast_summary(delta: pd.DataFrame) -> pd.DataFrame:
     """Matched-cell descriptive summaries with explicit eligibility and estimators."""
     rows = []
@@ -255,10 +272,11 @@ def contrast_summary(delta: pd.DataFrame) -> pd.DataFrame:
 
 
 def main(output_dir: str = "data") -> int:
+    require_nosys_collection(NOSYS_DIR)
     cm = CulturalMap(pd.DataFrame(), pd.DataFrame())
     cm.load_model(MODEL_PATH)
     responses = load_responses_2026(cm, RAW_DIR)
-    # Same inclusion rule as analyze_2026: a cell needs >= 10 parsed answers on
+    # Same inclusion rule as analyze_2026: a cell needs >= MIN_PER_QUESTION parsed answers on
     # every item under the full protocol (drops nemotron-3-ultra [zh]).
     per_q = responses.groupby(["llm", "question"]).size().unstack()
     usable = per_q.index[(per_q.fillna(0) >= MIN_PER_QUESTION).all(axis=1)]
@@ -266,7 +284,7 @@ def main(output_dir: str = "data") -> int:
     print(f"{len(usable)} usable cells under the full protocol")
 
     tables, boots = [], {}
-    for family, ids in FAMILIES.items():
+    for family, ids in PREFIX_FAMILIES.items():
         sub = responses[responses["system_prompt_id"].isin(ids)]
         rule = "min10" if family == "all_persona" else "min1"
         table, boot = family_rows(cm, sub, family, rule, stream=family, universe=list(usable))
@@ -286,34 +304,30 @@ def main(output_dir: str = "data") -> int:
         )
     ]
 
-    nosys = Path(NOSYS_DIR)
-    if nosys.exists() and any(nosys.glob("*.jsonl")):
-        base = load_responses_2026(cm, NOSYS_DIR)
-        base = base[base["language"] == "en"]
-        # Persona side: the primary cluster-bootstrap replicates (English cells).
-        cluster = load_cluster_replicates()
-        cluster = cluster[~cluster["llm"].str.endswith(" [zh]")]
-        persona_pts = pts[pts["family"] == "all_persona"]
-        # keep the persona-arm labels so the two arms join on llm
-        for rule in RULES:
-            table, boot = family_rows(cm, base, "nosys", rule, stream=f"nosys/{rule}")
-            tables.append(table)
-            deltas.append(
-                displacement(
-                    boot,
-                    cluster,
-                    table,
-                    persona_pts,
-                    "nosys-all_persona",
-                    rule,
-                    "item",
-                    "cluster",
-                )
+    base = load_responses_2026(cm, NOSYS_DIR)
+    base = base[base["language"] == "en"]
+    # Persona side: the primary cluster-bootstrap replicates (English cells).
+    cluster = load_cluster_replicates()
+    cluster = cluster[~cluster["llm"].str.endswith(" [zh]")]
+    persona_pts = pts[pts["family"] == "all_persona"]
+    # keep the persona-arm labels so the two arms join on llm
+    for rule in RULES:
+        table, boot = family_rows(cm, base, "nosys", rule, stream=f"nosys/{rule}")
+        tables.append(table)
+        deltas.append(
+            displacement(
+                boot,
+                cluster,
+                table,
+                persona_pts,
+                "nosys-all_persona",
+                rule,
+                "item",
+                "cluster",
             )
-            print(f"nosys arm ({rule}): {int(table['pc1'].notna().sum())} eligible cells")
-        pts = pd.concat(tables, ignore_index=True)
-    else:
-        print("no nosys arm collected yet (data/collection_2026_nosys/ absent)")
+        )
+        print(f"nosys arm ({rule}): {int(table['pc1'].notna().sum())} eligible cells")
+    pts = pd.concat(tables, ignore_index=True)
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -321,9 +335,10 @@ def main(output_dir: str = "data") -> int:
     delta = pd.concat(deltas, ignore_index=True)
     delta.to_csv(destination / OUT_DELTA.name, index=False)
     contrast_summary(delta).to_csv(destination / "prompt_control_summary_2026.csv", index=False)
-    coverages = [coverage_tables(RAW_DIR, "persona", list(cm.iv_qns))]
-    if nosys.exists():
-        coverages.append(coverage_tables(NOSYS_DIR, "nosys", list(cm.iv_qns)))
+    coverages = [
+        coverage_tables(RAW_DIR, "persona", list(cm.iv_qns)),
+        coverage_tables(NOSYS_DIR, "nosys", list(cm.iv_qns)),
+    ]
     pd.concat([c for c, _ in coverages], ignore_index=True).to_csv(
         destination / "prompt_control_coverage_2026.csv", index=False
     )

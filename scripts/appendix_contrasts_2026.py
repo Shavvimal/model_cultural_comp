@@ -31,8 +31,9 @@ corpus, no API - and the statistics live in app/appendix_contrasts.py.
       The standardised sensitivity uses the ten frozen fit means/SDs in
       data/validation_survey_item_baselines.csv; it needs no fitted NPZ.
 
-Everything here is deterministic (exact enumeration, no sampling); SEED is
-kept for the shared convention and the row order of the outputs.
+Everything here is deterministic (exact enumeration, no sampling), so no
+random generator is created. Every output is computed and checked before any
+CSV is written, so a failed check leaves the released files untouched.
 
 Writes:
     data/conf_2026_petition_contrast.csv             (a) per-model rows + a
@@ -57,10 +58,8 @@ from app.appendix_contrasts import (
     standardise_profiles,
 )
 from app.llm_meta import cohort_2026
+from app.study_design import SENSITIVE_QNS
 
-SEED = 42  # no randomness is consumed; kept for the repo-wide convention
-# Refusal-sensitive items, diagnostics_2026.py:62 (SENSITIVE_QNS).
-SENSITIVE_QNS = ["F118", "F120", "F063", "G006", "E025"]
 TARGET_ITEM = "E025"
 PROFILE_ARM = "en"
 PROFILE_COLUMN = "cell_mean"
@@ -88,9 +87,27 @@ ORIGIN_DEFINITION = (
 )
 
 
-def main() -> int:
-    np.random.default_rng(SEED)  # no draws; see module docstring
+def check_invariants(summary: pd.Series, origin_tables: dict[str, pd.DataFrame]) -> None:
+    """Mathematical invariants of the computed contrasts; raise before any write.
 
+    These do not force regenerated data to agree with historical paper
+    numerals after an estimator correction.
+    """
+    n_surv, n_eff = int(summary["n_target_more_survival_ward"]), int(summary["n_effective"])
+    if not 0 <= n_surv <= n_eff:
+        raise ValueError(
+            f"petition contrast: survival-ward count {n_surv} must lie in [0, n_effective={n_eff}]"
+        )
+    p = summary["p_sign_two_sided"]
+    if not 0 <= p <= 1:
+        raise ValueError(f"petition contrast: sign-test p must lie in [0, 1], got {p}")
+    for name, table in origin_tables.items():
+        bad = table.loc[~table["p_exact_ge"].between(0, 1), "p_exact_ge"]
+        if len(bad):
+            raise ValueError(f"{name}: p_exact_ge must lie in [0, 1], got {bad.tolist()}")
+
+
+def main() -> int:
     item_fx = pd.read_csv(ITEM_FX_CSV)
     keying = pd.read_csv(KEYING_CSV)
     profiles_long = pd.read_csv(PROFILES_CSV)
@@ -152,17 +169,13 @@ def main() -> int:
             standardised["statistic"] == "chinese_minus_cross", "definition"
         ].str.replace("within-cohort (Chinese and Western pooled)", "within-Chinese", regex=False)
     )
-    standardised.to_csv(OUT_ORIGIN_STANDARDISED, index=False)
 
-    # Check mathematical invariants; do not force regenerated data to agree
-    # with historical paper numerals after an estimator correction.
-    assert 0 <= int(s["n_target_more_survival_ward"]) <= int(s["n_effective"])
-    assert 0 <= s["p_sign_two_sided"] <= 1
+    check_invariants(s, {"raw profiles": origin, "standardised profiles": standardised})
     wc = origin[origin["statistic"] == "within_minus_cross"].iloc[0]
-    assert (origin["p_exact_ge"].between(0, 1)).all()
 
     petition.to_csv(OUT_PETITION, index=False)
     origin.to_csv(OUT_ORIGIN, index=False)
+    standardised.to_csv(OUT_ORIGIN_STANDARDISED, index=False)
 
     with pd.option_context("display.width", 220, "display.max_columns", 30):
         print("=== (a) petition-signing contrast within the refusal-sensitive set ===")

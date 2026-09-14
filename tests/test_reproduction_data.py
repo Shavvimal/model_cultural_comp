@@ -1,13 +1,28 @@
 """A separate data archive must be complete, verifiable and safe to install."""
 
+import gzip
 import hashlib
 import io
 import json
+import sys
 import tarfile
 
 import pytest
 
-from scripts.reproduction_data import install, load_manifest, pack, verify
+from scripts import reproduction_data
+from scripts.reproduction_data import (
+    RESULTS_MANIFEST_NAME,
+    RESULTS_README,
+    RESULTS_README_MAX_BYTES,
+    RESULTS_README_NAME,
+    install,
+    load_manifest,
+    manifest_bytes,
+    pack,
+    pack_results,
+    verify,
+    verify_results,
+)
 
 
 @pytest.fixture
@@ -140,3 +155,144 @@ def test_malformed_manifest_fails_at_boundary(tmp_path, manifest):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError):
         load_manifest(path)
+
+
+def test_stray_destination_record_is_rejected_before_any_input_is_written(corpus, tmp_path):
+    root, manifest = corpus
+    archive = tmp_path / "responses.tar.gz"
+    pack(root, manifest, archive)
+    fresh = tmp_path / "fresh"
+    stray = fresh / "data/collection/extra.jsonl"
+    stray.parent.mkdir(parents=True)
+    stray.write_text("{}\n")
+    with pytest.raises(ValueError, match="additional records"):
+        install(fresh, manifest, archive)
+    written = sorted(p.relative_to(fresh).as_posix() for p in fresh.rglob("*") if p.is_file())
+    assert written == ["data/collection/extra.jsonl"]
+
+
+def test_truncated_download_exits_with_named_message(corpus, tmp_path, monkeypatch, capsys):
+    root, manifest = corpus
+    archive = tmp_path / "responses.tar.gz"
+    pack(root, manifest, archive)
+    truncated = tmp_path / "truncated.tar.gz"
+    truncated.write_bytes(archive.read_bytes()[: archive.stat().st_size // 2])
+    manifest_path = tmp_path / "manifest.json"
+    fresh = tmp_path / "fresh"
+    argv = ["reproduction_data.py", "--root", str(fresh), "--manifest", str(manifest_path)]
+    monkeypatch.setattr(sys, "argv", [*argv, "install", str(truncated)])
+    with pytest.raises(SystemExit) as exit_info:
+        reproduction_data.main()
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err.startswith("Reproduction data: ")
+    assert not fresh.exists()
+
+
+@pytest.fixture
+def supplement(tmp_path):
+    """A synthetic results supplement, its tracked manifest and the input manifest it cites."""
+    inputs = tmp_path / "inputs.json"
+    inputs.write_text('{"schema_version": 1}\n')
+    root = tmp_path / "results-root"
+    files = {"data/summary.csv": b"a,b\n1,2\n", "data/trace_coding.json": b"{}\n"}
+    entries = []
+    for name, content in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        entries.append(
+            {"bytes": len(content), "path": name, "sha256": hashlib.sha256(content).hexdigest()}
+        )
+    results = {
+        "files": entries,
+        "input_manifest_sha256": hashlib.sha256(inputs.read_bytes()).hexdigest(),
+        "schema_version": 1,
+    }
+    tracked = tmp_path / "results-manifest.json"
+    tracked.write_bytes(manifest_bytes(results))
+    return root, tracked, inputs, files
+
+
+def _write_supplement(path, members):
+    with path.open("wb") as raw, gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as z:
+        with tarfile.open(fileobj=z, mode="w") as archive:
+            for name, content in members:
+                info = tarfile.TarInfo(name)
+                info.size = len(content)
+                archive.addfile(info, io.BytesIO(content))
+
+
+def _members(tracked, files, **changes):
+    members = {RESULTS_MANIFEST_NAME: tracked.read_bytes(), RESULTS_README_NAME: b"readme\n"}
+    members.update(files)
+    members.update(changes)
+    return [(name, content) for name, content in members.items() if content is not None]
+
+
+def test_results_supplement_roundtrip_verifies(supplement, tmp_path):
+    root, tracked, inputs, files = supplement
+    output = tmp_path / "out/results.tar.gz"
+    digest = pack_results(root, output, tracked, inputs)
+    assert digest == pack_results(root, output, tracked, inputs)
+    assert verify_results(output, tracked, inputs) == len(files)
+    _write_supplement(tmp_path / "handmade.tar.gz", _members(tracked, files))
+    assert verify_results(tmp_path / "handmade.tar.gz", tracked, inputs) == len(files)
+
+
+@pytest.mark.parametrize(
+    "problem", ["tampered", "resized", "missing", "extra", "duplicate", "manifest", "link"]
+)
+def test_results_supplement_rejects_altered_archives(supplement, tmp_path, problem):
+    _, tracked, inputs, files = supplement
+    changes = {}
+    if problem == "tampered":
+        changes["data/summary.csv"] = b"a,b\n1,3\n"  # same size, different hash
+    elif problem == "resized":
+        changes["data/summary.csv"] = b"a,b\n1,20\n"
+    elif problem == "missing":
+        changes["data/trace_coding.json"] = None
+    elif problem == "extra":
+        changes["data/ivs_df.pkl"] = b"licensed"
+    elif problem == "manifest":
+        changes[RESULTS_MANIFEST_NAME] = tracked.read_bytes().replace(b"  ", b"   ", 1)
+    members = _members(tracked, files, **changes)
+    if problem == "duplicate":
+        members.append(("data/summary.csv", files["data/summary.csv"]))
+    archive = tmp_path / "bad.tar.gz"
+    _write_supplement(archive, members)
+    if problem == "link":
+        with tarfile.open(archive, "w:gz") as target:
+            for name, content in _members(tracked, files):
+                info = tarfile.TarInfo(name)
+                if name == "data/summary.csv":
+                    info.type, info.linkname = tarfile.SYMTYPE, "../outside.csv"
+                else:
+                    info.size = len(content)
+                target.addfile(info, io.BytesIO(content))
+    with pytest.raises(ValueError):
+        verify_results(archive, tracked, inputs)
+
+
+def test_results_supplement_must_cite_checked_in_inputs(supplement, tmp_path):
+    _, tracked, inputs, files = supplement
+    _write_supplement(tmp_path / "results.tar.gz", _members(tracked, files))
+    inputs.write_text('{"schema_version": 1, "changed": true}\n')
+    with pytest.raises(ValueError, match="input manifest"):
+        verify_results(tmp_path / "results.tar.gz", tracked, inputs)
+
+
+def test_pack_results_refuses_changed_local_outputs(supplement, tmp_path):
+    root, tracked, inputs, _ = supplement
+    (root / "data/summary.csv").write_bytes(b"a,b\n9,9\n")
+    with pytest.raises(ValueError, match="differs"):
+        pack_results(root, tmp_path / "results.tar.gz", tracked, inputs)
+    assert not (tmp_path / "results.tar.gz").exists()
+
+
+def test_tracked_supplement_readme_is_the_released_copy():
+    """pack-results packs this file byte for byte; one changed byte moves the archive hash."""
+    content = RESULTS_README.read_bytes()
+    assert len(content) == 1106 <= RESULTS_README_MAX_BYTES
+    assert hashlib.sha256(content).hexdigest() == (
+        "cc4ae9dd8343c124f0d7de142d2528aa7b563aa62346f77b3beb84183dbd7464"
+    )

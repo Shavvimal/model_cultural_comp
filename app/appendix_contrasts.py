@@ -42,6 +42,22 @@ from app.culture_map import IV_QNS
 log = logging.getLogger(__name__)
 
 MAX_EXACT_LABELLINGS = 5_000_000
+# Tie tolerance for exact permutation counts. A labelling whose statistic
+# equals the observed one can differ from it by floating-point rounding of
+# the pooled correlation means (order 1e-15); 1e-12 counts those as ties while
+# staying far below any real difference between correlation means.
+PERMUTATION_TIE_TOLERANCE = 1e-12
+
+
+def _require_instrument_items(name: str, items: pd.Index | pd.Series) -> None:
+    """Raise unless ``items`` is exactly the ten instrument items, naming the gap."""
+    present = {str(item) for item in items}
+    missing = sorted(set(IV_QNS) - present)
+    extra = sorted(present - set(IV_QNS))
+    if missing or extra:
+        raise ValueError(
+            f"{name} must contain exactly the ten instrument items; missing {missing}, extra {extra}"
+        )
 
 
 def standardise_profiles(profiles: pd.DataFrame, item_baselines: pd.DataFrame) -> pd.DataFrame:
@@ -57,10 +73,13 @@ def standardise_profiles(profiles: pd.DataFrame, item_baselines: pd.DataFrame) -
         raise ValueError(f"item baselines require columns {sorted(required)}")
     if item_baselines["question"].duplicated().any():
         raise ValueError("item baselines must contain one row per question")
-    if set(item_baselines["question"]) != set(IV_QNS):
-        raise ValueError("item baselines must contain exactly the ten instrument items")
-    if profiles.columns.duplicated().any() or set(profiles.columns) != set(IV_QNS):
-        raise ValueError("profiles must contain exactly the ten instrument items")
+    _require_instrument_items("item baselines", item_baselines["question"])
+    if profiles.columns.duplicated().any():
+        duplicated = sorted(map(str, profiles.columns[profiles.columns.duplicated()]))
+        raise ValueError(
+            f"profiles must contain each instrument item once; duplicated {duplicated}"
+        )
+    _require_instrument_items("profiles", profiles.columns)
     fitted = item_baselines.set_index("question").reindex(profiles.columns)
     means = fitted["fit_standardisation_mean"].astype(float)
     stds = fitted["fit_standardisation_sd"].astype(float)
@@ -208,7 +227,7 @@ def origin_profile_permutation(
         lab[list(idx)] = True
         perm[i] = stats(lab)
 
-    eps = 1e-12
+    eps = PERMUTATION_TIE_TOLERANCE
     rows = []
     for j, (name, obs) in enumerate(
         [("within_minus_cross", obs_within_cross), ("chinese_minus_cross", obs_cn_cross)]

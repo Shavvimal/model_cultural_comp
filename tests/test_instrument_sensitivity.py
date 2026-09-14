@@ -13,14 +13,15 @@ from app.instrument_sensitivity import (
     XY,
     conditional_complete,
     country_year_benchmarks,
+    imputation_diagnostics,
     matrix_from_row,
     oriented_rotation,
     rotation_grid,
     rotation_outcomes,
     transport_coordinates,
     uniform_choice_baseline,
+    weighted_coordinates,
 )
-from scripts.instrument_sensitivity import imputation_diagnostics
 from scripts.validate_projection import write_validation_summary
 
 
@@ -28,7 +29,7 @@ def test_transport_matches_direct_projection_and_population_sd(fitted_map):
     cm = fitted_map
     grid = rotation_grid(cm)
     scores = cm.ppca.transform()
-    xy = cm._rescale(scores @ cm.rotation)[XY].to_numpy()
+    xy = cm.rescale(scores @ cm.rotation)[XY].to_numpy()
     for _, row in grid.iterrows():
         rotation = matrix_from_row(row)
         stds = row[["score_sd_pc1", "score_sd_pc2"]].to_numpy(dtype=float)
@@ -67,7 +68,7 @@ def test_latest_year_preserves_weights_and_changes_only_country_benchmark():
         {
             "country_code": [1, 1, 1, 2, 2],
             "year": [2005, 2020, 2020, 2005, 2019],
-            "weight": [6.0, 1.0, 3.0, np.nan, 1.0],
+            "weight": [6.0, 1.0, 3.0, 1.0, 1.0],
             "PC1_rescaled": [0.0, 3.0, 7.0, 4.0, 4.0],
             "PC2_rescaled": [0.0, 0.0, 0.0, 0.0, 0.0],
         }
@@ -85,6 +86,20 @@ def test_latest_year_preserves_weights_and_changes_only_country_benchmark():
     assert nearest.label_changed.iloc[0]
     assert len(yearly) == 4
     pd.testing.assert_frame_equal(snapshot, points)
+
+
+@pytest.mark.parametrize("bad", [np.nan, -1.0, np.inf])
+def test_weighted_coordinates_never_fill_invalid_weights(bad):
+    frame = pd.DataFrame(
+        {
+            "country_code": [1, 1],
+            "weight": [1.0, bad],
+            "PC1_rescaled": [0.0, 1.0],
+            "PC2_rescaled": 0.0,
+        }
+    )
+    with pytest.raises(ValueError, match="S017 weights must be present"):
+        weighted_coordinates(frame, ["country_code"])
 
 
 def test_rotation_outcomes_count_strict_boundaries_and_reject_unmatched_cells(fitted_map):
@@ -110,14 +125,45 @@ def test_country_item_coverage_reconciles_remaining_missingness_and_mapping(
 ):
     cm = copy(fitted_map)
     cm.country_codes = cm.country_codes.iloc[1:].copy()
-    (tmp_path / "data").mkdir()
     monkeypatch.chdir(tmp_path)
     observed = cm.subset_ivs_df
     standardized = (observed[IV_QNS].to_numpy() - cm.ppca.means) / cm.ppca.stds
     positions = observed[["country_code", "year", "weight"]].reset_index(drop=True)
-    positions[XY] = cm._rescale(cm.ppca.transform() @ cm.rotation)[XY]
-    summary = imputation_diagnostics(cm, standardized, cm.ppca.data, positions)
-    coverage = pd.read_csv("data/validation_country_item_coverage.csv")
+    positions[XY] = cm.rescale(cm.ppca.transform() @ cm.rotation)[XY]
+    ranges, coverage, masking, summary = imputation_diagnostics(
+        cm, standardized, cm.ppca.data, positions
+    )
+    assert list(tmp_path.iterdir()) == []  # computation only; main() owns every file
+    assert list(ranges.columns) == [
+        "question",
+        "n_imputed",
+        "imputed_min",
+        "imputed_max",
+        "n_below_range",
+        "n_above_range",
+    ]
+    assert ranges.n_imputed.tolist() == observed[IV_QNS].isna().sum().tolist()
+    assert list(masking.columns) == [
+        "country_code",
+        "weight_sum",
+        "observed_y003_mean",
+        "predicted_y003_mean",
+        "n_respondents",
+        "prediction_error",
+        "single_item_coordinate_shift",
+        "scope",
+    ]
+    assert len(masking) == observed.country_code.nunique()
+    np.testing.assert_allclose(
+        masking.prediction_error, masking.predicted_y003_mean - masking.observed_y003_mean
+    )
+    first = observed.country_code.eq(masking.country_code.iloc[0]) & observed.Y003.notna()
+    np.testing.assert_allclose(
+        masking.observed_y003_mean.iloc[0],
+        np.average(observed.loc[first, "Y003"], weights=observed.loc[first, "weight"]),
+    )
+    assert summary["y003_masked_observed_rows"] == int(observed.Y003.notna().sum())
+    assert summary["masking_scope"].startswith("in-sample")
     assert len(coverage) == observed.country_code.nunique() * len(IV_QNS)
     assert coverage.n_missing.sum() == observed[IV_QNS].isna().sum().sum()
     assert summary["remaining_imputed_entries"] == coverage.n_missing.sum()

@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.culture_map import CulturalMap
+from app.culture_map import CulturalMap, check_preparation
 
 SEEDS = list(range(20))
 STATS_PATH = "data/seed_sensitivity.csv"
@@ -93,6 +93,7 @@ def main(from_stored: bool = False) -> int:
     for seed in SEEDS:
         cm = CulturalMap(ivs, countries)
         cm.prepare_data()
+        check_preparation(cm.survey_preparation_report)
         cm.fit(seed=seed)
         cm.calculate_mean_scores()
         df = cm.country_scores_pca[["country_code", "PC1_rescaled", "PC2_rescaled"]].copy()

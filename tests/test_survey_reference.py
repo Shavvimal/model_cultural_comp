@@ -14,6 +14,9 @@ def test_reference_diagnostics_distinguish_fit_from_mapped_entities(fitted_map):
     first_code = cm.valid_data.country_code.iloc[0]
     missing = cm.valid_data.country_code.eq(first_code)
     cm.valid_data.loc[missing, "Numeric"] = np.nan
+    # Non-unit S017 so that a weighted/unweighted label swap cannot pass.
+    weights = np.random.default_rng(11).uniform(0.1, 4.0, len(cm.valid_data))
+    cm.valid_data["weight"] = weights
     summary, refs, items, unmapped = survey_reference_tables(cm)
     assert summary["fit_n_respondents"] == len(cm.valid_data)
     assert summary["mapped_n_respondents"] == int((~missing).sum())
@@ -21,16 +24,26 @@ def test_reference_diagnostics_distinguish_fit_from_mapped_entities(fitted_map):
     assert summary["mapped_n_country_codes"] == 7
     assert unmapped.n_respondents.tolist() == [int(missing.sum())]
     refs = refs.set_index("reference")
+    # Independent identity: the frozen standardisation means project to the reference.
+    projected_means = cm.project(pd.DataFrame([cm.ppca.means], columns=cm.iv_qns))[XY]
     np.testing.assert_allclose(
-        refs.loc["survey_reference", XY].to_numpy(dtype=float), SURVEY_REFERENCE
+        refs.loc["survey_reference", XY].to_numpy(dtype=float),
+        projected_means.to_numpy()[0],
+        atol=1e-12,
     )
-    np.testing.assert_allclose(
-        refs.loc["completed_mapped_unweighted", XY].to_numpy(dtype=float),
-        cm.valid_data.loc[~missing, XY].mean().to_numpy(),
-    )
-    np.testing.assert_allclose(
-        refs.loc["completed_all_weighted", XY].to_numpy(dtype=float),
-        np.average(cm.valid_data[XY], axis=0, weights=cm.valid_data.weight.fillna(1)),
+    xy = cm.valid_data[XY].to_numpy()
+    mapped = (~missing).to_numpy()
+    expected = {
+        "completed_all_unweighted": xy.mean(axis=0),
+        "completed_mapped_unweighted": xy[mapped].mean(axis=0),
+        "completed_all_weighted": np.average(xy, axis=0, weights=weights),
+        "completed_mapped_weighted": np.average(xy[mapped], axis=0, weights=weights[mapped]),
+    }
+    for name, point in expected.items():
+        np.testing.assert_allclose(refs.loc[name, XY].to_numpy(dtype=float), point)
+    assert (
+        np.abs(expected["completed_all_weighted"] - expected["completed_all_unweighted"]).min()
+        > 1e-4
     )
     assert not refs.loc["scale_midpoint", "is_comparison_reference"]
     assert "not a joint mode" in refs.loc["mode_unweighted", "definition"]
@@ -38,6 +51,23 @@ def test_reference_diagnostics_distinguish_fit_from_mapped_entities(fitted_map):
     assert items.set_index("question").loc["A165", "scale_midpoint"] == 1.5
     np.testing.assert_array_equal(items["fit_standardisation_mean"], cm.ppca.means)
     np.testing.assert_array_equal(items["fit_standardisation_sd"], cm.ppca.stds)
+
+
+@pytest.mark.parametrize("bad", [np.nan, -0.5, np.inf])
+def test_reference_tables_reject_invalid_weights(fitted_map, bad):
+    cm = copy(fitted_map)
+    cm.valid_data = fitted_map.valid_data.copy()
+    cm.valid_data.loc[cm.valid_data.index[0], "weight"] = bad
+    with pytest.raises(ValueError, match="S017 weights must be present"):
+        survey_reference_tables(cm)
+
+
+def test_reference_tables_reject_zero_weight_sum_for_an_item(fitted_map):
+    cm = copy(fitted_map)
+    cm.subset_ivs_df = fitted_map.subset_ivs_df.copy()
+    cm.subset_ivs_df["weight"] = 0.0
+    with pytest.raises(ValueError, match="A008 weighted mode: S017 weights sum to zero"):
+        survey_reference_tables(cm)
 
 
 def test_empirical_modes_have_explicit_weighting_and_tie_rule(fitted_map):
@@ -80,3 +110,24 @@ def test_sensitivity_changes_reference_without_moving_points():
     assert result.loc["alternative", "replicates_outside_quadrant"] == 1
     assert result.loc["alternative", "point_distance"] == pytest.approx(np.sqrt(1.01))
     pd.testing.assert_frame_equal(points, before)
+
+
+@pytest.mark.parametrize("frame", ["points", "replicates"])
+def test_sensitivity_rejects_non_finite_coordinates(frame):
+    points = pd.DataFrame(
+        {"llm": ["m", "n"], "PC1_rescaled": [1.0, 0.5], "PC2_rescaled": [1.0, 0.5]}
+    )
+    replicates = points.copy()
+    bad = points if frame == "points" else replicates
+    bad.loc[1, "PC1_rescaled"] = np.nan
+    countries = pd.DataFrame({"PC1_rescaled": [0.0, 2.0], "PC2_rescaled": [0.0, 2.0]})
+    refs = pd.DataFrame(
+        {
+            "reference": ["survey_reference"],
+            "PC1_rescaled": [SURVEY_REFERENCE[0]],
+            "PC2_rescaled": [SURVEY_REFERENCE[1]],
+            "is_comparison_reference": [True],
+        }
+    )
+    with pytest.raises(ValueError, match=r"must be finite; non-finite for \['n'\]"):
+        reference_sensitivity(points, countries, refs, replicates)

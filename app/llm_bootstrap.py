@@ -23,12 +23,14 @@ instead of retaining their separate observed positions).
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
 from app.culture_map import SURVEY_REFERENCE, CulturalMap
+from app.study_design import TRIAL_KEY
 
 WESTERN_REGIONS = frozenset({"Protestant Europe", "English-Speaking", "Catholic Europe"})
 
@@ -93,29 +95,42 @@ def load_transformed_responses(cm: CulturalMap, collection_dir: str) -> pd.DataF
     return df[["llm", "language", "question", "value", "system_prompt_id"]]
 
 
-def load_responses_2026(cm: CulturalMap, jsonl_dir: str) -> pd.DataFrame:
-    """Load the 2026 JSONL corpus directly (no pickle round-trip).
+def load_trial_records(directory: str | Path) -> pd.DataFrame:
+    """Every terminal 2026 record in ``directory``, one row per scheduled trial.
 
-    Deduplicates resumed runs on (llm, language, question, system_prompt_id,
-    repeat), keeping the last attempt, and keeps parsed rows only.
+    Reads ``*.jsonl`` files in sorted name order, one JSON object per line (a
+    blank line is invalid JSON and raises). Records without ``language`` are
+    English. ``system_prompt_id`` and ``repeat`` are cast with ``astype(int)``
+    because resumed runs serialised them as strings where the original run
+    wrote integers; without that a retried trial would survive alongside its
+    original. Duplicated trials are then dropped on ``TRIAL_KEY``, keeping the
+    last line in file order, which is append order. The index is not reset.
+    Raises ``FileNotFoundError`` when the directory holds no ``*.jsonl`` file.
+
+    ``app.control_audit`` keeps its own loader; its docstring lists the inputs
+    on which the two differ.
     """
-    paths = sorted(Path(jsonl_dir).glob("*.jsonl"))
+    paths = sorted(Path(directory).glob("*.jsonl"))
     if not paths:
-        raise FileNotFoundError(f"no JSONL files in {jsonl_dir}")
-
-    records = []
+        raise FileNotFoundError(f"no JSONL files in {directory}")
+    records: list[dict[str, Any]] = []
     for path in paths:
         with path.open() as f:
             records.extend(json.loads(line) for line in f)
     df = pd.DataFrame(records)
     df["language"] = df.get("language", pd.Series(["en"] * len(df))).fillna("en")
-    # Resumed runs serialise these as str where the original run wrote int;
-    # normalise before dedup or a retried row survives alongside its original.
     df["system_prompt_id"] = df["system_prompt_id"].astype(int)
     df["repeat"] = df["repeat"].astype(int)
-    df = df.drop_duplicates(
-        subset=["llm", "language", "question", "system_prompt_id", "repeat"], keep="last"
-    )
+    return df.drop_duplicates(subset=list(TRIAL_KEY), keep="last")
+
+
+def load_responses_2026(cm: CulturalMap, jsonl_dir: str) -> pd.DataFrame:
+    """Load the 2026 JSONL corpus directly (no pickle round-trip).
+
+    Deduplicates resumed runs as ``load_trial_records`` does, keeping the last
+    attempt, and keeps parsed rows only.
+    """
+    df = load_trial_records(jsonl_dir)
 
     ok = df[df["error"].isna()].copy()
     dropped = len(df) - len(ok)
@@ -218,7 +233,8 @@ def bootstrap_llm_positions_cluster(
     pools all their rows, and projects the per-item means. Requires
     ``system_prompt_id``; raises where it was not recorded (the 2024 corpus).
     With only ~10 clusters the interval is approximate (Cameron, Gelbach &
-    Miller 2008) — report it as such.
+    Miller 2008) — report it as such. A cell with fewer than two variants
+    raises: every replicate would be identical and claim zero uncertainty.
     """
     if responses["system_prompt_id"].isna().any():
         raise ValueError(
@@ -229,6 +245,11 @@ def bootstrap_llm_positions_cluster(
     out = []
     for llm, group in responses.groupby("llm"):
         variants = np.sort(group["system_prompt_id"].unique())
+        if len(variants) < 2:
+            raise ValueError(
+                f"{llm}: the cluster bootstrap needs at least two prompt variants; "
+                f"got {len(variants)} ({variants.tolist()})"
+            )
         # per-variant, per-item sums and counts, so replicates can pool
         # weighted by how many responses each drawn variant contributed. A
         # (variant, item) group with no parsed row is an empty group, so it
@@ -293,6 +314,8 @@ def confidence_ellipses(
     not coverage calibration. Supply ``project_cell_means`` output to centre
     on the observed plug-in estimate; otherwise the historical bootstrap
     mean is used. Covariance and quantiles always use the replicate cloud.
+    Eigenvalues are clipped at zero before the square root, so a collinear
+    cloud yields a zero-height ellipse instead of NaN from rounding.
     """
     k = chi2.ppf(level, df=2)
     points = _point_lookup(point_estimates)
@@ -303,7 +326,7 @@ def confidence_ellipses(
         mean = replicate_mean if points is None else points.loc[llm].to_numpy()
         cov = np.cov(xy.T)
         vals, vecs = np.linalg.eigh(cov)  # ascending
-        width, height = 2 * np.sqrt(k * vals[::-1])
+        width, height = 2 * np.sqrt(k * np.maximum(vals[::-1], 0.0))
         angle = np.degrees(np.arctan2(*vecs[:, 1][::-1]))
         centered = xy - replicate_mean
         mahal = np.einsum("ij,jk,ik->i", centered, np.linalg.pinv(cov), centered)
@@ -385,7 +408,8 @@ def central_tendency_diagnostics(cm: CulturalMap, responses: pd.DataFrame) -> pd
 
     Scale-midpoint answering and empirical modal answering are different
     diagnostics; this function measures the former and response entropy.
-    These diagnostics alone do not establish an answering strategy.
+    These diagnostics alone do not establish an answering strategy. A cell
+    with no response to any required item raises.
     """
     from app.culture_map import ITEM_VALID_RANGES
 
@@ -393,9 +417,10 @@ def central_tendency_diagnostics(cm: CulturalMap, responses: pd.DataFrame) -> pd
     rows = []
     for llm, group in responses.groupby("llm"):
         item_means = group.groupby("question")["value"].mean()
-        mid_dist = float(
-            np.linalg.norm([item_means.get(q, np.nan) - midpoints[q] for q in cm.iv_qns])
-        )
+        missing = [q for q in cm.iv_qns if q not in item_means.index]
+        if missing:
+            raise ValueError(f"{llm}: no stored responses for {missing}")
+        mid_dist = float(np.linalg.norm([item_means[q] - midpoints[q] for q in cm.iv_qns]))
 
         def entropy(values: pd.Series) -> float:
             p = values.value_counts(normalize=True).to_numpy()

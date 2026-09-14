@@ -8,19 +8,16 @@ successful trace sample, not a causal effect of removing prompt framing.
 import numpy as np
 import pandas as pd
 
+from app.study_design import PERSONA_PREFIX_FAMILY_OF, TRIAL_KEY
 from app.trace_codebook import CODES
 
-KEY = ["llm", "language", "question", "system_prompt_id", "repeat"]
+KEY = list(TRIAL_KEY)
 CODE_LABELS = {
     "modal_targeting": "typicality_or_moderation",
     "persona_reasoning": "first_person_persona_reasoning",
     "guideline_citation": "ai_identity_constraint_or_guideline",
 }
-PREFIX_FAMILY = {
-    **dict.fromkeys([0, 1, 3, 4, 6, 7], "averaging"),
-    **dict.fromkeys([2, 5, 8], "bare"),
-    9: "world_citizen",
-}
+PREFIX_FAMILY = dict(PERSONA_PREFIX_FAMILY_OF)
 
 
 def validate_trace_labels(labels: pd.DataFrame) -> pd.DataFrame:
