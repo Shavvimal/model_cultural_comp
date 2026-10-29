@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Cite the published paper in the ACL Anthology
+  ([2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)) in
+  `CITATION.cff`, the README and the `pyproject.toml` paper URL, replacing the
+  OpenReview link. Add a README citation section with the Anthology BibTeX. The
+  Anthology has not assigned a DOI yet.
+
 ## [1.1.0] - 2026-09-14
 
 The corrected instrument and analyses support the revised paper. The
@@ -234,5 +244,6 @@ supplies the corrected results for the revised paper.
   `app/cloud_survey.py`, the single-path `CulturalMap.project` and
   `app/region_svm.py`. They remain in git history.
 
+[Unreleased]: https://github.com/Shavvimal/model_cultural_comp/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/Shavvimal/model_cultural_comp/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Shavvimal/model_cultural_comp/releases/tag/v1.0.0
