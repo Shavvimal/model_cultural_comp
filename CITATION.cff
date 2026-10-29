@@ -32,18 +32,41 @@ keywords:
   - evaluation
 preferred-citation:
   type: conference-paper
-  title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
+  title: "Cultural Alignment of Open-Weight LLMs on the Inglehart–Welzel Map"
   authors:
     - family-names: Vimalendiran
       given-names: Shav
       orcid: "https://orcid.org/0000-0003-3236-248X"
-  year: 2026
+  editors:
+    - family-names: Ranaldi
+      given-names: Leonardo
+    - family-names: Pucci
+      given-names: Giulia
+    - family-names: Ranaldi
+      given-names: Federico
+    - family-names: Valentino
+      given-names: Marco
+    - family-names: Birch
+      given-names: Alexandra
+    - family-names: Zanzotto
+      given-names: Fabio Massimo
+  collection-title: "The Proceedings of the Workshop on Open Reasoning Across Cultures Languages (ORACLE)"
+  collection-type: proceedings
   conference:
     name: "Workshop on Open Reasoning Across Cultures and Languages (ORACLE) at EMNLP 2026"
+    city: Budapest
+    country: HU
   publisher:
     name: "Association for Computational Linguistics"
-  url: "https://openreview.net/forum?id=xJHa9ts0mt"
-  notes: "The paper this repository implements; accepted 4 September 2026. ACL Anthology DOI to be added on publication."
+  location:
+    name: "Budapest, Hungary"
+  year: 2026
+  month: 10
+  start: 205
+  end: 233
+  isbn: "979-8-89176-483-5"
+  url: "https://aclanthology.org/2026.oracle-main.14/"
+  notes: "The paper this repository implements. ACL Anthology ID 2026.oracle-main.14; no DOI assigned yet."
 references:
   - type: blog
     title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"

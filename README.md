@@ -2,14 +2,22 @@
 
 [![ci](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml/badge.svg)](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Paper: ACL Anthology](https://img.shields.io/badge/paper-ACL%20Anthology-ed1c24.svg)](https://aclanthology.org/2026.oracle-main.14/)
 
-Research code for [Cultural Alignment of Open-Weight LLMs on the
-Inglehart–Welzel Map](https://openreview.net/forum?id=xJHa9ts0mt) (ORACLE
-workshop at EMNLP 2026), with an expanded
-[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map).
-It fits a custom two-dimensional instrument to the Integrated Values Surveys
-and projects model responses and surveyed countries through the same frozen
-transformation. Coordinates describe reported responses under the specified
+Research code for the published paper:
+
+> **Cultural Alignment of Open-Weight LLMs on the Inglehart–Welzel Map**\
+> Shav Vimalendiran. ORACLE workshop at EMNLP 2026, pages 205–233.\
+> Association for Computational Linguistics.\
+> https://aclanthology.org/2026.oracle-main.14/
+
+An expanded
+[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map)
+covers the same study for a general audience.
+
+The code fits a custom two-dimensional instrument to the Integrated Values
+Surveys and projects model responses and surveyed countries through the same
+frozen transformation. Coordinates describe reported responses under the specified
 protocol, not held values or complete cultural profiles.
 
 The corrected instrument uses 392,382 respondents in 112 country/entity codes;
@@ -192,5 +200,33 @@ The figure scripts read outputs of the 2024 bootstrap, the 2026 analyses and
 See [CONTRIBUTING.md](CONTRIBUTING.md) for changes that could affect results.
 Code is MIT licensed, with the PPCA attribution and third-party survey-text
 notices retained in [NOTICE](NOTICE) and [LICENSES/](LICENSES/).
+## Citation
+
+The paper is published in the ACL Anthology as
+[2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)
+([PDF](https://aclanthology.org/2026.oracle-main.14.pdf)). No DOI is assigned
+yet. If you use this code or its results, please cite the paper:
+
+```bibtex
+@inproceedings{vimalendiran-2026-cultural,
+    title = "Cultural Alignment of Open-Weight {LLM}s on the Inglehart{--}Welzel Map",
+    author = "Vimalendiran, Shav",
+    editor = "Ranaldi, Leonardo  and
+      Pucci, Giulia  and
+      Ranaldi, Federico  and
+      Valentino, Marco  and
+      Birch, Alexandra  and
+      Zanzotto, Fabio Massimo",
+    booktitle = "The Proceedings of the Workshop on Open Reasoning Across Cultures Languages ({ORACLE})",
+    month = oct,
+    year = "2026",
+    address = "Budapest, Hungary",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.oracle-main.14/",
+    pages = "205--233",
+    ISBN = "979-8-89176-483-5"
+}
+```
+
 [CITATION.cff](CITATION.cff) gives the paper as the preferred citation and
 also describes this software release.

@@ -22,7 +22,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/Shavvimal/model_cultural_comp"
 Repository = "https://github.com/Shavvimal/model_cultural_comp"
-Paper = "https://openreview.net/forum?id=xJHa9ts0mt"
+Paper = "https://aclanthology.org/2026.oracle-main.14/"
 Write-up = "https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map"
 Changelog = "https://github.com/Shavvimal/model_cultural_comp/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Shavvimal/model_cultural_comp/issues"
