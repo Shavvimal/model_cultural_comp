@@ -4,13 +4,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Paper: ACL Anthology](https://img.shields.io/badge/paper-ACL%20Anthology-ed1c24.svg)](https://aclanthology.org/2026.oracle-main.14/)
 
-Research code for [Cultural Alignment of Open-Weight LLMs on the
-Inglehart–Welzel Map](https://aclanthology.org/2026.oracle-main.14/) (ORACLE
-workshop at EMNLP 2026, ACL Anthology), with an expanded
-[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map).
-It fits a custom two-dimensional instrument to the Integrated Values Surveys
-and projects model responses and surveyed countries through the same frozen
-transformation. Coordinates describe reported responses under the specified
+Research code for the published paper:
+
+> **Cultural Alignment of Open-Weight LLMs on the Inglehart–Welzel Map**\
+> Shav Vimalendiran. ORACLE workshop at EMNLP 2026, pages 205–233.\
+> Association for Computational Linguistics.\
+> https://aclanthology.org/2026.oracle-main.14/
+
+An expanded
+[write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map)
+covers the same study for a general audience.
+
+The code fits a custom two-dimensional instrument to the Integrated Values
+Surveys and projects model responses and surveyed countries through the same
+frozen transformation. Coordinates describe reported responses under the specified
 protocol, not held values or complete cultural profiles.
 
 The corrected instrument uses 392,382 respondents in 112 country/entity codes;
