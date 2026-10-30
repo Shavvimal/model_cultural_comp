@@ -9,8 +9,9 @@ All notable changes to this project are documented here.
 - Cite the published paper in the ACL Anthology
   ([2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)) in
   `CITATION.cff`, the README and the `pyproject.toml` paper URL, replacing the
-  OpenReview link. Add a README citation section with the Anthology BibTeX. The
-  Anthology has not assigned a DOI yet.
+  OpenReview link. Add a README citation section with the Anthology BibTeX.
+- Record the paper's DOI [10.18653/2026.oracle-main.14](https://doi.org/10.18653/2026.oracle-main.14) in
+  `CITATION.cff` and the README.
 
 ## [1.1.0] - 2026-09-14
 

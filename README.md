@@ -3,13 +3,14 @@
 [![ci](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml/badge.svg)](https://github.com/Shavvimal/model_cultural_comp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Paper: ACL Anthology](https://img.shields.io/badge/paper-ACL%20Anthology-ed1c24.svg)](https://aclanthology.org/2026.oracle-main.14/)
+[![DOI](https://img.shields.io/badge/DOI-10.18653%2F2026.oracle-main.14-blue.svg)](https://doi.org/10.18653/2026.oracle-main.14)
 
 Research code for the published paper:
 
 > **Cultural Alignment of Open-Weight LLMs on the Inglehart–Welzel Map**\
 > Shav Vimalendiran. ORACLE workshop at EMNLP 2026, pages 205–233.\
 > Association for Computational Linguistics.\
-> https://aclanthology.org/2026.oracle-main.14/
+> https://aclanthology.org/2026.oracle-main.14/ · https://doi.org/10.18653/2026.oracle-main.14
 
 An expanded
 [write-up](https://shav.dev/blog/cultural-alignment-of-open-weight-llms-on-the-inglehart-welzel-map)
@@ -204,8 +205,9 @@ notices retained in [NOTICE](NOTICE) and [LICENSES/](LICENSES/).
 
 The paper is published in the ACL Anthology as
 [2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)
-([PDF](https://aclanthology.org/2026.oracle-main.14.pdf)). No DOI is assigned
-yet. If you use this code or its results, please cite the paper:
+([PDF](https://aclanthology.org/2026.oracle-main.14.pdf)), DOI
+[10.18653/2026.oracle-main.14](https://doi.org/10.18653/2026.oracle-main.14). If you use this code or its
+results, please cite the paper:
 
 ```bibtex
 @inproceedings{vimalendiran-2026-cultural,
@@ -223,6 +225,7 @@ yet. If you use this code or its results, please cite the paper:
     address = "Budapest, Hungary",
     publisher = "Association for Computational Linguistics",
     url = "https://aclanthology.org/2026.oracle-main.14/",
+    doi = "10.18653/2026.oracle-main.14",
     pages = "205--233",
     ISBN = "979-8-89176-483-5"
 }
