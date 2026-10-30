@@ -66,7 +66,8 @@ preferred-citation:
   end: 233
   isbn: "979-8-89176-483-5"
   url: "https://aclanthology.org/2026.oracle-main.14/"
-  notes: "The paper this repository implements. ACL Anthology ID 2026.oracle-main.14; no DOI assigned yet."
+  doi: "10.18653/2026.oracle-main.14"
+  notes: "The paper this repository implements. ACL Anthology ID 2026.oracle-main.14, DOI 10.18653/2026.oracle-main.14."
 references:
   - type: blog
     title: "Cultural Alignment of Open-Weight LLMs on the Inglehart-Welzel Map"
