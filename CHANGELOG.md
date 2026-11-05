@@ -4,7 +4,15 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Escape the hyphen in the DOI badge path (`oracle--main.14`). Shields read the
+  bare hyphen as a field separator and rendered `404 badge not found`.
+
 ### Changed
+
+- Title the README with the paper's title. The repository name stays in the
+  first sentence.
 
 - Cite the published paper in the ACL Anthology
   ([2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)) in
