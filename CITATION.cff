@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "model_cultural_comp: mapping LLM cultural alignment onto the Inglehart-Welzel map"
+title: "Cultural Alignment of Open-Weight LLMs on the Inglehart–Welzel Map: research code"
 abstract: >-
   Fits a custom two-dimensional instrument inspired by the Inglehart-Welzel
   map using Gaussian probabilistic PCA over ten Integrated Values Surveys items,
