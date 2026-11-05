@@ -11,8 +11,8 @@ All notable changes to this project are documented here.
 
 ### Changed
 
-- Title the README with the paper's title. The repository name stays in the
-  first sentence.
+- Title the README and the `CITATION.cff` software record with the paper's
+  title. The repository name stays in the README's first sentence.
 
 - Cite the published paper in the ACL Anthology
   ([2026.oracle-main.14](https://aclanthology.org/2026.oracle-main.14/)) in
